@@ -51,8 +51,8 @@ When acting on this repository:
 
 ## Frontend Rules
 
-- Mobile-first layout.
 - Dark mode by default.
+- Web-first layout, responsive for mobile.
 
 ## TypeScript Rules
 
