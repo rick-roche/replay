@@ -2,6 +2,8 @@
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+builder.AddAzureContainerAppEnvironment("env");
+
 var endpoint = builder.AddParameter("registry-endpoint");
 var repository = builder.AddParameter("registry-repository");
 
@@ -12,6 +14,7 @@ var server = builder.AddProject<Projects.RePlay_Server>("server")
     .WithExternalHttpEndpoints();
 
 var webfrontend = builder.AddViteApp("webfrontend", "../frontend")
+    .WithExternalHttpEndpoints()
     .WithReference(server)
     .WaitFor(server);
 
