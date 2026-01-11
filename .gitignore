@@ -379,12 +379,12 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # VS Code files for those working on multiple tools
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
+# .vscode/*
+# !.vscode/settings.json
+# !.vscode/tasks.json
+# !.vscode/launch.json
+# !.vscode/extensions.json
+# *.code-workspace
 
 # Local History for Visual Studio Code
 .history/
@@ -446,7 +446,10 @@ bower_components
 psd
 thumb
 sketch
-_tmp
-obj/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,csharp,react
+
+_tmp
+obj/
+obj\\Debug/
+aspire-output/

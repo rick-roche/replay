@@ -33,6 +33,8 @@ When acting on this repository:
 - `src/`: All application source code.
     - `frontend/`: All the frontend code.
     - `RePlay.AppHost`: Aspire orchestrator.
+    - `RePlay.Api`: The exposed Re:Play API
+    - `RePlay.Application`: The core application of Re:Play
 - `docs/`: All docs other than the README.md.
 - `infra/`: All infrastructure needed to deploy the application.
 
@@ -51,8 +53,8 @@ When acting on this repository:
 
 ## Frontend Rules
 
-- Mobile-first layout.
 - Dark mode by default.
+- Web-first layout, responsive for mobile.
 
 ## TypeScript Rules
 
