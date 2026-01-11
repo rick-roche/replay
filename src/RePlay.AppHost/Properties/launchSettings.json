@@ -13,7 +13,6 @@
         "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "https://localhost:23010",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22143"
       },
-      "commandLineArgs": "--operation publish --step push-images"
     },
     "http": {
       "commandName": "Project",
@@ -26,8 +25,6 @@
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19284",
         "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "http://localhost:18131",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20021"
-      },
-      "commandLineArgs": "--operation publish --step push-images"
-    }
+      }    }
   }
 }
