@@ -1,183 +1,170 @@
-import { useState, useEffect } from 'react'
-import aspireLogo from '/Aspire.png'
-import './App.css'
-
-interface WeatherForecast {
-  date: string
-  temperatureC: number
-  temperatureF: number
-  summary: string
-}
+import { Music2, Disc3, ListMusic, Radio } from 'lucide-react'
+import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section } from '@radix-ui/themes'
 
 function App() {
-  const [weatherData, setWeatherData] = useState<WeatherForecast[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [useCelsius, setUseCelsius] = useState(false)
-
-  const fetchWeatherForecast = async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const response = await fetch('/api/weatherforecast')
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const data: WeatherForecast[] = await response.json()
-      setWeatherData(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch weather data')
-      console.error('Error fetching weather forecast:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchWeatherForecast()
-  }, [])
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }
-
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <a 
-          href="https://aspire.dev" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          aria-label="Visit Aspire website (opens in new tab)"
-          className="logo-link"
-        >
-          <img src={aspireLogo} className="logo" alt="Aspire logo" />
-        </a>
-        <h1 className="app-title">Aspire Starter</h1>
-        <p className="app-subtitle">Modern distributed application development</p>
-      </header>
+    <Box className="min-h-screen">
+      {/* Navigation */}
+      <Box className="border-b border-zinc-800">
+        <Container size="4">
+          <Flex justify="between" align="center" py="4">
+            <Flex align="center" gap="2">
+              <Music2 className="h-8 w-8 text-green-500" />
+              <Heading size="6" className="bg-linear-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
+                Re:Play
+              </Heading>
+            </Flex>
+            <Flex align="center" gap="4">
+              <Button variant="ghost" size="2">
+                About
+              </Button>
+              <Button size="2">
+                Connect Spotify
+              </Button>
+            </Flex>
+          </Flex>
+        </Container>
+      </Box>
 
-      <main className="main-content">
-        <section className="weather-section" aria-labelledby="weather-heading">
-          <div className="card">
-            <div className="section-header">
-              <h2 id="weather-heading" className="section-title">Weather Forecast</h2>
-              <div className="header-actions">
-                <fieldset className="toggle-switch" aria-label="Temperature unit selection">
-                  <legend className="visually-hidden">Temperature unit</legend>
-                  <button 
-                    className={`toggle-option ${!useCelsius ? 'active' : ''}`}
-                    onClick={() => setUseCelsius(false)}
-                    aria-pressed={!useCelsius}
-                    type="button"
-                  >
-                    <span aria-hidden="true">°F</span>
-                    <span className="visually-hidden">Fahrenheit</span>
-                  </button>
-                  <button 
-                    className={`toggle-option ${useCelsius ? 'active' : ''}`}
-                    onClick={() => setUseCelsius(true)}
-                    aria-pressed={useCelsius}
-                    type="button"
-                  >
-                    <span aria-hidden="true">°C</span>
-                    <span className="visually-hidden">Celsius</span>
-                  </button>
-                </fieldset>
-                <button 
-                  className="refresh-button"
-                  onClick={fetchWeatherForecast} 
-                  disabled={loading}
-                  aria-label={loading ? 'Loading weather forecast' : 'Refresh weather forecast'}
-                  type="button"
-                >
-                  <svg 
-                    className={`refresh-icon ${loading ? 'spinning' : ''}`}
-                    width="20" 
-                    height="20" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2"
-                    aria-hidden="true"
-                    focusable="false"
-                  >
-                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                  </svg>
-                  <span>{loading ? 'Loading...' : 'Refresh'}</span>
-                </button>
-              </div>
-            </div>
-            
-            {error && (
-              <div className="error-message" role="alert" aria-live="polite">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-            
-            {loading && weatherData.length === 0 && (
-              <div className="loading-skeleton" role="status" aria-live="polite" aria-label="Loading weather data">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="skeleton-row" aria-hidden="true" />
-                ))}
-                <span className="visually-hidden">Loading weather forecast data...</span>
-              </div>
-            )}
-            
-            {weatherData.length > 0 && (
-              <div className="weather-grid">
-                {weatherData.map((forecast, index) => (
-                  <article key={index} className="weather-card" aria-label={`Weather for ${formatDate(forecast.date)}`}>
-                    <h3 className="weather-date">
-                      <time dateTime={forecast.date}>{formatDate(forecast.date)}</time>
-                    </h3>
-                    <p className="weather-summary">{forecast.summary}</p>
-                    <div className="weather-temps" aria-label={`Temperature: ${useCelsius ? forecast.temperatureC : forecast.temperatureF} degrees ${useCelsius ? 'Celsius' : 'Fahrenheit'}`}>
-                      <div className="temp-group">
-                        <span className="temp-value" aria-hidden="true">
-                          {useCelsius ? forecast.temperatureC : forecast.temperatureF}°
-                        </span>
-                        <span className="temp-unit" aria-hidden="true">{useCelsius ? 'Celsius' : 'Fahrenheit'}</span>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      </main>
+      {/* Hero Section */}
+      <Container size="4">
+        <Section size="3">
+          <Flex direction="column" align="center" gap="6" className="text-center max-w-4xl mx-auto">
+            <Flex direction="column" gap="4">
+              <Heading size="9" weight="bold">
+                Replay Your Music History
+              </Heading>
+              <Text size="5" color="gray" className="max-w-2xl">
+                Transform your listening data, collection, and concert memories into curated Spotify playlists
+              </Text>
+            </Flex>
 
-      <footer className="app-footer">
-        <nav aria-label="Footer navigation">
-          <a href="https://aspire.dev" target="_blank" rel="noopener noreferrer">
-            Learn more about Aspire<span className="visually-hidden"> (opens in new tab)</span>
-          </a>
-          <a 
-            href="https://github.com/dotnet/aspire" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="github-link"
-            aria-label="View Aspire on GitHub (opens in new tab)"
+            <Flex gap="4">
+              <Button size="3">
+                <Music2 className="h-5 w-5" />
+                Get Started
+              </Button>
+              <Button size="3" variant="outline">
+                Learn More
+              </Button>
+            </Flex>
+
+            {/* Features Grid */}
+            <Grid columns={{ initial: '1', md: '3' }} gap="4" width="100%" pt="8">
+              <FeatureCard
+                icon={<Radio className="h-8 w-8" />}
+                title="Last.fm"
+                description="Turn your listening history into playlists based on any time period"
+              />
+              <FeatureCard
+                icon={<Disc3 className="h-8 w-8" />}
+                title="Discogs"
+                description="Convert your physical and digital collection into playable playlists"
+              />
+              <FeatureCard
+                icon={<ListMusic className="h-8 w-8" />}
+                title="Setlist.fm"
+                description="Relive concerts by creating playlists from shows you've attended"
+              />
+            </Grid>
+
+            {/* How It Works */}
+            <Flex direction="column" gap="6" width="100%" pt="8">
+              <Heading size="7" weight="bold">
+                How It Works
+              </Heading>
+              <Grid columns={{ initial: '1', md: '4' }} gap="4" className="text-left">
+                <StepCard
+                  number="1"
+                  title="Connect"
+                  description="Link your Spotify account and choose a data source"
+                />
+                <StepCard
+                  number="2"
+                  title="Select"
+                  description="Apply filters or use presets to find the music you want"
+                />
+                <StepCard
+                  number="3"
+                  title="Curate"
+                  description="Review and refine matched tracks to your liking"
+                />
+                <StepCard
+                  number="4"
+                  title="Create"
+                  description="Generate and save your playlist to Spotify"
+                />
+              </Grid>
+            </Flex>
+          </Flex>
+        </Section>
+      </Container>
+
+      {/* Footer */}
+      <Box className="border-t border-zinc-800 mt-24">
+        <Container size="4">
+          <Flex 
+            direction={{ initial: 'column', md: 'row' }} 
+            justify="between" 
+            align="center" 
+            gap="4" 
+            py="6"
           >
-            <img src="/github.svg" alt="" width="24" height="24" aria-hidden="true" />
-            <span className="visually-hidden">GitHub</span>
-          </a>
-        </nav>
-      </footer>
-    </div>
+            <Flex align="center" gap="2">
+              <Music2 className="h-4 w-4" />
+              <Text size="2" color="gray">
+                Re:Play — Your music, replayed your way
+              </Text>
+            </Flex>
+            <Flex gap="6">
+              <Text size="2" asChild>
+                <a href="#" className="hover:text-white transition-colors">
+                  Privacy
+                </a>
+              </Text>
+              <Text size="2" asChild>
+                <a href="#" className="hover:text-white transition-colors">
+                  Terms
+                </a>
+              </Text>
+              <Text size="2" asChild>
+                <a href="#" className="hover:text-white transition-colors">
+                  GitHub
+                </a>
+              </Text>
+            </Flex>
+          </Flex>
+        </Container>
+      </Box>
+    </Box>
+  )
+}
+
+function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <Card>
+      <Flex direction="column" gap="3">
+        <Box className="text-green-500">{icon}</Box>
+        <Heading size="4" weight="medium">{title}</Heading>
+        <Text size="2" color="gray">{description}</Text>
+      </Flex>
+    </Card>
+  )
+}
+
+function StepCard({ number, title, description }: { number: string; title: string; description: string }) {
+  return (
+    <Flex direction="column" gap="2">
+      <Flex 
+        align="center" 
+        justify="center" 
+        className="h-8 w-8 rounded-full bg-green-500/10 text-green-500 font-bold"
+      >
+        {number}
+      </Flex>
+      <Heading size="3" weight="medium">{title}</Heading>
+      <Text size="2" color="gray">{description}</Text>
+    </Flex>
   )
 }
 
