@@ -1,7 +1,10 @@
-import { Music2, Disc3, ListMusic, Radio } from 'lucide-react'
-import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section } from '@radix-ui/themes'
+import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucide-react'
+import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
+import { useAuth } from './contexts/AuthContext'
 
 function App() {
+  const { user, isLoading, isAuthenticated, login, logout } = useAuth()
+
   return (
     <Box className="min-h-screen">
       {/* Navigation */}
@@ -15,12 +18,42 @@ function App() {
               </Heading>
             </Flex>
             <Flex align="center" gap="4">
-              <Button variant="ghost" size="2">
-                About
-              </Button>
-              <Button size="2">
-                Connect Spotify
-              </Button>
+              {isLoading ? (
+                <Spinner />
+              ) : isAuthenticated && user ? (
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger>
+                    <Button variant="ghost" size="2">
+                      <Flex align="center" gap="2">
+                        <Avatar
+                          size="1"
+                          src={user.imageUrl || undefined}
+                          fallback={user.displayName.charAt(0)}
+                        />
+                        <Text size="2">{user.displayName}</Text>
+                      </Flex>
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content>
+                    <DropdownMenu.Item onClick={() => logout()}>
+                      <Flex align="center" gap="2">
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </Flex>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+              ) : (
+                <>
+                  <Button variant="ghost" size="2">
+                    About
+                  </Button>
+                  <Button size="2" onClick={login}>
+                    <UserIcon className="h-4 w-4" />
+                    Connect Spotify
+                  </Button>
+                </>
+              )}
             </Flex>
           </Flex>
         </Container>
@@ -30,24 +63,37 @@ function App() {
       <Container size="4">
         <Section size="3">
           <Flex direction="column" align="center" gap="6" className="text-center max-w-4xl mx-auto">
-            <Flex direction="column" gap="4">
-              <Heading size="9" weight="bold">
-                Replay Your Music History
-              </Heading>
-              <Text size="5" color="gray" className="max-w-2xl">
-                Transform your listening data, collection, and concert memories into curated Spotify playlists
-              </Text>
-            </Flex>
+            {isAuthenticated && user ? (
+              <Box>
+                <Heading size="8" weight="bold" mb="2">
+                  Welcome back, {user.displayName}!
+                </Heading>
+                <Text size="4" color="gray">
+                  Ready to create some playlists from your music history?
+                </Text>
+              </Box>
+            ) : (
+              <>
+                <Flex direction="column" gap="4">
+                  <Heading size="9" weight="bold">
+                    Replay Your Music History
+                  </Heading>
+                  <Text size="5" color="gray" className="max-w-2xl">
+                    Transform your listening data, collection, and concert memories into curated Spotify playlists
+                  </Text>
+                </Flex>
 
-            <Flex gap="4">
-              <Button size="3">
-                <Music2 className="h-5 w-5" />
-                Get Started
-              </Button>
-              <Button size="3" variant="outline">
-                Learn More
-              </Button>
-            </Flex>
+                <Flex gap="4">
+                  <Button size="3" onClick={login}>
+                    <Music2 className="h-5 w-5" />
+                    Get Started
+                  </Button>
+                  <Button size="3" variant="outline">
+                    Learn More
+                  </Button>
+                </Flex>
+              </>
+            )}
 
             {/* Features Grid */}
             <Grid columns={{ initial: '1', md: '3' }} gap="4" width="100%" pt="8">
