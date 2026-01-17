@@ -25,7 +25,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     if (stored) {
       try {
         setLastfmConfig(JSON.parse(stored))
-      } catch (e) {
+      } catch {
         localStorage.removeItem(LASTFM_CONFIG_KEY)
       }
     }
