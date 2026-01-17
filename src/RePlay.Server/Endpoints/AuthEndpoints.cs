@@ -11,6 +11,7 @@ public static class AuthEndpoints
 {
     private const string StateCookieName = "spotify_auth_state";
     private const string SessionCookieName = "replay_session_id";
+    private const string ReturnUrlCookieName = "replay_return_url";
 
     public static RouteGroupBuilder MapAuthEndpoints(this RouteGroupBuilder group)
     {
@@ -28,23 +29,49 @@ public static class AuthEndpoints
     /// Generates a state token and redirects to Spotify authorization.
     /// </summary>
     private static IResult GetLogin(
+        [FromQuery] string? returnUrl,
         ISpotifyAuthService authService,
         HttpContext httpContext)
     {
+        var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+        var isDev = env.IsDevelopment();
+
         // Generate anti-forgery state token
         var state = Guid.NewGuid().ToString();
+
+        // Default return url (fallback)
+        returnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
 
         // Store state in cookie for validation on callback
         httpContext.Response.Cookies.Append(StateCookieName, state, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = !isDev,
             SameSite = SameSiteMode.Lax,
             MaxAge = TimeSpan.FromMinutes(10)
         });
 
-        var authUrl = authService.GetAuthorizationUrl(state);
-        return Results.Redirect(authUrl);
+        // Store return url (short-lived)
+        httpContext.Response.Cookies.Append(ReturnUrlCookieName, returnUrl, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !isDev,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromMinutes(10)
+        });
+
+        try
+        {
+            var authUrl = authService.GetAuthorizationUrl(state);
+            return Results.Redirect(authUrl);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                detail: ex.Message,
+                statusCode: 500,
+                title: "Configuration Error");
+        }
     }
 
     /// <summary>
@@ -90,6 +117,9 @@ public static class AuthEndpoints
 
         try
         {
+            var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            var isDev = env.IsDevelopment();
+
             // Exchange authorization code for tokens
             var session = await authService.ExchangeCodeAsync(code, cancellationToken);
 
@@ -100,16 +130,20 @@ public static class AuthEndpoints
             httpContext.Response.Cookies.Append(SessionCookieName, session.SessionId, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
+                Secure = !isDev,
+                SameSite = SameSiteMode.Lax,
                 MaxAge = TimeSpan.FromDays(30)
             });
 
             // Clean up state cookie
             httpContext.Response.Cookies.Delete(StateCookieName);
 
-            // Redirect to frontend
-            return Results.Redirect("/");
+            // Read return url
+            httpContext.Request.Cookies.TryGetValue(ReturnUrlCookieName, out var returnUrl);
+            httpContext.Response.Cookies.Delete(ReturnUrlCookieName);
+
+            // Redirect to frontend (fallback if missing)
+            return Results.Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl);
         }
         catch (HttpRequestException ex)
         {
@@ -178,6 +212,9 @@ public static class AuthEndpoints
 
         try
         {
+            var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            var isDev = env.IsDevelopment();
+
             // Refresh the token
             var newSession = await authService.RefreshTokenAsync(session.RefreshToken, cancellationToken);
 
@@ -188,8 +225,8 @@ public static class AuthEndpoints
             httpContext.Response.Cookies.Append(SessionCookieName, newSession.SessionId, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
+                Secure = !isDev,
+                SameSite = SameSiteMode.Lax,
                 MaxAge = TimeSpan.FromDays(30)
             });
 

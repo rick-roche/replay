@@ -7,7 +7,8 @@ export const authApi = {
    * Initiate Spotify OAuth login
    */
   login(): void {
-    window.location.href = `${API_BASE}/login`
+    const returnUrl = window.location.href
+    window.location.href = `${API_BASE}/login?returnUrl=${encodeURIComponent(returnUrl)}`
   },
 
   /**

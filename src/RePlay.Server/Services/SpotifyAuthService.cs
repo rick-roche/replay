@@ -21,8 +21,31 @@ public sealed class SpotifyAuthService(
 
     private readonly SpotifyOptions _options = options.Value;
 
+    // Validate Spotify configuration when service is created
+    private void ValidateConfiguration()
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(_options.ClientId,
+            $"{nameof(SpotifyOptions.ClientId)} must be configured. Set Spotify__ClientId environment variable or configure in appsettings.Development.json");
+        ArgumentException.ThrowIfNullOrWhiteSpace(_options.ClientSecret,
+            $"{nameof(SpotifyOptions.ClientSecret)} must be configured. Set Spotify__ClientSecret environment variable or configure in appsettings.Development.json");
+        ArgumentException.ThrowIfNullOrWhiteSpace(_options.RedirectUri,
+            $"{nameof(SpotifyOptions.RedirectUri)} must be configured. Set Spotify__RedirectUri environment variable or configure in appsettings.Development.json");
+
+        // Validate redirect URI format per Spotify requirements
+        if (_options.RedirectUri.Contains("localhost"))
+        {
+            throw new ArgumentException(
+                "Spotify does not allow 'localhost' as a redirect URI. " +
+                "Use explicit loopback address instead: http://127.0.0.1:PORT or http://[::1]:PORT. " +
+                "See: https://developer.spotify.com/documentation/web-api/concepts/redirect_uri",
+                nameof(SpotifyOptions.RedirectUri));
+        }
+    }
+
     public string GetAuthorizationUrl(string state)
     {
+        ValidateConfiguration();
+
         var scopes = string.Join(" ", _options.Scopes);
         var queryParams = new Dictionary<string, string>
         {

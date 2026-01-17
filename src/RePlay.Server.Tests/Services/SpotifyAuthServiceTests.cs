@@ -22,7 +22,7 @@ public class SpotifyAuthServiceTests
         {
             ClientId = "test-client-id",
             ClientSecret = "test-client-secret",
-            RedirectUri = "https://localhost/callback"
+            RedirectUri = "http://127.0.0.1:7286/callback"
         });
 
         _service = new SpotifyAuthService(_httpClient, _options);
@@ -41,7 +41,7 @@ public class SpotifyAuthServiceTests
         url.Should().StartWith("https://accounts.spotify.com/authorize?");
         url.Should().Contain("client_id=test-client-id");
         url.Should().Contain("response_type=code");
-        url.Should().Contain("redirect_uri=https%3A%2F%2Flocalhost%2Fcallback");
+        url.Should().Contain("redirect_uri=http%3A%2F%2F127.0.0.1%3A7286%2Fcallback");
         url.Should().Contain("state=test-state");
         url.Should().Contain("scope=playlist-modify-private%20playlist-modify-public%20user-read-email");
     }

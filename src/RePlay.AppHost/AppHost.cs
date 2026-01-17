@@ -15,8 +15,6 @@ var server = builder.AddProject<Projects.RePlay_Server>("server")
     .WithExternalHttpEndpoints();
 
 var webfrontend = builder.AddViteApp("webfrontend", "../frontend")
-    .WithHttpsDeveloperCertificate()
-    .WithHttpsEndpoint(port: 5173)
     .WithExternalHttpEndpoints()
     .WithReference(server)
     .WaitFor(server);
