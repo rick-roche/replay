@@ -1,6 +1,7 @@
 import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucide-react'
 import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
 import { useAuth } from './contexts/AuthContext'
+import { LastfmConfigForm } from './components/LastfmConfigForm'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
@@ -64,14 +65,17 @@ function App() {
         <Section size="3">
           <Flex direction="column" align="center" gap="6" className="text-center max-w-4xl mx-auto">
             {isAuthenticated && user ? (
-              <Box>
-                <Heading size="8" weight="bold" mb="2">
-                  Welcome back, {user.displayName}!
-                </Heading>
-                <Text size="4" color="gray">
-                  Ready to create some playlists from your music history?
-                </Text>
-              </Box>
+              <Flex direction="column" gap="6" width="100%">
+                <Box>
+                  <Heading size="8" weight="bold" mb="2">
+                    Welcome back, {user.displayName}!
+                  </Heading>
+                  <Text size="4" color="gray">
+                    Ready to create some playlists from your music history?
+                  </Text>
+                </Box>
+                <LastfmConfigForm />
+              </Flex>
             ) : (
               <>
                 <Flex direction="column" gap="4">

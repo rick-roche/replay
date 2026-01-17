@@ -17,8 +17,15 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<SpotifyOptions>(
     builder.Configuration.GetSection(SpotifyOptions.SectionName));
 
+// Configure Last.fm options
+builder.Services.Configure<LastfmOptions>(
+    builder.Configuration.GetSection(LastfmOptions.SectionName));
+
 // Register HTTP client for Spotify API
 builder.Services.AddHttpClient<ISpotifyAuthService, SpotifyAuthService>();
+
+// Register HTTP client for Last.fm API
+builder.Services.AddHttpClient<ILastfmService, LastfmService>();
 
 // Register session storage (in-memory for now)
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
@@ -39,6 +46,9 @@ var api = app.MapGroup("/api");
 // Auth endpoints
 var auth = api.MapGroup("/auth");
 auth.MapAuthEndpoints();
+
+// Configuration endpoints
+api.MapConfigurationEndpoints();
 
 app.MapDefaultEndpoints();
 
