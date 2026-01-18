@@ -1,10 +1,16 @@
 import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucide-react'
 import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
 import { useAuth } from './contexts/AuthContext'
+import { useDataSource } from './contexts/DataSourceContext'
+import { DataSource } from './types/datasource'
+import { DataSourceSelector } from './components/DataSourceSelector'
 import { LastfmConfigForm } from './components/LastfmConfigForm'
+import { LastfmFilterForm } from './components/LastfmFilterForm'
+import { FetchDataButton, DataResults } from './components/DataFetchForm'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
+  const { selectedSource } = useDataSource()
 
   return (
     <Box className="min-h-screen">
@@ -74,7 +80,15 @@ function App() {
                     Ready to create some playlists from your music history?
                   </Text>
                 </Box>
-                <LastfmConfigForm />
+                <DataSourceSelector />
+                {selectedSource === DataSource.LASTFM && (
+                  <Flex direction="column" gap="4">
+                    <LastfmConfigForm />
+                    <LastfmFilterForm />
+                    <FetchDataButton />
+                    <DataResults />
+                  </Flex>
+                )}
               </Flex>
             ) : (
               <>

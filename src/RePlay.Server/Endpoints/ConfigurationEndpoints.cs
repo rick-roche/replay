@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using RePlay.Server.Endpoints;
 using RePlay.Server.Models;
 using RePlay.Server.Services;
 
@@ -14,6 +15,7 @@ public static class ConfigurationEndpoints
         var config = group.MapGroup("/config");
         config.MapPost("/lastfm", PostConfigureLastfm);
         config.MapGet("/lastfm", GetLastfmConfig);
+        config.MapPost("/lastfm/data", PostFetchLastfmData);
 
         return group;
     }
@@ -121,4 +123,83 @@ public static class ConfigurationEndpoints
             IsConfigured = false
         });
     }
-}
+
+    /// <summary>
+    /// Fetch Last.fm data (tracks, albums, or artists) with specified filters.
+    /// </summary>
+    private static async Task<IResult> PostFetchLastfmData(
+        [FromBody] FetchLastfmDataRequest request,
+        ILastfmService lastfmService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        // Validate request
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USERNAME",
+                "Username is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        // Validate custom date range if specified
+        if (request.Filter.TimePeriod == LastfmTimePeriod.Custom)
+        {
+            if (string.IsNullOrWhiteSpace(request.Filter.CustomStartDate) || 
+                string.IsNullOrWhiteSpace(request.Filter.CustomEndDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_CUSTOM_DATES",
+                    "Custom time period requires both start and end dates");
+            }
+
+            if (!DateTime.TryParse(request.Filter.CustomStartDate, out var startDate) ||
+                !DateTime.TryParse(request.Filter.CustomEndDate, out var endDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            if (startDate > endDate)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_RANGE",
+                    "Start date must be before end date");
+            }
+        }
+
+        try
+        {
+            // Fetch data from Last.fm
+            var data = await lastfmService.GetUserDataAsync(request.Username, request.Filter, cancellationToken);
+            
+            if (data == null)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "LASTFM_FETCH_FAILED",
+                    "Failed to fetch data from Last.fm");
+            }
+
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "LASTFM_FETCH_ERROR",
+                "Error fetching Last.fm data",
+                ex.Message);
+        }
+    }}

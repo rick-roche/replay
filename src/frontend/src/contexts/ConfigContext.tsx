@@ -1,32 +1,52 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { ConfigureLastfmResponse } from '../types/lastfm'
+import type { ConfigureLastfmResponse, LastfmFilter } from '../types/lastfm'
+import { LastfmDataType as DataType, LastfmTimePeriod as TimePeriod } from '../types/lastfm'
 import { configApi } from '../api/config'
 
 interface ConfigContextValue {
   lastfmConfig: ConfigureLastfmResponse | null
+  lastfmFilter: LastfmFilter
   isLoading: boolean
   error: string | null
   configureLastfm: (username: string) => Promise<void>
+  updateFilter: (updates: Partial<LastfmFilter>) => void
   clearError: () => void
 }
 
 const ConfigContext = createContext<ConfigContextValue | null>(null)
 
 const LASTFM_CONFIG_KEY = 'replay:lastfm_config'
+const LASTFM_FILTER_KEY = 'replay:lastfm_filter'
+
+const DEFAULT_FILTER: LastfmFilter = {
+  dataType: DataType.Tracks,
+  timePeriod: TimePeriod.Last12Months,
+  maxResults: 50
+}
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [lastfmConfig, setLastfmConfig] = useState<ConfigureLastfmResponse | null>(null)
+  const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(DEFAULT_FILTER)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load configuration from localStorage on mount
+  // Load configuration and filter from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(LASTFM_CONFIG_KEY)
-    if (stored) {
+    const storedConfig = localStorage.getItem(LASTFM_CONFIG_KEY)
+    if (storedConfig) {
       try {
-        setLastfmConfig(JSON.parse(stored))
+        setLastfmConfig(JSON.parse(storedConfig))
       } catch {
         localStorage.removeItem(LASTFM_CONFIG_KEY)
+      }
+    }
+
+    const storedFilter = localStorage.getItem(LASTFM_FILTER_KEY)
+    if (storedFilter) {
+      try {
+        setLastfmFilter(JSON.parse(storedFilter))
+      } catch {
+        localStorage.removeItem(LASTFM_FILTER_KEY)
       }
     }
   }, [])
@@ -46,15 +66,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function updateFilter(updates: Partial<LastfmFilter>) {
+    const newFilter = { ...lastfmFilter, ...updates }
+    setLastfmFilter(newFilter)
+    // Persist to localStorage
+    localStorage.setItem(LASTFM_FILTER_KEY, JSON.stringify(newFilter))
+  }
+
   function clearError() {
     setError(null)
   }
 
   const value: ConfigContextValue = {
     lastfmConfig,
+    lastfmFilter,
     isLoading,
     error,
     configureLastfm,
+    updateFilter,
     clearError
   }
 
