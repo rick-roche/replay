@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { configApi } from './config'
 
-// Helper to mock global fetch
-const mockFetch = (responseInit: Partial<Response> & { json?: any }) => {
+// Helper to mock global fetch (avoid explicit any)
+const mockFetch = (responseInit: Partial<Response> & { json?: unknown }) => {
   const resp = {
     ok: responseInit.ok ?? true,
     status: responseInit.status ?? (responseInit.ok ? 200 : 400),
