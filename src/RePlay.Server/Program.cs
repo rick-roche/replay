@@ -72,6 +72,9 @@ auth.MapAuthEndpoints();
 // Configuration endpoints
 api.MapConfigurationEndpoints();
 
+// Data sources endpoints
+api.MapSourcesEndpoints();
+
 app.MapDefaultEndpoints();
 
 app.UseFileServer();
