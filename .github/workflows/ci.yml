@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-frontend
-          path: coverage/**
+          path: src/frontend/coverage/**
           retention-days: 7
 
       - name: Run knip
