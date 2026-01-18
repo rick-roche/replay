@@ -6,6 +6,7 @@ import { DataSource } from './types/datasource'
 import { DataSourceSelector } from './components/DataSourceSelector'
 import { LastfmConfigForm } from './components/LastfmConfigForm'
 import { LastfmFilterForm } from './components/LastfmFilterForm'
+import { FetchDataButton, DataResults } from './components/DataFetchForm'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
@@ -84,6 +85,8 @@ function App() {
                   <Flex direction="column" gap="4">
                     <LastfmConfigForm />
                     <LastfmFilterForm />
+                    <FetchDataButton />
+                    <DataResults />
                   </Flex>
                 )}
               </Flex>

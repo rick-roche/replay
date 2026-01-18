@@ -1,6 +1,7 @@
 using RePlay.Server.Configuration;
 using RePlay.Server.Endpoints;
 using RePlay.Server.Services;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +43,12 @@ builder.Services.AddHttpClient<ILastfmService, LastfmService>();
 
 // Register session storage (in-memory for now)
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
+
+// Use string-based enums for request/response JSON
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 var app = builder.Build();
 
