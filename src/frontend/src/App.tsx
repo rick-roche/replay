@@ -5,6 +5,7 @@ import { useDataSource } from './contexts/DataSourceContext'
 import { DataSource } from './types/datasource'
 import { DataSourceSelector } from './components/DataSourceSelector'
 import { LastfmConfigForm } from './components/LastfmConfigForm'
+import { LastfmFilterForm } from './components/LastfmFilterForm'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
@@ -79,7 +80,12 @@ function App() {
                   </Text>
                 </Box>
                 <DataSourceSelector />
-                {selectedSource === DataSource.LASTFM && <LastfmConfigForm />}
+                {selectedSource === DataSource.LASTFM && (
+                  <Flex direction="column" gap="4">
+                    <LastfmConfigForm />
+                    <LastfmFilterForm />
+                  </Flex>
+                )}
               </Flex>
             ) : (
               <>

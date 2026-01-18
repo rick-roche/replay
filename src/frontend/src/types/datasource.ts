@@ -1,8 +1,10 @@
-export enum DataSource {
-  LASTFM = 'lastfm',
-  DISCOGS = 'discogs',
-  SETLISTFM = 'setlistfm'
-}
+export const DataSource = {
+  LASTFM: 'lastfm',
+  DISCOGS: 'discogs',
+  SETLISTFM: 'setlistfm'
+} as const
+
+export type DataSource = (typeof DataSource)[keyof typeof DataSource]
 
 export interface DataSourceInfo {
   id: DataSource

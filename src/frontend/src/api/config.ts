@@ -1,4 +1,4 @@
-import type { ConfigureLastfmRequest, ConfigureLastfmResponse } from '../types/lastfm'
+import type { ConfigureLastfmRequest, ConfigureLastfmResponse, LastfmFilter, LastfmDataResponse } from '../types/lastfm'
 
 const API_BASE = '/api/config'
 
@@ -34,6 +34,30 @@ export const configApi = {
 
     if (!response.ok) {
       throw new Error('Failed to fetch Last.fm config')
+    }
+
+    return await response.json()
+  },
+
+  /**
+   * Fetch Last.fm data (tracks, albums, or artists) with specified filters
+   */
+  async fetchLastfmData(username: string, filter: LastfmFilter): Promise<LastfmDataResponse> {
+    const response = await fetch(`${API_BASE}/lastfm/data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        username,
+        filter
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to fetch Last.fm data')
     }
 
     return await response.json()
