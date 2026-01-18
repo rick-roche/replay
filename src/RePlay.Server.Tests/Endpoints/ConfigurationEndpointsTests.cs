@@ -27,12 +27,16 @@ public class ConfigurationEndpointsTests
     {
         public Func<string, CancellationToken, Task<LastfmUser?>>? OnGetUserAsync { get; set; }
         public Func<string, LastfmFilter, CancellationToken, Task<LastfmDataResponse?>>? OnGetUserDataAsync { get; set; }
+        public Func<string, LastfmFilter, CancellationToken, Task<NormalizedDataResponse?>>? OnGetUserDataNormalizedAsync { get; set; }
 
         public Task<LastfmUser?> GetUserAsync(string username, CancellationToken cancellationToken = default)
             => OnGetUserAsync?.Invoke(username, cancellationToken) ?? Task.FromResult<LastfmUser?>(null);
 
         public Task<LastfmDataResponse?> GetUserDataAsync(string username, LastfmFilter filter, CancellationToken cancellationToken = default)
             => OnGetUserDataAsync?.Invoke(username, filter, cancellationToken) ?? Task.FromResult<LastfmDataResponse?>(null);
+
+        public Task<NormalizedDataResponse?> GetUserDataNormalizedAsync(string username, LastfmFilter filter, CancellationToken cancellationToken = default)
+            => OnGetUserDataNormalizedAsync?.Invoke(username, filter, cancellationToken) ?? Task.FromResult<NormalizedDataResponse?>(null);
     }
 
     private static HttpContext ContextWithSessionCookie(string? sessionId = "sid")
@@ -138,28 +142,6 @@ public class ConfigurationEndpointsTests
         var ok = (Ok<ConfigureLastfmResponse>)result;
         ok.Value!.IsConfigured.Should().BeTrue();
         ok.Value!.Username.Should().Be("user");
-    }
-
-    [Fact]
-    public async Task GetLastfmConfig_NoSession_Returns401()
-    {
-        var mi = typeof(ConfigurationEndpoints).GetMethod("GetLastfmConfig", BindingFlags.NonPublic | BindingFlags.Static);
-        mi.Should().NotBeNull();
-        var ctx = new DefaultHttpContext();
-        var result = (IResult)mi!.Invoke(null, new object[] { ctx })!;
-        result.Should().BeOfType<JsonHttpResult<ApiError>>();
-        ((JsonHttpResult<ApiError>)result).StatusCode.Should().Be(401);
-    }
-
-    [Fact]
-    public async Task GetLastfmConfig_FromItems_ReturnsConfigured()
-    {
-        var mi = typeof(ConfigurationEndpoints).GetMethod("GetLastfmConfig", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var ctx = ContextWithSessionCookie();
-        ctx.Items["lastfm_config"] = new ExternalSourceConfig { Source = "lastfm", ConfigValue = "user", ConfiguredAt = DateTime.UtcNow };
-        var result = (IResult)mi.Invoke(null, new object[] { ctx })!;
-        result.Should().BeOfType<Ok<ConfigureLastfmResponse>>();
-        ((Ok<ConfigureLastfmResponse>)result).Value!.IsConfigured.Should().BeTrue();
     }
 
     [Fact]

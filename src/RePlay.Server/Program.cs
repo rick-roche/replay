@@ -2,6 +2,7 @@ using RePlay.Server.Configuration;
 using RePlay.Server.Endpoints;
 using RePlay.Server.Services;
 using System.Text.Json.Serialization;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +59,7 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 // API routes

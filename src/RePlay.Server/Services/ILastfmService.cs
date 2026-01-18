@@ -21,6 +21,11 @@ public interface ILastfmService
     /// Fetch Last.fm data (tracks, albums, or artists) for a user with specified filters.
     /// </summary>
     Task<LastfmDataResponse?> GetUserDataAsync(string username, LastfmFilter filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetch Last.fm data and normalize it to a canonical format for matching.
+    /// </summary>
+    Task<NormalizedDataResponse?> GetUserDataNormalizedAsync(string username, LastfmFilter filter, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -307,6 +312,70 @@ public sealed class LastfmService : ILastfmService
         }
 
         return artists;
+    }
+
+    public async Task<NormalizedDataResponse?> GetUserDataNormalizedAsync(string username, LastfmFilter filter, CancellationToken cancellationToken = default)
+    {
+        // Fetch the source data
+        var sourceData = await GetUserDataAsync(username, filter, cancellationToken);
+        if (sourceData == null)
+        {
+            return null;
+        }
+
+        // Convert to normalized format, preserving all source metadata
+        var response = new NormalizedDataResponse
+        {
+            DataType = filter.DataType.ToString(),
+            Source = "lastfm",
+            TotalResults = sourceData.TotalResults,
+            Tracks = [],
+            Albums = [],
+            Artists = []
+        };
+
+        if (filter.DataType == LastfmDataType.Tracks)
+        {
+            response = response with
+            {
+                Tracks = sourceData.Tracks.Select(t => new NormalizedTrack
+                {
+                    Name = t.Name,
+                    Artist = t.Artist,
+                    Album = t.Album,
+                    Source = "lastfm",
+                    SourceMetadata = new Dictionary<string, object?> { { "playCount", t.PlayCount } }
+                }).ToList()
+            };
+        }
+        else if (filter.DataType == LastfmDataType.Albums)
+        {
+            response = response with
+            {
+                Albums = sourceData.Albums.Select(a => new NormalizedAlbum
+                {
+                    Name = a.Name,
+                    Artist = a.Artist,
+                    Tracks = [],
+                    Source = "lastfm",
+                    SourceMetadata = new Dictionary<string, object?> { { "playCount", a.PlayCount } }
+                }).ToList()
+            };
+        }
+        else if (filter.DataType == LastfmDataType.Artists)
+        {
+            response = response with
+            {
+                Artists = sourceData.Artists.Select(a => new NormalizedArtist
+                {
+                    Name = a.Name,
+                    Source = "lastfm",
+                    SourceMetadata = new Dictionary<string, object?> { { "playCount", a.PlayCount } }
+                }).ToList()
+            };
+        }
+
+        return response;
     }
 }
 
