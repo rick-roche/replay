@@ -19,7 +19,7 @@ public class AuthEndpointsTests
         return mi!;
     }
 
-    private static async Task<IResult> InvokeAsync(MethodInfo mi, params object[] args)
+    private static async Task<IResult> InvokeAsync(MethodInfo mi, params object[]? args)
     {
         if (typeof(Task).IsAssignableFrom(mi.ReturnType))
         {
@@ -110,7 +110,7 @@ public class AuthEndpointsTests
         var ctx = ContextWithServices();
         var auth = new FakeAuthService { OnGetAuthorizationUrl = s => "https://auth.example/authorize?state=" + s };
 
-        var result = await InvokeAsync(mi, "/return", auth, ctx);
+        var result = await InvokeAsync(mi, null!, auth, ctx);
 
         result.Should().BeOfType<RedirectHttpResult>();
         var setCookie = string.Join(";", ctx.Response.Headers["Set-Cookie"].ToArray());
@@ -125,7 +125,7 @@ public class AuthEndpointsTests
         var ctx = ContextWithServices();
         var auth = new FakeAuthService { OnGetAuthorizationUrl = _ => throw new ArgumentException("bad config") };
 
-        var result = await InvokeAsync(mi, null, auth, ctx);
+        var result = await InvokeAsync(mi, null!, auth, ctx);
 
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
@@ -141,7 +141,7 @@ public class AuthEndpointsTests
         var auth = new FakeAuthService();
         var store = new InMemorySessionStore();
 
-        var result = await InvokeAsync(mi, null, "abc", "access_denied", auth, store, ctx, CancellationToken.None);
+        var result = await InvokeAsync(mi, null!, "abc", "access_denied", auth, store, ctx, CancellationToken.None);
         result.Should().BeOfType<BadRequest<ApiError>>();
         ((BadRequest<ApiError>)result).Value!.Code.Should().Be("OAUTH_ERROR");
     }
@@ -154,7 +154,7 @@ public class AuthEndpointsTests
         var auth = new FakeAuthService();
         var store = new InMemorySessionStore();
 
-        var result = await InvokeAsync(mi, null, null, null, auth, store, ctx, CancellationToken.None);
+        var result = await InvokeAsync(mi, null!, null!, null!, auth, store, ctx, CancellationToken.None);
         result.Should().BeOfType<BadRequest<ApiError>>();
         ((BadRequest<ApiError>)result).Value!.Code.Should().Be("MISSING_PARAMETERS");
     }
@@ -167,7 +167,7 @@ public class AuthEndpointsTests
         var auth = new FakeAuthService();
         var store = new InMemorySessionStore();
 
-        var result = await InvokeAsync(mi, "code", "abc", null, auth, store, ctx, CancellationToken.None);
+        var result = await InvokeAsync(mi, "code", "abc", null!, auth, store, ctx, CancellationToken.None);
         result.Should().BeOfType<BadRequest<ApiError>>();
         ((BadRequest<ApiError>)result).Value!.Code.Should().Be("INVALID_STATE");
     }
@@ -183,7 +183,7 @@ public class AuthEndpointsTests
             OnExchangeCodeAsync = (code, ct) => Task.FromResult(NewSession("sid"))
         };
 
-        var result = await InvokeAsync(mi, "code", "abc", null, auth, store, ctx, CancellationToken.None);
+        var result = await InvokeAsync(mi, "code", "abc", null!, auth, store, ctx, CancellationToken.None);
 
         result.Should().BeOfType<RedirectHttpResult>();
         ((RedirectHttpResult)result).Url.Should().Be("/go");
@@ -204,7 +204,7 @@ public class AuthEndpointsTests
             OnExchangeCodeAsync = (code, ct) => throw new HttpRequestException("fail")
         };
 
-        var result = await InvokeAsync(mi, "code", "abc", null, auth, store, ctx, CancellationToken.None);
+        var result = await InvokeAsync(mi, "code", "abc", null!, auth, store, ctx, CancellationToken.None);
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
         json.StatusCode.Should().Be(502);
