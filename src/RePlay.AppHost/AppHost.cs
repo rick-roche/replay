@@ -1,4 +1,5 @@
 #pragma warning disable ASPIRECOMPUTE003
+#pragma warning disable ASPIRECERTIFICATES001
 
 var builder = DistributedApplication.CreateBuilder(args);
 
