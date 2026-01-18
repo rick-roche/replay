@@ -28,7 +28,28 @@ jobs:
         run: dotnet build RePlay.sln -c Release
 
       - name: Test backend
-        run: dotnet test
+        run: >
+          dotnet test
+          --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+          --logger "trx;LogFileName=test-results.trx"
+
+      - name: Generate coverage report
+        uses: danielpalme/ReportGenerator-GitHub-Action@5
+        with:
+          reports: "TestResults/**/coverage.cobertura.xml"
+          targetdir: "coveragereport"
+          reporttypes: "MarkdownSummary;HtmlInline_AzurePipelines"
+
+      - name: Write coverage to Job Summary
+        run: cat coveragereport/Summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload HTML coverage report (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend
+          path: coveragereport
 
   frontend:
     runs-on: ubuntu-latest
@@ -55,7 +76,14 @@ jobs:
 
       - name: Run frontend tests
         working-directory: src/frontend
-        run: npm test
+        run: npm run test -- --run --coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend
+          path: coverage/**
+          retention-days: 7
 
       - name: Run knip
         working-directory: src/frontend

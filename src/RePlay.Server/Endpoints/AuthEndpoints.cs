@@ -67,10 +67,10 @@ public static class AuthEndpoints
         }
         catch (ArgumentException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: 500,
-                title: "Configuration Error");
+            return ApiErrorExtensions.InternalServerError(
+                "SPOTIFY_CONFIG_ERROR",
+                "Spotify configuration is invalid",
+                ex.Message);
         }
     }
 
@@ -90,29 +90,27 @@ public static class AuthEndpoints
         // Check for OAuth errors
         if (!string.IsNullOrEmpty(error))
         {
-            return Results.Problem(
-                detail: $"Spotify authorization failed: {error}",
-                statusCode: 400,
-                title: "Authorization Failed");
+            return ApiErrorExtensions.BadRequest(
+                "OAUTH_ERROR",
+                "Spotify authorization failed",
+                error);
         }
 
         // Validate required parameters
         if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
         {
-            return Results.Problem(
-                detail: "Missing required parameters",
-                statusCode: 400,
-                title: "Bad Request");
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_PARAMETERS",
+                "Missing required parameters: code and state are required");
         }
 
         // Validate state token (CSRF protection)
         if (!httpContext.Request.Cookies.TryGetValue(StateCookieName, out var storedState) ||
             storedState != state)
         {
-            return Results.Problem(
-                detail: "Invalid state token",
-                statusCode: 400,
-                title: "Invalid State");
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_STATE",
+                "Invalid state token - possible CSRF attack");
         }
 
         try
@@ -147,10 +145,10 @@ public static class AuthEndpoints
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: 502,
-                title: "Spotify API Error");
+            return ApiErrorExtensions.ServiceUnavailable(
+                "SPOTIFY_API_ERROR",
+                "Failed to communicate with Spotify API",
+                ex.Message);
         }
     }
 
@@ -163,13 +161,17 @@ public static class AuthEndpoints
     {
         if (!httpContext.Request.Cookies.TryGetValue(SessionCookieName, out var sessionId))
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "NO_SESSION",
+                "No active session found");
         }
 
         var session = sessionStore.GetSession(sessionId);
         if (session == null)
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "INVALID_SESSION",
+                "Session not found or has been invalidated");
         }
 
         // Check if session is expired
@@ -177,7 +179,9 @@ public static class AuthEndpoints
         {
             sessionStore.RemoveSession(sessionId);
             httpContext.Response.Cookies.Delete(SessionCookieName);
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "SESSION_EXPIRED",
+                "Session has expired");
         }
 
         var sessionInfo = new SessionInfo
@@ -201,13 +205,17 @@ public static class AuthEndpoints
     {
         if (!httpContext.Request.Cookies.TryGetValue(SessionCookieName, out var sessionId))
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "NO_SESSION",
+                "No active session found");
         }
 
         var session = sessionStore.GetSession(sessionId);
         if (session == null)
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "INVALID_SESSION",
+                "Session not found or has been invalidated");
         }
 
         try
@@ -244,10 +252,10 @@ public static class AuthEndpoints
             sessionStore.RemoveSession(sessionId);
             httpContext.Response.Cookies.Delete(SessionCookieName);
 
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: 502,
-                title: "Token Refresh Failed");
+            return ApiErrorExtensions.ServiceUnavailable(
+                "TOKEN_REFRESH_FAILED",
+                "Failed to refresh access token",
+                ex.Message);
         }
     }
 

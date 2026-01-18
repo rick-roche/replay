@@ -11,15 +11,20 @@ namespace RePlay.Server.Services;
 /// <summary>
 /// Implementation of Spotify OAuth authentication service.
 /// </summary>
-public sealed class SpotifyAuthService(
-    HttpClient httpClient,
-    IOptions<SpotifyOptions> options) : ISpotifyAuthService
+public sealed class SpotifyAuthService : ISpotifyAuthService
 {
     private const string AuthorizeEndpoint = "https://accounts.spotify.com/authorize";
     private const string TokenEndpoint = "https://accounts.spotify.com/api/token";
     private const string UserProfileEndpoint = "https://api.spotify.com/v1/me";
 
-    private readonly SpotifyOptions _options = options.Value;
+    private readonly HttpClient _httpClient;
+    private readonly SpotifyOptions _options;
+
+    public SpotifyAuthService(HttpClient httpClient, IOptions<SpotifyOptions> options)
+    {
+        _httpClient = httpClient;
+        _options = options.Value;
+    }
 
     // Validate Spotify configuration when service is created
     private void ValidateConfiguration()
@@ -108,7 +113,7 @@ public sealed class SpotifyAuthService(
         using var request = new HttpRequestMessage(HttpMethod.Get, UserProfileEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -137,7 +142,7 @@ public sealed class SpotifyAuthService(
 
         request.Content = new FormUrlEncodedContent(parameters);
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);

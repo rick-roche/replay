@@ -13,9 +13,22 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Configure Spotify options
-builder.Services.Configure<SpotifyOptions>(
-    builder.Configuration.GetSection(SpotifyOptions.SectionName));
+// Configure Spotify options with validation
+builder.Services.AddOptions<SpotifyOptions>()
+    .Bind(builder.Configuration.GetSection(SpotifyOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(options =>
+    {
+        if (string.IsNullOrWhiteSpace(options.ClientId))
+            return false;
+        if (string.IsNullOrWhiteSpace(options.ClientSecret))
+            return false;
+        if (string.IsNullOrWhiteSpace(options.RedirectUri))
+            return false;
+        if (options.RedirectUri.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return true;
+    }, "Spotify configuration is invalid. Ensure ClientId, ClientSecret, and RedirectUri are set. RedirectUri must not contain 'localhost'.");
 
 // Configure Last.fm options
 builder.Services.Configure<LastfmOptions>(

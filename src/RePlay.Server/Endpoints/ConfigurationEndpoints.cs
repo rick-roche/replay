@@ -31,19 +31,25 @@ public static class ConfigurationEndpoints
         // Validate request
         if (string.IsNullOrWhiteSpace(request.Username))
         {
-            return Results.BadRequest(new { error = "Username is required" });
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USERNAME",
+                "Username is required");
         }
 
         // Get current session
         if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId))
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "NO_SESSION",
+                "No active session found");
         }
 
         var session = sessionStore.GetSession(sessionId);
         if (session == null)
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "INVALID_SESSION",
+                "Session not found or has been invalidated");
         }
 
         try
@@ -52,7 +58,9 @@ public static class ConfigurationEndpoints
             var user = await lastfmService.GetUserAsync(request.Username, cancellationToken);
             if (user == null)
             {
-                return Results.BadRequest(new { error = "Invalid Last.fm username or user not found" });
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_LASTFM_USER",
+                    "Invalid Last.fm username or user not found");
             }
 
             // Store configuration in session (in-memory for now)
@@ -75,10 +83,10 @@ public static class ConfigurationEndpoints
         }
         catch (Exception ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: 500,
-                title: "Error configuring Last.fm");
+            return ApiErrorExtensions.InternalServerError(
+                "LASTFM_CONFIG_ERROR",
+                "Error configuring Last.fm",
+                ex.Message);
         }
     }
 
@@ -90,7 +98,9 @@ public static class ConfigurationEndpoints
         // Get current session
         if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId))
         {
-            return Results.Unauthorized();
+            return ApiErrorExtensions.Unauthorized(
+                "NO_SESSION",
+                "No active session found");
         }
 
         // Check if configuration is in session context
