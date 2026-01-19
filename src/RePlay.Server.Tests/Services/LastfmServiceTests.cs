@@ -295,6 +295,184 @@ public class LastfmServiceTests
             .Should().ThrowAsync<ArgumentException>();
     }
 
+    [Fact]
+    public async Task GetUserDataNormalizedAsync_ShouldReturnNormalizedTracks()
+    {
+        // Arrange
+        var username = "testuser";
+        var filter = new LastfmFilter
+        {
+            DataType = LastfmDataType.Tracks,
+            TimePeriod = LastfmTimePeriod.Last12Months,
+            MaxResults = 10
+        };
+
+        var responseJson = """
+            {
+                "toptracks": {
+                    "track": [
+                        {
+                            "name": "Test Track 1",
+                            "artist": { "name": "Test Artist 1" },
+                            "playcount": "50"
+                        }
+                    ]
+                }
+            }
+            """;
+
+        var response = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(responseJson)
+        };
+        _httpMessageHandler.EnqueueResponse(response);
+
+        // Act
+        var result = await _service.GetUserDataNormalizedAsync(username, filter);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.DataType.Should().Be("Tracks");
+        result.Source.Should().Be("lastfm");
+        result.Tracks.Should().HaveCount(1);
+        
+        var track = result.Tracks[0];
+        track.Name.Should().Be("Test Track 1");
+        track.Artist.Should().Be("Test Artist 1");
+        track.Source.Should().Be("lastfm");
+        track.SourceMetadata.Should().ContainKey("playCount");
+        track.SourceMetadata["playCount"].Should().Be(50);
+    }
+
+    [Fact]
+    public async Task GetUserDataNormalizedAsync_ShouldReturnNormalizedAlbums()
+    {
+        // Arrange
+        var username = "testuser";
+        var filter = new LastfmFilter
+        {
+            DataType = LastfmDataType.Albums,
+            TimePeriod = LastfmTimePeriod.Overall,
+            MaxResults = 5
+        };
+
+        var responseJson = """
+            {
+                "topalbums": {
+                    "album": [
+                        {
+                            "name": "Album 1",
+                            "artist": { "name": "Artist 1" },
+                            "playcount": "25"
+                        }
+                    ]
+                }
+            }
+            """;
+
+        var response = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(responseJson)
+        };
+        _httpMessageHandler.EnqueueResponse(response);
+
+        // Act
+        var result = await _service.GetUserDataNormalizedAsync(username, filter);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.DataType.Should().Be("Albums");
+        result.Source.Should().Be("lastfm");
+        result.Albums.Should().HaveCount(1);
+        
+        var album = result.Albums[0];
+        album.Name.Should().Be("Album 1");
+        album.Artist.Should().Be("Artist 1");
+        album.Source.Should().Be("lastfm");
+        album.SourceMetadata["playCount"].Should().Be(25);
+    }
+
+    [Fact]
+    public async Task GetUserDataNormalizedAsync_ShouldReturnNormalizedArtists()
+    {
+        // Arrange
+        var username = "testuser";
+        var filter = new LastfmFilter
+        {
+            DataType = LastfmDataType.Artists,
+            TimePeriod = LastfmTimePeriod.Overall,
+            MaxResults = 20
+        };
+
+        var responseJson = """
+            {
+                "topartists": {
+                    "artist": [
+                        {
+                            "name": "Artist 1",
+                            "playcount": "100"
+                        }
+                    ]
+                }
+            }
+            """;
+
+        var response = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(responseJson)
+        };
+        _httpMessageHandler.EnqueueResponse(response);
+
+        // Act
+        var result = await _service.GetUserDataNormalizedAsync(username, filter);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.DataType.Should().Be("Artists");
+        result.Source.Should().Be("lastfm");
+        result.Artists.Should().HaveCount(1);
+        
+        var artist = result.Artists[0];
+        artist.Name.Should().Be("Artist 1");
+        artist.Source.Should().Be("lastfm");
+        artist.SourceMetadata["playCount"].Should().Be(100);
+    }
+
+    [Fact]
+    public async Task GetUserDataNormalizedAsync_ShouldReturnNull_WhenSourceDataIsNull()
+    {
+        // Arrange
+        var filter = new LastfmFilter
+        {
+            DataType = LastfmDataType.Tracks,
+            TimePeriod = LastfmTimePeriod.Overall,
+            MaxResults = 50
+        };
+
+        var responseJson = """
+            {
+                "error": 6,
+                "message": "User not found"
+            }
+            """;
+
+        var response = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(responseJson)
+        };
+        _httpMessageHandler.EnqueueResponse(response);
+
+        // Act
+        var result = await _service.GetUserDataNormalizedAsync("nonexistentuser", filter);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
     private sealed class TestHttpMessageHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new();

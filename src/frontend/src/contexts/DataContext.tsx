@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { LastfmDataResponse, LastfmFilter } from '../types/lastfm'
+import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
+
+type LastfmDataResponse = components['schemas']['LastfmDataResponse']
+type LastfmFilter = components['schemas']['LastfmFilter']
 
 interface DataContextValue {
   data: LastfmDataResponse | null

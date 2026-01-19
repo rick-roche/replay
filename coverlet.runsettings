@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+
+  <!-- Optional but helpful: keep results in one place -->
+  <RunConfiguration>
+    <ResultsDirectory>TestResults</ResultsDirectory>
+  </RunConfiguration>
+
+  <DataCollectionRunSettings>
+    <DataCollectors>
+
+      <!-- This is Coverlet's VSTest collector (XPlat Code Coverage) -->
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+
+          <!-- Output formats: single or comma-separated -->
+          <Format>cobertura</Format>
+
+          <!-- Exclude test assemblies from the report (recommended) -->
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+
+          <!-- Exclude files by glob (COMMA-separated, single line) -->
+          <ExcludeByFile>**/obj/**,**/bin/**,**/*.g.cs,**/*.generated.cs,**/*Generated*.cs,**/*.designer.cs</ExcludeByFile>
+
+          <!-- Exclude code by attribute (COMMA-separated) -->
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+
+          <!-- Exclude by assembly + type filter:
+               [Assembly-Filter]Type-Filter
+               Use this to remove “Microsoft.* namespaces inside *your* assembly” -->
+          <Exclude>[RePlay.Server]Microsoft.AspNetCore.OpenApi.Generated*,[RePlay.Server]Microsoft.Extensions.Hosting.Extensions*,[RePlay.Server]System.Runtime.CompilerServices*</Exclude>
+
+          <!-- Nice-to-haves -->
+          <SkipAutoProps>true</SkipAutoProps>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+
+        </Configuration>
+      </DataCollector>
+
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

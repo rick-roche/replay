@@ -27,7 +27,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    /* https://johnnyreilly.com/dotnet-openapi-and-openapi-ts */
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src"],
   "exclude": [

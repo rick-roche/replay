@@ -7,7 +7,6 @@ import * as apiModule from '@/api/config'
 vi.mock('@/api/config', () => ({
   configApi: {
     configureLastfm: vi.fn(),
-    getLastfmConfig: vi.fn()
   }
 }))
 

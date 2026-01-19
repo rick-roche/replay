@@ -10,11 +10,13 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "knip": "knip"
+    "knip": "knip",
+    "generate-client": "openapi-typescript http://localhost:7511/openapi/v1.json --output src/api/generated-client.ts --root-types --root-types-no-schema-prefix"
   },
   "dependencies": {
     "@radix-ui/themes": "^3.2.1",
     "lucide-react": "^0.562.0",
+    "openapi-fetch": "^0.15.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
   },
@@ -36,6 +38,7 @@
     "globals": "^16.5.0",
     "jsdom": "^27.4.0",
     "knip": "^5.81.0",
+    "openapi-typescript": "^7.10.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
