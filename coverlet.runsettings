@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+
+          <!-- Output format -->
+          <Format>cobertura</Format>
+
+          <!-- Exclude generated/build output -->
+          <ExcludeByFile>**/obj/**;**/bin/**;**/*.g.cs;**/*Generated*.cs;**/*.designer.cs</ExcludeByFile>
+
+          <!-- Exclude compiler/generated stuff -->
+          <ExcludeByAttribute>
+            CompilerGeneratedAttribute;
+            ExcludeFromCodeCoverageAttribute
+          </ExcludeByAttribute>
+
+          <!-- (Optional) exclude by namespace/pattern -->
+          <Exclude>[Microsoft.*]*;[System.*]*</Exclude>
+
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
