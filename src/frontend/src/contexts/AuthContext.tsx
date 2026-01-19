@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { SessionInfo, SpotifyUser } from '../types/auth'
 import { authApi } from '../api/auth'
+import type { SessionInfo, SpotifyUser } from '../types/auth'
 
 interface AuthContextValue {
   user: SpotifyUser | null

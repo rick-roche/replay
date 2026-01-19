@@ -1,65 +1,35 @@
-import type { ConfigureLastfmRequest, ConfigureLastfmResponse, LastfmFilter, LastfmDataResponse } from '../types/lastfm'
+import type { components } from './generated-client'
+import { client } from './client'
+import { handleApiError } from './errors'
 
-const API_BASE = '/api/config'
+type ConfigureLastfmRequest = components['schemas']['ConfigureLastfmRequest']
+type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse']
+type LastfmFilter = components['schemas']['LastfmFilter']
+type LastfmDataResponse = components['schemas']['LastfmDataResponse']
+
+const CONFIG_LASTFM_PATH = '/api/config/lastfm' as const
+const SOURCES_LASTFM_DATA_PATH = '/api/sources/lastfm/data' as const
 
 export const configApi = {
   /**
    * Configure a Last.fm username
    */
   async configureLastfm(username: string): Promise<ConfigureLastfmResponse> {
-    const response = await fetch(`${API_BASE}/lastfm`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify({ username } as ConfigureLastfmRequest)
+    const { data, error } = await client.POST(CONFIG_LASTFM_PATH, {
+      body: { username } as ConfigureLastfmRequest
     })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to configure Last.fm')
-    }
-
-    return await response.json()
-  },
-
-  /**
-   * Get current Last.fm configuration
-   */
-  async getLastfmConfig(): Promise<ConfigureLastfmResponse> {
-    const response = await fetch(`${API_BASE}/lastfm`, {
-      credentials: 'include'
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch Last.fm config')
-    }
-
-    return await response.json()
+    if (error) handleApiError(error, 'Failed to configure Last.fm')
+    return data!
   },
 
   /**
    * Fetch Last.fm data (tracks, albums, or artists) with specified filters
    */
   async fetchLastfmData(username: string, filter: LastfmFilter): Promise<LastfmDataResponse> {
-    const response = await fetch(`${API_BASE}/lastfm/data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        username,
-        filter
-      })
+    const { data, error } = await client.POST(SOURCES_LASTFM_DATA_PATH, {
+      body: { username, filter } as { username: string; filter: LastfmFilter }
     })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to fetch Last.fm data')
-    }
-
-    return await response.json()
+    if (error) handleApiError(error, 'Failed to fetch Last.fm data')
+    return data!
   }
 }

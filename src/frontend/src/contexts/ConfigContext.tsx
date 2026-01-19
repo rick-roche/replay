@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { ConfigureLastfmResponse, LastfmFilter } from '../types/lastfm'
-import { LastfmDataType as DataType, LastfmTimePeriod as TimePeriod } from '../types/lastfm'
+import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
+
+type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse']
+type LastfmFilter = components['schemas']['LastfmFilter']
 
 interface ConfigContextValue {
   lastfmConfig: ConfigureLastfmResponse | null
@@ -19,8 +21,8 @@ const LASTFM_CONFIG_KEY = 'replay:lastfm_config'
 const LASTFM_FILTER_KEY = 'replay:lastfm_filter'
 
 const DEFAULT_FILTER: LastfmFilter = {
-  dataType: DataType.Tracks,
-  timePeriod: TimePeriod.Last12Months,
+  dataType: 'Tracks',
+  timePeriod: 'Last12Months',
   maxResults: 50
 }
 
