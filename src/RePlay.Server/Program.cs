@@ -42,6 +42,9 @@ builder.Services.AddHttpClient<ISpotifyAuthService, SpotifyAuthService>();
 // Register HTTP client for Last.fm API
 builder.Services.AddHttpClient<ILastfmService, LastfmService>();
 
+// Register HTTP client for Spotify matching service
+builder.Services.AddHttpClient<ISpotifyMatchingService, SpotifyMatchingService>();
+
 // Register session storage (in-memory for now)
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 
@@ -71,6 +74,9 @@ auth.MapAuthEndpoints();
 
 // Configuration endpoints
 api.MapConfigurationEndpoints();
+
+// Matching endpoints
+api.MapMatchingEndpoints();
 
 // Data sources endpoints
 api.MapSourcesEndpoints();

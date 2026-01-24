@@ -8,7 +8,9 @@ import * as configApiModule from '@/api/config'
 
 vi.mock('@/api/config', () => ({
   configApi: {
-    fetchLastfmData: vi.fn()
+    fetchLastfmData: vi.fn(),
+    // Provide a default resolved value for normalized fetch to avoid errors in tests
+    fetchLastfmDataNormalized: vi.fn().mockResolvedValue({ dataType: 'Tracks', tracks: [], albums: [], artists: [] })
   }
 }))
 
