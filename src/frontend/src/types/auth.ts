@@ -1,14 +1,13 @@
-// Frontend types matching backend models
-
 export interface SpotifyUser {
-  id: string
-  displayName: string
-  email?: string | null
-  imageUrl?: string | null
+  id: string;
+  displayName: string;
+  imageUrl?: string;
+  externalUrl?: string;
 }
 
 export interface SessionInfo {
-  sessionId: string
-  user: SpotifyUser
-  expiresAt: string
+  isAuthenticated: boolean;
+  user?: SpotifyUser;
+  expiresAt: string;
+  source?: string;
 }

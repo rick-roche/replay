@@ -195,6 +195,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/api/match/spotify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match normalized tracks to Spotify
+         * @description Attempts to find Spotify matches for normalized tracks using exact, normalized, fuzzy, and album-based matching strategies.
+         */
+        post: operations["MatchTracksToSpotify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/lastfm/data": {
         parameters: {
             query?: never;
@@ -295,6 +315,25 @@ export interface components {
             /** Format: int32 */
             playCount?: number | string;
         };
+        MatchedDataResponse: {
+            tracks: components["schemas"]["MatchedTrack"][];
+            /** Format: int32 */
+            totalTracks?: number | string;
+            /** Format: int32 */
+            matchedCount?: number | string;
+            /** Format: int32 */
+            unmatchedCount?: number | string;
+        };
+        MatchedTrack: {
+            sourceTrack: components["schemas"]["NormalizedTrack"];
+            match?: null | components["schemas"]["SpotifyMatch"];
+            isMatched?: boolean;
+        };
+        /** @enum {unknown} */
+        MatchMethod: "Exact" | "Normalized" | "Fuzzy" | "AlbumBased";
+        MatchTracksRequest: {
+            tracks: components["schemas"]["NormalizedTrack"][];
+        };
         NormalizedAlbum: {
             name: string;
             artist: string;
@@ -323,6 +362,16 @@ export interface components {
             sourceMetadata: Record<string, never>;
             source: string;
         };
+        SpotifyMatch: {
+            spotifyId: string;
+            name: string;
+            artist: string;
+            album?: null | string;
+            uri: string;
+            /** Format: int32 */
+            confidence: number | string;
+            method: components["schemas"]["MatchMethod"];
+        };
     };
     responses: never;
     parameters: never;
@@ -341,10 +390,15 @@ export type LastfmDataType = components['schemas']['LastfmDataType'];
 export type LastfmFilter = components['schemas']['LastfmFilter'];
 export type LastfmTimePeriod = components['schemas']['LastfmTimePeriod'];
 export type LastfmTrack = components['schemas']['LastfmTrack'];
+export type MatchedDataResponse = components['schemas']['MatchedDataResponse'];
+export type MatchedTrack = components['schemas']['MatchedTrack'];
+export type MatchMethod = components['schemas']['MatchMethod'];
+export type MatchTracksRequest = components['schemas']['MatchTracksRequest'];
 export type NormalizedAlbum = components['schemas']['NormalizedAlbum'];
 export type NormalizedArtist = components['schemas']['NormalizedArtist'];
 export type NormalizedDataResponse = components['schemas']['NormalizedDataResponse'];
 export type NormalizedTrack = components['schemas']['NormalizedTrack'];
+export type SpotifyMatch = components['schemas']['SpotifyMatch'];
 export type $defs = Record<string, never>;
 export interface operations {
     ConfigureLastfm: {
@@ -367,6 +421,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigureLastfmResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    MatchTracksToSpotify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchTracksRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchedDataResponse"];
                 };
             };
             /** @description Bad Request */

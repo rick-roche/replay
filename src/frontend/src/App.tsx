@@ -7,6 +7,8 @@ import { DataSourceSelector } from './components/DataSourceSelector'
 import { LastfmConfigForm } from './components/LastfmConfigForm'
 import { LastfmFilterForm } from './components/LastfmFilterForm'
 import { FetchDataButton, DataResults } from './components/DataFetchForm'
+import { MatchTracksButton } from './components/MatchTracksButton'
+import { MatchResults } from './components/MatchResults'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
@@ -87,6 +89,8 @@ function App() {
                     <LastfmFilterForm />
                     <FetchDataButton />
                     <DataResults />
+                    <MatchTracksButton />
+                    <MatchResults />
                   </Flex>
                 )}
               </Flex>

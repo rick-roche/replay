@@ -4,9 +4,11 @@ import { configApi } from '../api/config'
 
 type LastfmDataResponse = components['schemas']['LastfmDataResponse']
 type LastfmFilter = components['schemas']['LastfmFilter']
+type NormalizedDataResponse = components['schemas']['NormalizedDataResponse']
 
 interface DataContextValue {
   data: LastfmDataResponse | null
+  normalizedData: NormalizedDataResponse | null
   isLoading: boolean
   error: string | null
   fetchData: (username: string, filter: LastfmFilter) => Promise<void>
@@ -18,6 +20,7 @@ const DataContext = createContext<DataContextValue | null>(null)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<LastfmDataResponse | null>(null)
+  const [normalizedData, setNormalizedData] = useState<NormalizedDataResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,10 +28,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     setError(null)
     setData(null)
+    setNormalizedData(null)
 
     try {
-      const result = await configApi.fetchLastfmData(username, filter)
-      setData(result)
+      // Fetch both raw and normalized data
+      const [rawData, normalized] = await Promise.all([
+        configApi.fetchLastfmData(username, filter),
+        configApi.fetchLastfmDataNormalized(username, filter)
+      ])
+      setData(rawData)
+      setNormalizedData(normalized)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
@@ -38,6 +47,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   function clearData() {
     setData(null)
+    setNormalizedData(null)
   }
 
   function clearError() {
@@ -46,6 +56,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value: DataContextValue = {
     data,
+    normalizedData,
     isLoading,
     error,
     fetchData,
