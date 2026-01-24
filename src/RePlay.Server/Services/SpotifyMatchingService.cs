@@ -50,6 +50,31 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         };
     }
 
+    public async Task<IReadOnlyList<SpotifyTrack>> SearchTracksAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Array.Empty<SpotifyTrack>();
+        }
+
+        var searchResults = await SearchSpotifyAsync(query, accessToken, cancellationToken);
+        
+        return searchResults
+            .Take(5) // Limit to top 5 results
+            .Select(track => new SpotifyTrack
+            {
+                Id = track.Id,
+                Name = track.Name,
+                Artist = string.Join(", ", track.Artists.Select(a => a.Name)),
+                Album = track.Album?.Name,
+                Uri = track.Uri
+            })
+            .ToList();
+    }
+
     private async Task<SpotifyMatch?> MatchSingleTrackAsync(
         NormalizedTrack track,
         string accessToken,

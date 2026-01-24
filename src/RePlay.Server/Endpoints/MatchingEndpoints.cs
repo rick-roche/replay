@@ -22,6 +22,15 @@ public static class MatchingEndpoints
             .Produces<ApiError>(StatusCodes.Status400BadRequest)
             .Produces<ApiError>(StatusCodes.Status401Unauthorized)
             .Produces<ApiError>(StatusCodes.Status500InternalServerError);
+
+        group.MapGet("/spotify/search", SearchTracksAsync)
+            .WithName("SearchSpotifyTracks")
+            .WithSummary("Search Spotify for tracks")
+            .WithDescription("Searches Spotify for tracks matching the given query. Returns up to 5 results.")
+            .Produces<List<SpotifyTrack>>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest)
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError);
     }
 
     /// <summary>
@@ -72,6 +81,71 @@ public static class MatchingEndpoints
                 cancellationToken);
 
             return Results.Ok(matchedData);
+        }
+        catch (HttpRequestException ex)
+        {
+            return Results.Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Spotify API Error");
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Internal Server Error");
+        }
+    }
+
+    /// <summary>
+    /// Searches Spotify for tracks.
+    /// </summary>
+    /// <param name="query">Track/artist query string.</param>
+    /// <param name="matchingService">Spotify matching service.</param>
+    /// <param name="sessionStore">Session store to retrieve access token.</param>
+    /// <param name="httpContext">HTTP context to get session ID from cookie.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of matching Spotify tracks.</returns>
+    private static async Task<IResult> SearchTracksAsync(
+        [FromQuery] string? query,
+        [FromServices] ISpotifyMatchingService matchingService,
+        [FromServices] ISessionStore sessionStore,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        // Validate query
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Results.BadRequest(new ApiError
+            {
+                Code = "INVALID_QUERY",
+                Message = "Query cannot be empty."
+            });
+        }
+
+        // Get session from cookie
+        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
+            string.IsNullOrWhiteSpace(sessionId))
+        {
+            return Results.Unauthorized();
+        }
+
+        // Retrieve session and access token
+        var session = sessionStore.GetSession(sessionId);
+        if (session is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        try
+        {
+            var results = await matchingService.SearchTracksAsync(
+                query,
+                session.AccessToken,
+                cancellationToken);
+
+            return Results.Ok(results);
         }
         catch (HttpRequestException ex)
         {

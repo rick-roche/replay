@@ -4,6 +4,7 @@ import { client } from './client'
 
 type MatchTracksRequest = components['schemas']['MatchTracksRequest']
 type MatchedDataResponse = components['schemas']['MatchedDataResponse']
+type SpotifyTrack = components['schemas']['SpotifyTrack']
 
 
 
@@ -18,5 +19,21 @@ export const matchApi = {
     })
     if (error) handleApiError(error, 'Failed to match tracks to Spotify')
     return data!
+  },
+
+  /**
+   * Search Spotify for tracks to manually match
+   */
+  async searchTracksForManualMatch(query: string): Promise<SpotifyTrack[]> {
+    const { data, error } = await client.GET('/api/api/match/spotify/search', {
+      params: {
+        query: {
+          query
+        }
+      }
+    })
+    if (error) handleApiError(error, 'Failed to search Spotify')
+    return data || []
   }
 }
+

@@ -215,6 +215,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/api/match/spotify/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Spotify for tracks
+         * @description Searches Spotify for tracks matching the given query. Returns up to 5 results.
+         */
+        get: operations["SearchSpotifyTracks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/lastfm/data": {
         parameters: {
             query?: never;
@@ -372,6 +392,13 @@ export interface components {
             confidence: number | string;
             method: components["schemas"]["MatchMethod"];
         };
+        SpotifyTrack: {
+            id: string;
+            name: string;
+            artist: string;
+            album?: null | string;
+            uri: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -399,6 +426,7 @@ export type NormalizedArtist = components['schemas']['NormalizedArtist'];
 export type NormalizedDataResponse = components['schemas']['NormalizedDataResponse'];
 export type NormalizedTrack = components['schemas']['NormalizedTrack'];
 export type SpotifyMatch = components['schemas']['SpotifyMatch'];
+export type SpotifyTrack = components['schemas']['SpotifyTrack'];
 export type $defs = Record<string, never>;
 export interface operations {
     ConfigureLastfm: {
@@ -472,6 +500,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchedDataResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    SearchSpotifyTracks: {
+        parameters: {
+            query?: {
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpotifyTrack"][];
                 };
             };
             /** @description Bad Request */

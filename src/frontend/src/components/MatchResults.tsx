@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { Badge, Box, Card, Flex, Heading, Separator, Text } from '@radix-ui/themes';
-import { AlertTriangleIcon, CheckCircle2Icon, LinkIcon } from 'lucide-react';
+import { AlertTriangleIcon, CheckCircle2Icon, LinkIcon, Loader2, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useMatch } from '@/contexts/MatchContext';
+import { ManualSearchModal } from './ManualSearchModal';
 import type { components } from '@/api/generated-client';
 
 type MatchedTrack = components['schemas']['MatchedTrack']
 type MatchMethod = 'Exact' | 'Normalized' | 'Fuzzy' | 'AlbumBased'
+type SpotifyTrack = components['schemas']['SpotifyTrack']
 
 const MatchMethodBadge = ({ method }: { method: MatchMethod }) => {
   const colors: Record<MatchMethod, 'green' | 'blue' | 'cyan' | 'orange'> = {
@@ -37,18 +40,97 @@ const ConfidenceBadge = ({ confidence }: { confidence: number | string }) => {
   );
 };
 
-const TrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
-  const { sourceTrack, match, isMatched } = matchedTrack;
+interface UnmatchedTrackRowProps {
+  trackIndex: number;
+  matchedTrack: MatchedTrack;
+}
+
+const UnmatchedTrackRow = ({ trackIndex, matchedTrack }: UnmatchedTrackRowProps) => {
+  const { sourceTrack } = matchedTrack;
+  const { retryMatch, removeTrack, applyManualMatch, searchTracks } = useMatch();
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    try {
+      await retryMatch(trackIndex);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const handleManualSearch = (result: SpotifyTrack) => {
+    applyManualMatch(trackIndex, result);
+  };
+
+  return (
+    <>
+      <Box>
+        <Flex direction="column" gap="2" py="2">
+          <Flex align="center" gap="2">
+            <AlertTriangleIcon size={16} color="var(--red-9)" />
+            <Text weight="medium" size="2">
+              {sourceTrack.name}
+            </Text>
+            <Text size="2" color="gray">
+              by {sourceTrack.artist}
+            </Text>
+          </Flex>
+          <Flex ml="6" gap="2" align="center">
+            <button
+              onClick={handleRetry}
+              disabled={isRetrying}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-blue-400 hover:bg-blue-900/20 disabled:opacity-50"
+              title="Try matching again with different strategies"
+            >
+              {isRetrying ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <RotateCcw size={14} />
+              )}
+              Retry
+            </button>
+            <button
+              onClick={() => setSearchModalOpen(true)}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-green-400 hover:bg-green-900/20"
+              title="Search manually on Spotify"
+            >
+              <Search size={14} />
+              Search
+            </button>
+            <button
+              onClick={() => removeTrack(trackIndex)}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/20"
+              title="Remove this track"
+            >
+              <Trash2 size={14} />
+              Remove
+            </button>
+          </Flex>
+        </Flex>
+        <Separator size="4" />
+      </Box>
+
+      <ManualSearchModal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onSelect={handleManualSearch}
+        onSearch={searchTracks}
+        initialQuery={`${sourceTrack.name} ${sourceTrack.artist}`.trim()}
+      />
+    </>
+  );
+};
+
+const MatchedTrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
+  const { sourceTrack, match } = matchedTrack;
 
   return (
     <Box>
       <Flex direction="column" gap="1" py="2">
         <Flex align="center" gap="2">
-          {isMatched ? (
-            <CheckCircle2Icon size={16} color="var(--green-9)" />
-          ) : (
-            <AlertTriangleIcon size={16} color="var(--red-9)" />
-          )}
+          <CheckCircle2Icon size={16} color="var(--green-9)" />
           <Text weight="medium" size="2">
             {sourceTrack.name}
           </Text>
@@ -57,7 +139,7 @@ const TrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
           </Text>
         </Flex>
 
-        {isMatched && match ? (
+        {match ? (
           <Flex gap="2" align="center" ml="6">
             <LinkIcon size={12} color="var(--gray-9)" />
             <Text size="1" color="gray">
@@ -145,9 +227,13 @@ export function MatchResults() {
         <Separator size="4" />
 
         <Box>
-          {(tracks ?? []).slice(0, 20).map((track, index) => (
-            <TrackRow key={index} matchedTrack={track} />
-          ))}
+          {(tracks ?? []).slice(0, 20).map((track, index) => 
+            !track.isMatched ? (
+              <UnmatchedTrackRow key={index} trackIndex={index} matchedTrack={track} />
+            ) : (
+              <MatchedTrackRow key={index} matchedTrack={track} />
+            )
+          )}
           {(tracks?.length ?? 0) > 20 && (
             <Text size="2" color="gray" mt="2">
               ...and {(tracks?.length ?? 0) - 20} more tracks
