@@ -30,4 +30,17 @@ public interface ISpotifyMatchingService
         string query,
         string accessToken,
         CancellationToken cancellationToken = default);
-}
+
+    /// <summary>
+    /// Creates a playlist on Spotify and adds tracks to it.
+    /// </summary>
+    /// <param name="request">Playlist creation request with name, description, visibility, and track URIs.</param>
+    /// <param name="accessToken">Spotify access token for API authentication.</param>
+    /// <param name="userId">Spotify user ID (from session).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Created playlist information with ID, URI, and URL.</returns>
+    Task<PlaylistCreationResponse> CreatePlaylistAsync(
+        PlaylistCreationRequest request,
+        string accessToken,
+        string userId,
+        CancellationToken cancellationToken = default);}

@@ -6,6 +6,8 @@ import { ConfigProvider } from './contexts/ConfigContext'
 import { DataSourceProvider } from './contexts/DataSourceContext'
 import { DataProvider } from './contexts/DataContext'
 import { MatchProvider } from './contexts/MatchContext'
+import { PlaylistProvider } from './contexts/PlaylistContext'
+import { CreatePlaylistProvider } from './contexts/CreatePlaylistContext'
 import './index.css'
 import App from './App.tsx'
 
@@ -17,7 +19,11 @@ createRoot(document.getElementById('root')!).render(
           <ConfigProvider>
             <DataProvider>
               <MatchProvider>
-                <App />
+                <PlaylistProvider>
+                  <CreatePlaylistProvider>
+                    <App />
+                  </CreatePlaylistProvider>
+                </PlaylistProvider>
               </MatchProvider>
             </DataProvider>
           </ConfigProvider>

@@ -75,6 +75,97 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
             .ToList();
     }
 
+    public async Task<PlaylistCreationResponse> CreatePlaylistAsync(
+        PlaylistCreationRequest request,
+        string accessToken,
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        if (request.TrackUris.Count == 0)
+        {
+            throw new InvalidOperationException("At least one track URI is required to create a playlist.");
+        }
+
+        // Step 1: Create the playlist
+        var createPlaylistUrl = $"https://api.spotify.com/v1/users/{userId}/playlists";
+        var createPlaylistPayload = new
+        {
+            name = request.Name,
+            description = request.Description,
+            @public = request.IsPublic
+        };
+
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, createPlaylistUrl)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(createPlaylistPayload),
+                Encoding.UTF8,
+                "application/json")
+        };
+        createRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await _httpClient.SendAsync(createRequest, cancellationToken);
+        if (!createResponse.IsSuccessStatusCode)
+        {
+            var errorContent = await createResponse.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Failed to create playlist on Spotify: {createResponse.StatusCode}. Details: {errorContent}");
+        }
+
+        var createResponseBody = await createResponse.Content.ReadAsStringAsync(cancellationToken);
+        var playlistJson = JsonSerializer.Deserialize<JsonElement>(createResponseBody);
+        var playlistId = playlistJson.GetProperty("id").GetString();
+        var playlistUri = playlistJson.GetProperty("uri").GetString();
+        var playlistUrl = playlistJson.GetProperty("external_urls").GetProperty("spotify").GetString();
+
+        if (string.IsNullOrWhiteSpace(playlistId))
+        {
+            throw new InvalidOperationException("Playlist created but ID was null or empty.");
+        }
+
+        // Step 2: Add tracks to the playlist (Spotify allows up to 100 tracks per request)
+        var addTracksUrl = $"https://api.spotify.com/v1/playlists/{playlistId}/tracks";
+        var tracksAdded = 0;
+
+        // Add tracks in batches of 100
+        for (int i = 0; i < request.TrackUris.Count; i += 100)
+        {
+            var batch = request.TrackUris.Skip(i).Take(100).ToList();
+            var addTracksPayload = new { uris = batch };
+
+            var addTracksRequest = new HttpRequestMessage(HttpMethod.Post, addTracksUrl)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(addTracksPayload),
+                    Encoding.UTF8,
+                    "application/json")
+            };
+            addTracksRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var addTracksResponse = await _httpClient.SendAsync(addTracksRequest, cancellationToken);
+            if (!addTracksResponse.IsSuccessStatusCode)
+            {
+                var errorContent = await addTracksResponse.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(
+                    $"Failed to add tracks to playlist: {addTracksResponse.StatusCode}. Details: {errorContent}");
+            }
+
+            tracksAdded += batch.Count;
+        }
+
+        return new PlaylistCreationResponse
+        {
+            PlaylistId = playlistId,
+            Uri = playlistUri ?? $"spotify:playlist:{playlistId}",
+            Url = playlistUrl ?? $"https://open.spotify.com/playlist/{playlistId}",
+            TracksAdded = tracksAdded
+        };
+    }
+
     private async Task<SpotifyMatch?> MatchSingleTrackAsync(
         NormalizedTrack track,
         string accessToken,

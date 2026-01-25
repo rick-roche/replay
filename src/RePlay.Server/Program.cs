@@ -78,6 +78,9 @@ api.MapConfigurationEndpoints();
 // Matching endpoints
 api.MapMatchingEndpoints();
 
+// Playlist endpoints
+api.MapPlaylistEndpoints();
+
 // Data sources endpoints
 api.MapSourcesEndpoints();
 

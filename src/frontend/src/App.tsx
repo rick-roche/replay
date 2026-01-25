@@ -9,6 +9,9 @@ import { LastfmFilterForm } from './components/LastfmFilterForm'
 import { FetchDataButton, DataResults } from './components/DataFetchForm'
 import { MatchTracksButton } from './components/MatchTracksButton'
 import { MatchResults } from './components/MatchResults'
+import { PlaylistConfigForm } from './components/PlaylistConfigForm'
+import { CreatePlaylistButton } from './components/CreatePlaylistButton'
+import { PlaylistConfirmation } from './components/PlaylistConfirmation'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
@@ -91,6 +94,9 @@ function App() {
                     <DataResults />
                     <MatchTracksButton />
                     <MatchResults />
+                    <PlaylistConfigForm />
+                    <CreatePlaylistButton />
+                    <PlaylistConfirmation />
                   </Flex>
                 )}
               </Flex>

@@ -235,6 +235,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/playlist/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a playlist on Spotify
+         * @description Creates a new Spotify playlist with the provided tracks. Requires an authenticated session.
+         */
+        post: operations["CreatePlaylist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/lastfm/data": {
         parameters: {
             query?: never;
@@ -382,6 +402,19 @@ export interface components {
             sourceMetadata: Record<string, never>;
             source: string;
         };
+        PlaylistCreationRequest: {
+            name: string;
+            description?: null | string;
+            isPublic: boolean;
+            trackUris: string[];
+        };
+        PlaylistCreationResponse: {
+            playlistId: string;
+            uri: string;
+            url: string;
+            /** Format: int32 */
+            tracksAdded: number | string;
+        };
         SpotifyMatch: {
             spotifyId: string;
             name: string;
@@ -425,6 +458,8 @@ export type NormalizedAlbum = components['schemas']['NormalizedAlbum'];
 export type NormalizedArtist = components['schemas']['NormalizedArtist'];
 export type NormalizedDataResponse = components['schemas']['NormalizedDataResponse'];
 export type NormalizedTrack = components['schemas']['NormalizedTrack'];
+export type PlaylistCreationRequest = components['schemas']['PlaylistCreationRequest'];
+export type PlaylistCreationResponse = components['schemas']['PlaylistCreationResponse'];
 export type SpotifyMatch = components['schemas']['SpotifyMatch'];
 export type SpotifyTrack = components['schemas']['SpotifyTrack'];
 export type $defs = Record<string, never>;
@@ -549,6 +584,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpotifyTrack"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    CreatePlaylist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistCreationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistCreationResponse"];
                 };
             };
             /** @description Bad Request */
