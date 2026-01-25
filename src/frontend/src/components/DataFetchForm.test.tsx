@@ -4,6 +4,24 @@ import { Theme } from '@radix-ui/themes'
 import { FetchDataButton, DataResults } from '@/components/DataFetchForm'
 import { DataProvider } from '@/contexts/DataContext'
 import { ConfigProvider } from '@/contexts/ConfigContext'
+const appendMatchesMock = vi.fn()
+
+vi.mock('@/contexts/MatchContext', () => ({
+  useMatch: () => ({
+    appendMatches: appendMatchesMock,
+    matchTracks: vi.fn(),
+    clearMatches: vi.fn(),
+    clearError: vi.fn(),
+    retryMatch: vi.fn(),
+    removeTrack: vi.fn(),
+    moveTrack: vi.fn(),
+    applyManualMatch: vi.fn(),
+    searchTracks: vi.fn(),
+    matchedData: null,
+    isLoading: false,
+    error: null,
+  }),
+}))
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +36,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 describe('FetchDataButton', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    appendMatchesMock.mockReset()
     localStorage.clear()
   })
 
@@ -49,6 +68,7 @@ describe('FetchDataButton', () => {
 
     // Button should be present
     expect(screen.getByRole('button', { name: /Fetch Data/i })).toBeInTheDocument()
+    appendMatchesMock.mockReset()
   })
 
   it('should display filter info when configured', () => {
@@ -84,6 +104,7 @@ describe('FetchDataButton', () => {
 
     // Button and heading should both be present
     expect(screen.getByRole('button', { name: /Fetch Data/i })).toBeInTheDocument()
+    appendMatchesMock.mockReset()
   })
 
   it('should be dark mode compatible', () => {
@@ -102,6 +123,7 @@ describe('FetchDataButton', () => {
 
     // Component renders without errors in Theme context
     expect(screen.getByRole('button', { name: /Fetch Data/i })).toBeInTheDocument()
+    appendMatchesMock.mockReset()
   })
 })
 

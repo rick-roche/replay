@@ -16,14 +16,14 @@ const dataSources: DataSourceInfo[] = [
     name: 'Discogs',
     description: 'Convert your collection into playlists',
     icon: 'disc',
-    enabled: false // Disabled for initial slice
+    enabled: true
   },
   {
     id: DataSource.SETLISTFM,
     name: 'Setlist.fm',
     description: 'Relive concerts with setlist-based playlists',
     icon: 'listmusic',
-    enabled: false // Disabled for initial slice
+    enabled: true
   }
 ]
 
@@ -63,9 +63,9 @@ export function DataSourceSelector() {
                   relative p-4 rounded-lg border-2 transition-all text-left
                   ${isSelected
                     ? 'border-green-500 bg-green-500/10'
-                    : isDisabled
-                      ? 'border-zinc-800 bg-zinc-900/50 opacity-50 cursor-not-allowed'
-                      : 'border-zinc-800 hover:border-zinc-700 cursor-pointer'
+                      : isDisabled
+                        ? 'border-zinc-800 bg-zinc-900/50 opacity-50 cursor-not-allowed'
+                        : 'border-zinc-800 hover:border-zinc-700 cursor-pointer'
                   }
                 `}
               >

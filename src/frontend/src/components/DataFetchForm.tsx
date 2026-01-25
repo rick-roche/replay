@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { Button, Card, Heading, Flex, Box, Text, Spinner } from '@radix-ui/themes'
-import { AlertCircle, CheckCircle2, Download } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Download, PlusCircle } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
 import { useData } from '../contexts/DataContext'
+import { useMatch } from '../contexts/MatchContext'
 
 export function FetchDataButton() {
   const { lastfmConfig, lastfmFilter } = useConfig()
-  const { isLoading, error, fetchData, clearError } = useData()
+  const { isLoading, error, fetchData, fetchMoreData, clearError, data } = useData()
+  const { appendMatches } = useMatch()
+  const [infoMessage, setInfoMessage] = useState<string | null>(null)
 
   if (!lastfmConfig?.isConfigured) {
     return null
@@ -13,10 +17,24 @@ export function FetchDataButton() {
 
   const handleFetch = async () => {
     clearError()
+    setInfoMessage(null)
     await fetchData(lastfmConfig.username, lastfmFilter)
   }
 
+  const handleFetchMore = async () => {
+    clearError()
+    setInfoMessage(null)
+    const added = await fetchMoreData(lastfmConfig.username, lastfmFilter)
+    if (added.length === 0) {
+      setInfoMessage('No new tracks found to add')
+      return
+    }
+    await appendMatches(added)
+    setInfoMessage(`${added.length} new tracks fetched and added`)
+  }
+
   const isDisabled = isLoading || !lastfmConfig.isConfigured
+  const canFetchMore = Boolean(data) && !isLoading
 
   return (
     <Card>
@@ -37,6 +55,12 @@ export function FetchDataButton() {
           </Flex>
         )}
 
+        {infoMessage && (
+          <Text size="2" color="gray">
+            {infoMessage}
+          </Text>
+        )}
+
         <Button onClick={handleFetch} disabled={isDisabled}>
           {isLoading ? (
             <>
@@ -50,6 +74,13 @@ export function FetchDataButton() {
             </>
           )}
         </Button>
+
+        {canFetchMore && (
+          <Button onClick={handleFetchMore} disabled={isDisabled} variant="soft">
+            <PlusCircle className="h-4 w-4" />
+            Fetch More
+          </Button>
+        )}
       </Flex>
     </Card>
   )

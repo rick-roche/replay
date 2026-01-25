@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Badge, Box, Card, Flex, Heading, Separator, Text } from '@radix-ui/themes';
-import { AlertTriangleIcon, CheckCircle2Icon, LinkIcon, Loader2, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { AlertTriangleIcon, CheckCircle2Icon, GripVertical, LinkIcon, Loader2, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useMatch } from '@/contexts/MatchContext';
 import { ManualSearchModal } from './ManualSearchModal';
 import type { components } from '@/api/generated-client';
@@ -170,12 +170,14 @@ const UnmatchedTrackRow = ({ trackIndex, matchedTrack }: UnmatchedTrackRowProps)
   );
 };
 
-const MatchedTrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
+const MatchedTrackRow = ({ matchedTrack, trackIndex }: { matchedTrack: MatchedTrack; trackIndex: number }) => {
   const { sourceTrack, match } = matchedTrack;
+
+  const { removeTrack } = useMatch();
 
   return (
     <Box>
-      <Flex direction="column" gap="1" py="2">
+      <Flex direction="column" gap="2" py="2">
         <Flex align="center" gap="2">
           <CheckCircle2Icon size={16} color="var(--green-9)" />
           <Text weight="medium" size="2">
@@ -187,7 +189,7 @@ const MatchedTrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
         </Flex>
 
         {match ? (
-          <Flex gap="2" align="center" ml="6">
+          <Flex gap="2" align="center" ml="6" wrap="wrap">
             <LinkIcon size={12} color="var(--gray-9)" />
             <Text size="1" color="gray">
               Matched: {match.name} by {match.artist}
@@ -208,6 +210,17 @@ const MatchedTrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
           album={sourceTrack.album ?? null}
           metadata={(sourceTrack as unknown as { sourceMetadata?: Record<string, unknown> }).sourceMetadata ?? null}
         />
+
+        <Flex ml="6" gap="2" align="center">
+          <button
+            onClick={() => removeTrack(trackIndex)}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-900/20"
+            title="Remove this track"
+          >
+            <Trash2 size={14} />
+            Remove
+          </button>
+        </Flex>
       </Flex>
       <Separator size="4" />
     </Box>
@@ -215,7 +228,14 @@ const MatchedTrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
 };
 
 export function MatchResults() {
-  const { matchedData, isLoading } = useMatch();
+  const { matchedData, isLoading, moveTrack } = useMatch();
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  const handleDrop = (toIndex: number) => {
+    if (draggingIndex === null) return;
+    moveTrack(draggingIndex, toIndex);
+    setDraggingIndex(null);
+  };
 
   if (isLoading) {
     return (
@@ -280,18 +300,37 @@ export function MatchResults() {
         <Separator size="4" />
 
         <Box>
-          {(tracks ?? []).slice(0, 20).map((track, index) => 
-            track.match ? (
-              <MatchedTrackRow key={index} matchedTrack={track} />
-            ) : (
-              <UnmatchedTrackRow key={index} trackIndex={index} matchedTrack={track} />
-            )
-          )}
-          {(tracks?.length ?? 0) > 20 && (
-            <Text size="2" color="gray" mt="2">
-              ...and {(tracks?.length ?? 0) - 20} more tracks
-            </Text>
-          )}
+          <Text size="1" color="gray" mb="2">
+            Drag the handle to reorder tracks. Remove any you do not want in the playlist.
+          </Text>
+          {(tracks ?? []).map((track, index) => {
+            const isDragging = draggingIndex === index;
+
+            return (
+              <Box
+                key={index}
+                draggable
+                onDragStart={() => setDraggingIndex(index)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(index)}
+                onDragEnd={() => setDraggingIndex(null)}
+                className={`rounded-md ${isDragging ? 'bg-green-900/10 border border-green-700' : ''}`}
+              >
+                <Flex gap="3" align="start" py="1" px="1">
+                  <span className="flex items-center text-gray-500 cursor-grab" aria-hidden>
+                    <GripVertical size={16} />
+                  </span>
+                  <Box style={{ flex: 1 }}>
+                    {track.match ? (
+                      <MatchedTrackRow matchedTrack={track} trackIndex={index} />
+                    ) : (
+                      <UnmatchedTrackRow trackIndex={index} matchedTrack={track} />
+                    )}
+                  </Box>
+                </Flex>
+              </Box>
+            );
+          })}
         </Box>
       </Flex>
     </Card>

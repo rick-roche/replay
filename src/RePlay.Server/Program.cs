@@ -32,15 +32,24 @@ builder.Services.AddOptions<SpotifyOptions>()
         return true;
     }, "Spotify configuration is invalid. Ensure ClientId, ClientSecret, and RedirectUri are set. RedirectUri must not contain 'localhost'.");
 
-// Configure Last.fm options
-builder.Services.Configure<LastfmOptions>(
-    builder.Configuration.GetSection(LastfmOptions.SectionName));
+// Configure external source options
+builder.Services.Configure<LastfmOptions>(builder.Configuration.GetSection(LastfmOptions.SectionName));
+builder.Services.AddOptions<DiscogsOptions>()
+    .Bind(builder.Configuration.GetSection(DiscogsOptions.SectionName))
+    .ValidateDataAnnotations();
+builder.Services.Configure<SetlistFmOptions>(builder.Configuration.GetSection(SetlistFmOptions.SectionName));
 
 // Register HTTP client for Spotify API
 builder.Services.AddHttpClient<ISpotifyAuthService, SpotifyAuthService>();
 
 // Register HTTP client for Last.fm API
 builder.Services.AddHttpClient<ILastfmService, LastfmService>();
+
+// Register HTTP client for Discogs API
+builder.Services.AddHttpClient<IDiscogsService, DiscogsService>();
+
+// Register HTTP client for Setlist.fm API
+builder.Services.AddHttpClient<ISetlistFmService, SetlistFmService>();
 
 // Register HTTP client for Spotify matching service
 builder.Services.AddHttpClient<ISpotifyMatchingService, SpotifyMatchingService>();
@@ -89,4 +98,3 @@ app.MapDefaultEndpoints();
 app.UseFileServer();
 
 app.Run();
-

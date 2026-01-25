@@ -17,16 +17,35 @@ interface MatchContextType {
   isLoading: boolean;
   error: string | null;
   matchTracks: (tracks: NormalizedTrack[]) => Promise<void>;
+  appendMatches: (tracks: NormalizedTrack[]) => Promise<void>;
   clearMatches: () => void;
   clearError: () => void;
   // Methods for handling unmatched tracks
   retryMatch: (trackIndex: number) => Promise<void>;
   removeTrack: (trackIndex: number) => void;
+  moveTrack: (fromIndex: number, toIndex: number) => void;
   applyManualMatch: (trackIndex: number, spotifyTrack: SpotifyTrack) => void;
   searchTracks: (query: string) => Promise<SpotifyTrack[]>;
 }
 
 const MatchContext = createContext<MatchContextType | undefined>(undefined);
+
+const withCounts = (data: MatchedDataResponse): MatchedDataResponse => {
+  const tracks = data.tracks ?? [];
+  const matchedCount = tracks.filter((track) => Boolean(track.match)).length;
+  const unmatchedCount = tracks.length - matchedCount;
+
+  return {
+    ...data,
+    tracks,
+    matchedCount,
+    unmatchedCount,
+    totalTracks: tracks.length,
+  };
+};
+
+const trackKey = (t: NormalizedTrack) =>
+  `${(t.name ?? '').toLowerCase()}|${(t.artist ?? '').toLowerCase()}|${(t.album ?? '').toLowerCase()}`;
 
 export function MatchProvider({ children }: { children: ReactNode }) {
   const [matchedData, setMatchedData] = useState<MatchedDataResponse | null>(
@@ -42,7 +61,7 @@ export function MatchProvider({ children }: { children: ReactNode }) {
 
       try {
         const result = await matchApi.matchTracksToSpotify({ tracks });
-        setMatchedData(result);
+        setMatchedData(withCounts(result));
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to match tracks';
@@ -52,6 +71,40 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       }
     },
     []
+  );
+
+  const appendMatches = useCallback(
+    async (tracks: NormalizedTrack[]) => {
+      if (tracks.length === 0) return;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await matchApi.matchTracksToSpotify({ tracks });
+        const existing = matchedData?.tracks ?? [];
+        const seen = new Set(existing.map((t) => trackKey(t.sourceTrack)));
+
+        const newTracks: MatchedDataResponse['tracks'] = [];
+        for (const t of result.tracks ?? []) {
+          const key = trackKey(t.sourceTrack);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          newTracks.push(t);
+        }
+
+        const merged: MatchedDataResponse = {
+          tracks: [...existing, ...newTracks],
+        };
+        setMatchedData(withCounts(merged));
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to match new tracks';
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [matchedData]
   );
 
   const retryMatch = useCallback(
@@ -70,10 +123,12 @@ export function MatchProvider({ children }: { children: ReactNode }) {
         if (result.tracks && result.tracks[0]) {
           const updatedTracks = [...matchedData.tracks];
           updatedTracks[trackIndex] = result.tracks[0];
-          setMatchedData({
-            ...matchedData,
-            tracks: updatedTracks,
-          });
+          setMatchedData(
+            withCounts({
+              ...matchedData,
+              tracks: updatedTracks,
+            })
+          );
         }
       } catch (err) {
         const errorMessage =
@@ -89,10 +144,27 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       if (!prev?.tracks) return prev;
 
       const updatedTracks = prev.tracks.filter((_, i) => i !== trackIndex);
-      return {
+      return withCounts({
         ...prev,
         tracks: updatedTracks,
-      };
+      });
+    });
+  }, []);
+
+  const moveTrack = useCallback((fromIndex: number, toIndex: number) => {
+    setMatchedData((prev) => {
+      if (!prev?.tracks) return prev;
+      if (fromIndex === toIndex) return prev;
+
+      const updatedTracks = [...prev.tracks];
+      const [moved] = updatedTracks.splice(fromIndex, 1);
+      if (!moved) return prev;
+      updatedTracks.splice(toIndex, 0, moved);
+
+      return withCounts({
+        ...prev,
+        tracks: updatedTracks,
+      });
     });
   }, []);
 
@@ -116,10 +188,12 @@ export function MatchProvider({ children }: { children: ReactNode }) {
         },
       };
 
-      setMatchedData({
-        ...matchedData,
-        tracks: updatedTracks,
-      });
+      setMatchedData(
+        withCounts({
+          ...matchedData,
+          tracks: updatedTracks,
+        })
+      );
     },
     [matchedData]
   );
@@ -153,10 +227,12 @@ export function MatchProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         matchTracks,
+        appendMatches,
         clearMatches,
         clearError,
         retryMatch,
         removeTrack,
+        moveTrack,
         applyManualMatch,
         searchTracks,
       }}

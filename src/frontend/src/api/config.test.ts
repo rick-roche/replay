@@ -39,6 +39,23 @@ describe('configApi', () => {
     })
   })
 
+  describe('configureDiscogs', () => {
+    it('returns configuration on success', async () => {
+      mockFetch({ ok: true, json: { username: 'alice', collectionUrl: 'https://discogs.com/users/alice/collection', releaseCount: 42, isConfigured: true } })
+      const res = await configApi.configureDiscogs('alice')
+      expect(res).toEqual({ username: 'alice', collectionUrl: 'https://discogs.com/users/alice/collection', releaseCount: 42, isConfigured: true })
+      const call = (fetch as Mock).mock.calls[0]
+      const req: Request = call[0]
+      expect(req.url.endsWith('/api/config/discogs')).toBe(true)
+      expect(req.method).toBe('POST')
+    })
+
+    it('throws error with server message on failure', async () => {
+      mockFetch({ ok: false, json: { code: 'INVALID_DISCOGS_PROFILE', message: 'INVALID_DISCOGS_PROFILE' } })
+      await expect(configApi.configureDiscogs('bad')).rejects.toThrow('INVALID_DISCOGS_PROFILE')
+    })
+  })
+
   describe('fetchLastfmData', () => {
     it('returns data on success', async () => {
       mockFetch({ ok: true, json: { dataType: 'Tracks', tracks: [{ name: 't', artist: 'a', playCount: 1 }], albums: [], artists: [] } })
