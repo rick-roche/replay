@@ -242,4 +242,181 @@ describe('MatchContext', () => {
     expect(result.current.matchedData?.matchedCount).toBe(2);
     expect(result.current.matchedData?.tracks[1].sourceTrack.name).toBe('Track 3');
   });
+
+  it('clears all matches', async () => {
+    const apiResponse = responseWithTracks([
+      { sourceTrack: buildNormalizedTrack('Track 1'), match: buildMatch('t1', 'Track 1', 'Artist 1') },
+    ]);
+    vi.mocked(matchApi.matchTracksToSpotify).mockResolvedValue(apiResponse);
+
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    await act(async () => {
+      await result.current.matchTracks([buildNormalizedTrack('Track 1')]);
+    });
+
+    expect(result.current.matchedData).not.toBeNull();
+
+    act(() => {
+      result.current.clearMatches();
+    });
+
+    expect(result.current.matchedData).toBeNull();
+  });
+
+  it('clears error state', async () => {
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    vi.mocked(matchApi.matchTracksToSpotify).mockRejectedValueOnce(new Error('Match failed'));
+
+    await act(async () => {
+      await result.current.matchTracks([buildNormalizedTrack('Track 1')]);
+    });
+
+    expect(result.current.error).not.toBeNull();
+
+    act(() => {
+      result.current.clearError();
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('removes a track from matches', async () => {
+    const apiResponse = responseWithTracks([
+      { sourceTrack: buildNormalizedTrack('Track 1'), match: buildMatch('t1', 'Track 1', 'Artist 1') },
+      { sourceTrack: buildNormalizedTrack('Track 2'), match: buildMatch('t2', 'Track 2', 'Artist 2') },
+    ]);
+    vi.mocked(matchApi.matchTracksToSpotify).mockResolvedValue(apiResponse);
+
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    await act(async () => {
+      await result.current.matchTracks([buildNormalizedTrack('Track 1'), buildNormalizedTrack('Track 2')]);
+    });
+
+    expect(result.current.matchedData?.tracks).toHaveLength(2);
+
+    act(() => {
+      result.current.removeTrack(0);
+    });
+
+    expect(result.current.matchedData?.tracks).toHaveLength(1);
+    expect(result.current.matchedData?.tracks[0].sourceTrack.name).toBe('Track 2');
+  });
+
+  it('handles empty search query', async () => {
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    let searchResults: SpotifyTrack[] = [];
+    await act(async () => {
+      searchResults = await result.current.searchTracks('');
+    });
+
+    expect(searchResults).toEqual([]);
+  });
+
+  it('handles whitespace search query', async () => {
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    let searchResults: SpotifyTrack[] = [];
+    await act(async () => {
+      searchResults = await result.current.searchTracks('   ');
+    });
+
+    expect(searchResults).toEqual([]);
+  });
+
+  it('handles search errors', async () => {
+    vi.mocked(matchApi.searchTracksForManualMatch).mockRejectedValueOnce(new Error('Search failed'));
+
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    let searchResults: SpotifyTrack[] = [];
+    await act(async () => {
+      searchResults = await result.current.searchTracks('query');
+    });
+
+    expect(searchResults).toEqual([]);
+    expect(result.current.error).toBe('Search failed');
+  });
+
+  it('applies manual match to a track', async () => {
+    const apiResponse = responseWithTracks([
+      { sourceTrack: buildNormalizedTrack('Track 1'), match: null },
+    ]);
+    vi.mocked(matchApi.matchTracksToSpotify).mockResolvedValue(apiResponse);
+
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    await act(async () => {
+      await result.current.matchTracks([buildNormalizedTrack('Track 1')]);
+    });
+
+    expect(result.current.matchedData?.tracks[0].match).toBeNull();
+
+    const spotifyTrack: SpotifyTrack = {
+      id: 'manual-id',
+      name: 'Manual Track',
+      artist: 'Manual Artist',
+      album: 'Manual Album',
+      uri: 'spotify:track:manual-id'
+    };
+
+    act(() => {
+      result.current.applyManualMatch(0, spotifyTrack);
+    });
+
+    expect(result.current.matchedData?.tracks[0].match?.spotifyId).toBe('manual-id');
+    expect(result.current.matchedData?.tracks[0].match?.confidence).toBe(100);
+  });
+
+  it('ignores applyManualMatch with invalid track index', async () => {
+    const apiResponse = responseWithTracks([
+      { sourceTrack: buildNormalizedTrack('Track 1'), match: null },
+    ]);
+    vi.mocked(matchApi.matchTracksToSpotify).mockResolvedValue(apiResponse);
+
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    await act(async () => {
+      await result.current.matchTracks([buildNormalizedTrack('Track 1')]);
+    });
+
+    const spotifyTrack: SpotifyTrack = {
+      id: 'manual-id',
+      name: 'Manual Track',
+      artist: 'Manual Artist',
+      album: 'Manual Album',
+      uri: 'spotify:track:manual-id'
+    };
+
+    act(() => {
+      result.current.applyManualMatch(99, spotifyTrack);
+    });
+
+    // Should remain unchanged
+    expect(result.current.matchedData?.tracks[0].match).toBeNull();
+  });
+
+  it('ignores moveTrack with same from and to index', async () => {
+    const apiResponse = responseWithTracks([
+      { sourceTrack: buildNormalizedTrack('Track 1'), match: buildMatch('t1', 'Track 1', 'Artist 1') },
+      { sourceTrack: buildNormalizedTrack('Track 2'), match: buildMatch('t2', 'Track 2', 'Artist 2') },
+    ]);
+    vi.mocked(matchApi.matchTracksToSpotify).mockResolvedValue(apiResponse);
+
+    const { result } = renderHook(() => useMatch(), { wrapper: MatchProvider });
+
+    await act(async () => {
+      await result.current.matchTracks([buildNormalizedTrack('Track 1'), buildNormalizedTrack('Track 2')]);
+    });
+
+    act(() => {
+      result.current.moveTrack(0, 0);
+    });
+
+    expect(result.current.matchedData?.tracks[0].sourceTrack.name).toBe('Track 1');
+    expect(result.current.matchedData?.tracks[1].sourceTrack.name).toBe('Track 2');
+  });
 });

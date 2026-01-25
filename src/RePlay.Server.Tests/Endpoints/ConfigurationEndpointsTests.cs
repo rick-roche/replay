@@ -136,7 +136,7 @@ public class ConfigurationEndpointsTests
         });
         var fake = new FakeLastfmService
         {
-            OnGetUserAsync = (u, ct) => Task.FromResult<LastfmUser?>(new LastfmUser { Username = u, PlayCount = 1, Registered = "" })
+            OnGetUserAsync = (u, ct) => Task.FromResult<LastfmUser?>(new LastfmUser { Username = u, PlayCount = 1, Registered = "", ProfileUrl = "https://www.last.fm/user/" + u })
         };
 
         var result = await InvokeAsync(mi,

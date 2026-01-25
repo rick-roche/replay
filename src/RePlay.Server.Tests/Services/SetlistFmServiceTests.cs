@@ -29,21 +29,35 @@ public sealed class SetlistFmServiceTests
     [Fact]
     public async Task GetUserAsync_ReturnsUser_WhenFound()
     {
-        var payload = """
+        var userPayload = """
             {
                 "userId": "exampleUser",
-                "fullName": "Example Person",
-                "url": "https://www.setlist.fm/user/exampleUser",
-                "stats": {
-                    "attended": 42
-                }
+                "fullname": "Example Person",
+                "url": "https://www.setlist.fm/user/exampleUser"
             }
             """;
 
+        var attendedPayload = """
+            {
+                "setlist": [],
+                "total": 42,
+                "page": 1,
+                "itemsPerPage": 1
+            }
+            """;
+
+        // First call returns user profile
         _handler.Enqueue(new HttpResponseMessage
         {
             StatusCode = HttpStatusCode.OK,
-            Content = new StringContent(payload)
+            Content = new StringContent(userPayload)
+        });
+
+        // Second call returns attended concerts count
+        _handler.Enqueue(new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(attendedPayload)
         });
 
         var user = await _service.GetUserAsync("exampleUser");
