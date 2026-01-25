@@ -8,10 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
     "test:ui": "vitest --ui",
     "knip": "knip",
-    "generate-client": "openapi-typescript http://localhost:7511/openapi/v1.json --output src/api/generated-client.ts --root-types --root-types-no-schema-prefix"
+    "generate-client": "openapi-typescript http://localhost:7511/openapi/v1.json --output src/api/generated-client.ts --root-types --root-types-no-schema-prefix",
+    "validate": "npm run build && npm run lint && npm run knip"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -26,6 +27,7 @@
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.10.9",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

@@ -38,10 +38,12 @@ When acting on this repository:
 - `docs/`: All docs other than the README.md.
 - `infra/`: All infrastructure needed to deploy the application.
 
-### Setup commands
+### Commands
 
 - `aspire run`: Runs the application (including installing all dependencies).
-- `dotnet test`: Runs the tests.
+- `dotnet test`: Runs the backend tests.
+- `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
+- `cd src/frontend && npm run test`: Runs the frontend tests.
 
 ---
 
@@ -76,3 +78,9 @@ When acting on this repository:
 - All backend functionality should have unit tests.
 - All frontend components performing logic should have component unit tests
 - All API's should have non-integrated contract tests.
+
+Ensure that all changes have tests added and that all validations pass:
+
+- `dotnet test`: Runs the backend tests.
+- `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
+- `cd src/frontend && npm run test`: Runs the frontend tests.

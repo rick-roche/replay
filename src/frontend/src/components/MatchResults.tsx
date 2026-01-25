@@ -9,6 +9,48 @@ type MatchedTrack = components['schemas']['MatchedTrack']
 type MatchMethod = 'Exact' | 'Normalized' | 'Fuzzy' | 'AlbumBased'
 type SpotifyTrack = components['schemas']['SpotifyTrack']
 
+const SourceInfo = ({
+  source,
+  album,
+  metadata,
+}: {
+  source: string;
+  album?: string | null;
+  metadata?: Record<string, unknown> | null;
+}) => {
+  const items: string[] = [];
+
+  // Known metadata keys across sources
+  const playCount = typeof metadata?.playCount === 'number' ? metadata?.playCount :
+    (typeof metadata?.playCount === 'string' ? parseInt(metadata.playCount as string, 10) : undefined);
+  const concertDate = typeof metadata?.concertDate === 'string' ? (metadata.concertDate as string) : undefined;
+  const venue = typeof metadata?.venue === 'string' ? (metadata.venue as string) : undefined;
+  const year = typeof metadata?.year === 'number' ? (metadata.year as number) :
+    (typeof metadata?.year === 'string' ? parseInt(metadata.year as string, 10) : undefined);
+  const format = typeof metadata?.format === 'string' ? (metadata.format as string) : undefined;
+  const added = typeof metadata?.added === 'string' ? (metadata.added as string) : undefined;
+
+  if (album) items.push(`Album: ${album}`);
+  if (playCount !== undefined && !Number.isNaN(playCount)) items.push(`Play count: ${playCount}`);
+  if (concertDate) items.push(`Concert: ${concertDate}${venue ? ` @ ${venue}` : ''}`);
+  if (year) items.push(`Year: ${year}`);
+  if (format) items.push(`Format: ${format}`);
+  if (added) items.push(`Added: ${added}`);
+
+  if (items.length === 0) return null;
+
+  return (
+    <Flex gap="2" align="center" ml="6">
+      <Badge color="gray" variant="soft" size="1">
+        {source}
+      </Badge>
+      <Text size="1" color="gray">
+        {items.join(' · ')}
+      </Text>
+    </Flex>
+  );
+};
+
 const MatchMethodBadge = ({ method }: { method: MatchMethod }) => {
   const colors: Record<MatchMethod, 'green' | 'blue' | 'cyan' | 'orange'> = {
     Exact: 'green',
@@ -77,6 +119,11 @@ const UnmatchedTrackRow = ({ trackIndex, matchedTrack }: UnmatchedTrackRowProps)
               by {sourceTrack.artist}
             </Text>
           </Flex>
+          <SourceInfo
+            source={String(sourceTrack.source)}
+            album={sourceTrack.album ?? null}
+            metadata={(sourceTrack as unknown as { sourceMetadata?: Record<string, unknown> }).sourceMetadata ?? null}
+          />
           <Flex ml="6" gap="2" align="center">
             <button
               onClick={handleRetry}
@@ -155,6 +202,12 @@ const MatchedTrackRow = ({ matchedTrack }: { matchedTrack: MatchedTrack }) => {
             </Text>
           </Flex>
         )}
+
+        <SourceInfo
+          source={String(sourceTrack.source)}
+          album={sourceTrack.album ?? null}
+          metadata={(sourceTrack as unknown as { sourceMetadata?: Record<string, unknown> }).sourceMetadata ?? null}
+        />
       </Flex>
       <Separator size="4" />
     </Box>
@@ -228,10 +281,10 @@ export function MatchResults() {
 
         <Box>
           {(tracks ?? []).slice(0, 20).map((track, index) => 
-            !track.isMatched ? (
-              <UnmatchedTrackRow key={index} trackIndex={index} matchedTrack={track} />
-            ) : (
+            track.match ? (
               <MatchedTrackRow key={index} matchedTrack={track} />
+            ) : (
+              <UnmatchedTrackRow key={index} trackIndex={index} matchedTrack={track} />
             )
           )}
           {(tracks?.length ?? 0) > 20 && (
