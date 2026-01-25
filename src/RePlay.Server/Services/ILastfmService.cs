@@ -91,11 +91,18 @@ public sealed class LastfmService : ILastfmService
                 ? playCountElement.GetString() 
                 : playCountElement.GetInt32().ToString();
 
+            var profileUrl = userElement.TryGetProperty("url", out var urlElement)
+                ? urlElement.GetString()
+                : null;
+
             var user = new LastfmUser
             {
                 Username = userElement.GetProperty("name").GetString() ?? username,
                 PlayCount = int.TryParse(playcountStr, out var count) ? count : 0,
-                Registered = userElement.GetProperty("registered").GetProperty("unixtime").GetString() ?? ""
+                Registered = userElement.GetProperty("registered").GetProperty("unixtime").GetString() ?? string.Empty,
+                ProfileUrl = string.IsNullOrWhiteSpace(profileUrl)
+                    ? $"https://www.last.fm/user/{Uri.EscapeDataString(username)}"
+                    : profileUrl!
             };
 
             return user;
@@ -387,4 +394,5 @@ public sealed record LastfmUser
     public required string Username { get; init; }
     public required int PlayCount { get; init; }
     public required string Registered { get; init; }
+    public required string ProfileUrl { get; init; }
 }

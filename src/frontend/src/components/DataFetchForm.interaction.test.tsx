@@ -6,6 +6,25 @@ import { ConfigProvider } from '@/contexts/ConfigContext'
 import { DataProvider } from '@/contexts/DataContext'
 import * as configApiModule from '@/api/config'
 
+const appendMatchesMock = vi.fn()
+
+vi.mock('@/contexts/MatchContext', () => ({
+  useMatch: () => ({
+    appendMatches: appendMatchesMock,
+    matchTracks: vi.fn(),
+    clearMatches: vi.fn(),
+    clearError: vi.fn(),
+    retryMatch: vi.fn(),
+    removeTrack: vi.fn(),
+    moveTrack: vi.fn(),
+    applyManualMatch: vi.fn(),
+    searchTracks: vi.fn(),
+    matchedData: null,
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 vi.mock('@/api/config', () => ({
   configApi: {
     fetchLastfmData: vi.fn(),
@@ -37,6 +56,7 @@ const setFilter = (dataType: 'Tracks' | 'Albums' | 'Artists' = 'Tracks') => {
 describe('DataFetchForm interactions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    appendMatchesMock.mockReset()
     localStorage.clear()
   })
 
@@ -167,5 +187,53 @@ describe('DataFetchForm interactions', () => {
     await waitFor(() => {
       expect(screen.getByText('Boom')).toBeInTheDocument()
     })
+  })
+
+  it('fetches more data, dedupes, and appends matches', async () => {
+    setConfigured()
+    setFilter('Tracks')
+
+    const firstTracks = [
+      { name: 't1', artist: 'a1', playCount: 1 },
+      { name: 't2', artist: 'a2', playCount: 2 },
+    ]
+    const moreTracks = [
+      { name: 't2', artist: 'a2', playCount: 2 }, // duplicate
+      { name: 't3', artist: 'a3', playCount: 3 },
+    ]
+
+    vi.mocked(configApi.fetchLastfmData)
+      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: firstTracks, albums: [], artists: [] })
+      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: moreTracks, albums: [], artists: [] })
+
+    vi.mocked(configApi.fetchLastfmDataNormalized)
+      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: firstTracks.map((t) => ({ ...t, source: 'lastfm', sourceMetadata: {} })), albums: [], artists: [] })
+      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: moreTracks.map((t) => ({ ...t, source: 'lastfm', sourceMetadata: {} })), albums: [], artists: [] })
+
+    render(
+      <Wrapper>
+        <FetchDataButton />
+        <DataResults />
+      </Wrapper>
+    )
+
+    // Initial fetch
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/Tracks Found/)).toBeInTheDocument()
+    })
+
+    // Fetch more
+    fireEvent.click(screen.getByRole('button', { name: /Fetch More/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/3 tracks found/)).toBeInTheDocument()
+    })
+
+    // Only the new track should be appended to matching
+    expect(appendMatchesMock).toHaveBeenCalledTimes(1)
+    const calledWith = appendMatchesMock.mock.calls[0][0]
+    expect(calledWith).toHaveLength(1)
+    expect(calledWith[0].name).toBe('t3')
   })
 })

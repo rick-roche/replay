@@ -195,6 +195,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/discogs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Configure or validate a Discogs profile
+         * @description Validates a Discogs username or collection and stores the configuration in the user session.
+         */
+        post: operations["ConfigureDiscogs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/setlistfm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Configure or validate a Setlist.fm username or ID
+         * @description Validates the provided Setlist.fm identity and stores the configuration in the user session.
+         */
+        post: operations["ConfigureSetlistFm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/api/match/spotify": {
         parameters: {
             query?: never;
@@ -304,6 +344,16 @@ export interface components {
             message: string;
             details?: null | string;
         };
+        ConfigureDiscogsRequest: {
+            usernameOrCollectionId: string;
+        };
+        ConfigureDiscogsResponse: {
+            username: string;
+            collectionUrl: string;
+            /** Format: int32 */
+            releaseCount: number | string;
+            isConfigured: boolean;
+        };
         ConfigureLastfmRequest: {
             username: string;
         };
@@ -311,6 +361,18 @@ export interface components {
             username: string;
             /** Format: int32 */
             playCount: number | string;
+            profileUrl: string;
+            isConfigured: boolean;
+        };
+        ConfigureSetlistRequest: {
+            usernameOrId: string;
+        };
+        ConfigureSetlistResponse: {
+            userId: string;
+            displayName: string;
+            profileUrl?: null | string;
+            /** Format: int32 */
+            attendedConcerts?: number | string;
             isConfigured: boolean;
         };
         FetchLastfmDataRequest: {
@@ -440,8 +502,12 @@ export interface components {
     pathItems: never;
 }
 export type ApiError = components['schemas']['ApiError'];
+export type ConfigureDiscogsRequest = components['schemas']['ConfigureDiscogsRequest'];
+export type ConfigureDiscogsResponse = components['schemas']['ConfigureDiscogsResponse'];
 export type ConfigureLastfmRequest = components['schemas']['ConfigureLastfmRequest'];
 export type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse'];
+export type ConfigureSetlistRequest = components['schemas']['ConfigureSetlistRequest'];
+export type ConfigureSetlistResponse = components['schemas']['ConfigureSetlistResponse'];
 export type FetchLastfmDataRequest = components['schemas']['FetchLastfmDataRequest'];
 export type LastfmAlbum = components['schemas']['LastfmAlbum'];
 export type LastfmArtist = components['schemas']['LastfmArtist'];
@@ -484,6 +550,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigureLastfmResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    ConfigureDiscogs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureDiscogsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigureDiscogsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    ConfigureSetlistFm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigureSetlistRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigureSetlistResponse"];
                 };
             };
             /** @description Bad Request */

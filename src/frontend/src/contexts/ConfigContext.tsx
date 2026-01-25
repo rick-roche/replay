@@ -3,14 +3,20 @@ import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
 
 type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse']
+type ConfigureDiscogsResponse = components['schemas']['ConfigureDiscogsResponse']
+type ConfigureSetlistResponse = components['schemas']['ConfigureSetlistResponse']
 type LastfmFilter = components['schemas']['LastfmFilter']
 
 interface ConfigContextValue {
   lastfmConfig: ConfigureLastfmResponse | null
+  discogsConfig: ConfigureDiscogsResponse | null
+  setlistConfig: ConfigureSetlistResponse | null
   lastfmFilter: LastfmFilter
   isLoading: boolean
   error: string | null
   configureLastfm: (username: string) => Promise<void>
+  configureDiscogs: (identifier: string) => Promise<void>
+  configureSetlistFm: (usernameOrId: string) => Promise<void>
   updateFilter: (updates: Partial<LastfmFilter>) => void
   clearError: () => void
 }
@@ -18,6 +24,8 @@ interface ConfigContextValue {
 const ConfigContext = createContext<ConfigContextValue | null>(null)
 
 const LASTFM_CONFIG_KEY = 'replay:lastfm_config'
+const DISCOGS_CONFIG_KEY = 'replay:discogs_config'
+const SETLIST_CONFIG_KEY = 'replay:setlist_config'
 const LASTFM_FILTER_KEY = 'replay:lastfm_filter'
 
 const DEFAULT_FILTER: LastfmFilter = {
@@ -28,6 +36,8 @@ const DEFAULT_FILTER: LastfmFilter = {
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [lastfmConfig, setLastfmConfig] = useState<ConfigureLastfmResponse | null>(null)
+  const [discogsConfig, setDiscogsConfig] = useState<ConfigureDiscogsResponse | null>(null)
+  const [setlistConfig, setSetlistConfig] = useState<ConfigureSetlistResponse | null>(null)
   const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(DEFAULT_FILTER)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +50,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setLastfmConfig(JSON.parse(storedConfig))
       } catch {
         localStorage.removeItem(LASTFM_CONFIG_KEY)
+      }
+    }
+
+    const storedDiscogs = localStorage.getItem(DISCOGS_CONFIG_KEY)
+    if (storedDiscogs) {
+      try {
+        setDiscogsConfig(JSON.parse(storedDiscogs))
+      } catch {
+        localStorage.removeItem(DISCOGS_CONFIG_KEY)
+      }
+    }
+
+    const storedSetlist = localStorage.getItem(SETLIST_CONFIG_KEY)
+    if (storedSetlist) {
+      try {
+        setSetlistConfig(JSON.parse(storedSetlist))
+      } catch {
+        localStorage.removeItem(SETLIST_CONFIG_KEY)
       }
     }
 
@@ -68,6 +96,34 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function configureDiscogs(identifier: string) {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const config = await configApi.configureDiscogs(identifier)
+      setDiscogsConfig(config)
+      localStorage.setItem(DISCOGS_CONFIG_KEY, JSON.stringify(config))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function configureSetlistFm(usernameOrId: string) {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const config = await configApi.configureSetlistFm(usernameOrId)
+      setSetlistConfig(config)
+      localStorage.setItem(SETLIST_CONFIG_KEY, JSON.stringify(config))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function updateFilter(updates: Partial<LastfmFilter>) {
     const newFilter = { ...lastfmFilter, ...updates }
     setLastfmFilter(newFilter)
@@ -81,10 +137,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const value: ConfigContextValue = {
     lastfmConfig,
+    discogsConfig,
+    setlistConfig,
     lastfmFilter,
     isLoading,
     error,
     configureLastfm,
+    configureDiscogs,
+    configureSetlistFm,
     updateFilter,
     clearError
   }

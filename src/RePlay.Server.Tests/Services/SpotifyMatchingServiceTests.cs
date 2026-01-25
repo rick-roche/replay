@@ -61,9 +61,9 @@ public class SpotifyMatchingServiceTests : IDisposable
         Assert.Single(result.Tracks);
         Assert.True(result.Tracks[0].IsMatched);
         Assert.NotNull(result.Tracks[0].Match);
-        Assert.Equal("spotify123", result.Tracks[0].Match.SpotifyId);
-        Assert.Equal(100, result.Tracks[0].Match.Confidence); // Exact match
-        Assert.Equal(MatchMethod.Exact, result.Tracks[0].Match.Method);
+        Assert.Equal("spotify123", result.Tracks[0].Match!.SpotifyId);
+        Assert.Equal(100, result.Tracks[0].Match!.Confidence); // Exact match
+        Assert.Equal(MatchMethod.Exact, result.Tracks[0].Match!.Method);
         Assert.Equal(1, result.MatchedCount);
         Assert.Equal(0, result.UnmatchedCount);
     }
@@ -111,7 +111,7 @@ public class SpotifyMatchingServiceTests : IDisposable
         Assert.Single(result.Tracks);
         Assert.True(result.Tracks[0].IsMatched);
         Assert.Equal(90, result.Tracks[0].Match!.Confidence); // Normalized match
-        Assert.Equal(MatchMethod.Normalized, result.Tracks[0].Match.Method);
+        Assert.Equal(MatchMethod.Normalized, result.Tracks[0].Match!.Method);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class SpotifyMatchingServiceTests : IDisposable
         Assert.Single(result.Tracks);
         Assert.True(result.Tracks[0].IsMatched);
         Assert.Equal(85, result.Tracks[0].Match!.Confidence); // Album-based match
-        Assert.Equal(MatchMethod.AlbumBased, result.Tracks[0].Match.Method);
+        Assert.Equal(MatchMethod.AlbumBased, result.Tracks[0].Match!.Method);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public class SpotifyMatchingServiceTests : IDisposable
         Assert.Single(result.Tracks);
         Assert.True(result.Tracks[0].IsMatched);
         Assert.Equal(70, result.Tracks[0].Match!.Confidence); // Fuzzy match
-        Assert.Equal(MatchMethod.Fuzzy, result.Tracks[0].Match.Method);
+        Assert.Equal(MatchMethod.Fuzzy, result.Tracks[0].Match!.Method);
     }
 
     [Fact]

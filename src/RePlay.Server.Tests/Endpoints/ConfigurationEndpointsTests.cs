@@ -39,6 +39,14 @@ public class ConfigurationEndpointsTests
             => OnGetUserDataNormalizedAsync?.Invoke(username, filter, cancellationToken) ?? Task.FromResult<NormalizedDataResponse?>(null);
     }
 
+    private sealed class FakeDiscogsService : IDiscogsService
+    {
+        public Func<string, CancellationToken, Task<DiscogsProfile?>>? OnGetProfileAsync { get; set; }
+
+        public Task<DiscogsProfile?> GetProfileAsync(string usernameOrCollectionId, CancellationToken cancellationToken = default)
+            => OnGetProfileAsync?.Invoke(usernameOrCollectionId, cancellationToken) ?? Task.FromResult<DiscogsProfile?>(null);
+    }
+
     private static HttpContext ContextWithSessionCookie(string? sessionId = "sid")
     {
         var ctx = new DefaultHttpContext();
@@ -128,7 +136,7 @@ public class ConfigurationEndpointsTests
         });
         var fake = new FakeLastfmService
         {
-            OnGetUserAsync = (u, ct) => Task.FromResult<LastfmUser?>(new LastfmUser { Username = u, PlayCount = 1, Registered = "" })
+            OnGetUserAsync = (u, ct) => Task.FromResult<LastfmUser?>(new LastfmUser { Username = u, PlayCount = 1, Registered = "", ProfileUrl = "https://www.last.fm/user/" + u })
         };
 
         var result = await InvokeAsync(mi,
@@ -144,5 +152,118 @@ public class ConfigurationEndpointsTests
         ok.Value!.Username.Should().Be("user");
     }
 
+    [Fact]
+    public async Task PostConfigureDiscogs_ValidatesMissingIdentifier()
+    {
+        var mi = GetPrivate("PostConfigureDiscogs");
+        var ctx = ContextWithSessionCookie();
+        var store = new InMemorySessionStore();
+        store.StoreSession(new AuthSession
+        {
+            SessionId = "sid",
+            AccessToken = "a",
+            RefreshToken = "r",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            User = new SpotifyUser { Id = "id", DisplayName = "name" }
+        });
 
+        var result = await InvokeAsync(mi,
+            new ConfigureDiscogsRequest { UsernameOrCollectionId = "" },
+            new FakeDiscogsService(),
+            store,
+            ctx,
+            CancellationToken.None);
+
+        result.Should().BeOfType<BadRequest<ApiError>>();
+        ((BadRequest<ApiError>)result).Value!.Code.Should().Be("MISSING_USERNAME_OR_COLLECTION");
+    }
+
+    [Fact]
+    public async Task PostConfigureDiscogs_ReturnsUnauthorized_WhenSessionMissing()
+    {
+        var mi = GetPrivate("PostConfigureDiscogs");
+
+        var result = await InvokeAsync(mi,
+            new ConfigureDiscogsRequest { UsernameOrCollectionId = "user" },
+            new FakeDiscogsService(),
+            new InMemorySessionStore(),
+            new DefaultHttpContext(),
+            CancellationToken.None);
+
+        result.Should().BeOfType<JsonHttpResult<ApiError>>();
+        ((JsonHttpResult<ApiError>)result).StatusCode.Should().Be(401);
+    }
+
+    [Fact]
+    public async Task PostConfigureDiscogs_ReturnsBadRequest_WhenProfileNotFound()
+    {
+        var mi = GetPrivate("PostConfigureDiscogs");
+        var ctx = ContextWithSessionCookie();
+        var store = new InMemorySessionStore();
+        store.StoreSession(new AuthSession
+        {
+            SessionId = "sid",
+            AccessToken = "a",
+            RefreshToken = "r",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            User = new SpotifyUser { Id = "id", DisplayName = "name" }
+        });
+
+        var fake = new FakeDiscogsService
+        {
+            OnGetProfileAsync = (_, _) => Task.FromResult<DiscogsProfile?>(null)
+        };
+
+        var result = await InvokeAsync(mi,
+            new ConfigureDiscogsRequest { UsernameOrCollectionId = "missing" },
+            fake,
+            store,
+            ctx,
+            CancellationToken.None);
+
+        result.Should().BeOfType<BadRequest<ApiError>>();
+        ((BadRequest<ApiError>)result).Value!.Code.Should().Be("INVALID_DISCOGS_PROFILE");
+    }
+
+    [Fact]
+    public async Task PostConfigureDiscogs_ReturnsOk_WhenProfileFound()
+    {
+        var mi = GetPrivate("PostConfigureDiscogs");
+        var ctx = ContextWithSessionCookie();
+        var store = new InMemorySessionStore();
+        store.StoreSession(new AuthSession
+        {
+            SessionId = "sid",
+            AccessToken = "a",
+            RefreshToken = "r",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            User = new SpotifyUser { Id = "id", DisplayName = "name" }
+        });
+
+        var fake = new FakeDiscogsService
+        {
+            OnGetProfileAsync = (identifier, _) => Task.FromResult<DiscogsProfile?>(new DiscogsProfile
+            {
+                Username = identifier,
+                CollectionUrl = "https://discogs.com/users/test/collection",
+                ReleaseCount = 5
+            })
+        };
+
+        var result = await InvokeAsync(mi,
+            new ConfigureDiscogsRequest { UsernameOrCollectionId = "collector" },
+            fake,
+            store,
+            ctx,
+            CancellationToken.None);
+
+        result.Should().BeOfType<Ok<ConfigureDiscogsResponse>>();
+        var ok = (Ok<ConfigureDiscogsResponse>)result;
+        ok.Value!.IsConfigured.Should().BeTrue();
+        ok.Value!.Username.Should().Be("collector");
+
+        var stored = store.GetSourceConfig("sid", "discogs");
+        stored.Should().NotBeNull();
+        stored!.ConfigValue.Should().Be("collector");
+    }
 }

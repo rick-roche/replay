@@ -49,6 +49,7 @@ vi.mock('@/contexts/MatchContext', () => {
       clearError: vi.fn(),
       retryMatch: vi.fn(),
       removeTrack: vi.fn(),
+      moveTrack: vi.fn(),
       applyManualMatch: vi.fn(),
       searchTracks: vi.fn().mockResolvedValue([]),
     }),

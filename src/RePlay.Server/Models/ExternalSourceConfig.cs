@@ -25,5 +25,35 @@ public sealed record ConfigureLastfmResponse
 {
     public required string Username { get; init; }
     public required int PlayCount { get; init; }
+    public required string ProfileUrl { get; init; }
     public required bool IsConfigured { get; init; }
+}
+
+/// <summary>
+/// Request to configure a Discogs profile.
+/// </summary>
+public sealed record ConfigureDiscogsRequest
+{
+    public required string UsernameOrCollectionId { get; init; }
+}
+
+/// <summary>
+/// Response containing Discogs configuration details.
+/// </summary>
+public sealed record ConfigureDiscogsResponse
+{
+    public required string Username { get; init; }
+    public required string CollectionUrl { get; init; }
+    public required int ReleaseCount { get; init; }
+    public required bool IsConfigured { get; init; }
+}
+
+/// <summary>
+/// Discogs profile metadata.
+/// </summary>
+public sealed record DiscogsProfile
+{
+    public required string Username { get; init; }
+    public required string CollectionUrl { get; init; }
+    public required int ReleaseCount { get; init; }
 }

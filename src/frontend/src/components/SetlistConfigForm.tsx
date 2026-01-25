@@ -3,27 +3,27 @@ import { Button, TextField, Text, Flex, Box, Card, Heading, Spinner, Link } from
 import { AlertCircle, CheckCircle2, Edit2 } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
 
-export function LastfmConfigForm() {
-  const { lastfmConfig, isLoading, error, configureLastfm, clearError } = useConfig()
-  const [username, setUsername] = useState('')
+export function SetlistConfigForm() {
+  const { setlistConfig, isLoading, error, configureSetlistFm, clearError } = useConfig()
+  const [usernameOrId, setUsernameOrId] = useState('')
   const [isEditing, setIsEditing] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!username.trim()) return
+    if (!usernameOrId.trim()) return
 
     clearError()
-    await configureLastfm(username.trim())
+    await configureSetlistFm(usernameOrId.trim())
     setIsEditing(false)
   }
 
-  if (lastfmConfig?.isConfigured && !isEditing) {
+  if (setlistConfig?.isConfigured && !isEditing) {
     return (
       <Card>
         <Flex direction="column" gap="4">
           <Box>
             <Heading size="4" weight="medium" mb="2">
-              Last.fm Profile
+              Setlist.fm Profile
             </Heading>
           </Box>
 
@@ -31,14 +31,14 @@ export function LastfmConfigForm() {
             <CheckCircle2 className="h-5 w-5" />
             <Flex direction="column" gap="1" width="100%">
               <Text size="2" weight="medium">
-                {lastfmConfig.username}
+                {setlistConfig.displayName}
               </Text>
               <Text size="1" color="gray">
-                {lastfmConfig.playCount.toLocaleString()} total scrobbles
+                {setlistConfig.attendedConcerts} concerts attended
               </Text>
-              {lastfmConfig.profileUrl && (
+              {setlistConfig.profileUrl && (
                 <Text size="1" color="gray">
-                  <Link href={lastfmConfig.profileUrl} target="_blank" rel="noreferrer">
+                  <Link href={setlistConfig.profileUrl} target="_blank" rel="noreferrer">
                     View profile
                   </Link>
                 </Text>
@@ -50,11 +50,11 @@ export function LastfmConfigForm() {
             variant="outline"
             onClick={() => {
               setIsEditing(true)
-              setUsername(lastfmConfig.username)
+              setUsernameOrId(setlistConfig.userId)
             }}
           >
             <Edit2 className="h-4 w-4" />
-            Change Username
+            Change Profile
           </Button>
         </Flex>
       </Card>
@@ -66,10 +66,10 @@ export function LastfmConfigForm() {
       <Flex direction="column" gap="4">
         <Box>
           <Heading size="4" weight="medium" mb="2">
-            Last.fm Profile
+            Setlist.fm Profile
           </Heading>
           <Text size="2" color="gray">
-            Connect your Last.fm account to access your listening history
+            Link your Setlist.fm username or user ID
           </Text>
         </Box>
 
@@ -77,10 +77,10 @@ export function LastfmConfigForm() {
           <Flex direction="column" gap="3">
             <Box>
               <TextField.Root
-                placeholder="Enter your Last.fm username"
-                value={username}
+                placeholder="Enter Setlist.fm username or user ID"
+                value={usernameOrId}
                 onChange={(e) => {
-                  setUsername(e.target.value)
+                  setUsernameOrId(e.target.value)
                   clearError()
                 }}
                 disabled={isLoading}
@@ -96,9 +96,9 @@ export function LastfmConfigForm() {
 
             <Button
               type="submit"
-              disabled={!username.trim() || isLoading}
+              disabled={!usernameOrId.trim() || isLoading}
             >
-              {isLoading ? <Spinner /> : 'Connect Last.fm'}
+              {isLoading ? <Spinner /> : 'Connect Setlist.fm'}
             </Button>
           </Flex>
         </form>

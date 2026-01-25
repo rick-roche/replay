@@ -4,11 +4,17 @@ import { handleApiError } from './errors'
 
 type ConfigureLastfmRequest = components['schemas']['ConfigureLastfmRequest']
 type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse']
+type ConfigureDiscogsRequest = components['schemas']['ConfigureDiscogsRequest']
+type ConfigureDiscogsResponse = components['schemas']['ConfigureDiscogsResponse']
+type ConfigureSetlistRequest = components['schemas']['ConfigureSetlistRequest']
+type ConfigureSetlistResponse = components['schemas']['ConfigureSetlistResponse']
 type LastfmFilter = components['schemas']['LastfmFilter']
 type LastfmDataResponse = components['schemas']['LastfmDataResponse']
 type NormalizedDataResponse = components['schemas']['NormalizedDataResponse']
 
 const CONFIG_LASTFM_PATH = '/api/config/lastfm' as const
+const CONFIG_DISCOGS_PATH = '/api/config/discogs' as const
+const CONFIG_SETLIST_PATH = '/api/config/setlistfm' as const
 const SOURCES_LASTFM_DATA_PATH = '/api/sources/lastfm/data' as const
 
 export const configApi = {
@@ -20,6 +26,28 @@ export const configApi = {
       body: { username } as ConfigureLastfmRequest
     })
     if (error) handleApiError(error, 'Failed to configure Last.fm')
+    return data!
+  },
+
+  /**
+   * Configure a Discogs profile
+   */
+  async configureDiscogs(identifier: string): Promise<ConfigureDiscogsResponse> {
+    const { data, error } = await client.POST(CONFIG_DISCOGS_PATH, {
+      body: { usernameOrCollectionId: identifier } as ConfigureDiscogsRequest
+    })
+    if (error) handleApiError(error, 'Failed to configure Discogs')
+    return data!
+  },
+
+  /**
+   * Configure a Setlist.fm username or ID
+   */
+  async configureSetlistFm(usernameOrId: string): Promise<ConfigureSetlistResponse> {
+    const { data, error } = await client.POST(CONFIG_SETLIST_PATH, {
+      body: { usernameOrId } as ConfigureSetlistRequest
+    })
+    if (error) handleApiError(error, 'Failed to configure Setlist.fm')
     return data!
   },
 

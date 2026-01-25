@@ -41,6 +41,7 @@ When acting on this repository:
 ### Commands
 
 - `aspire run`: Runs the application (including installing all dependencies).
+- `dotnet build`: Builds the dotnet solution. This should never have errors or warnings.
 - `dotnet test`: Runs the backend tests.
 - `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
 - `cd src/frontend && npm run test`: Runs the frontend tests.
@@ -62,7 +63,7 @@ When acting on this repository:
 
 - Strict typing enabled.
 - Avoid `any`.
-- Generate frontend types from the API. See https://johnnyreilly.com/dotnet-openapi-and-openapi-ts.
+- Generate frontend types and client from the API using `cd src/frontend && npm run generate-client`. This updates `src/frontend/src/api/generated-client.ts`.
 
 ## API Rules
 
@@ -76,7 +77,7 @@ When acting on this repository:
 
 - Prefer non-integrated tests always.
 - All backend functionality should have unit tests.
-- All frontend components performing logic should have component unit tests
+- All frontend components performing logic should have component unit tests.
 - All API's should have non-integrated contract tests.
 
 Ensure that all changes have tests added and that all validations pass:
@@ -84,3 +85,5 @@ Ensure that all changes have tests added and that all validations pass:
 - `dotnet test`: Runs the backend tests.
 - `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
 - `cd src/frontend && npm run test`: Runs the frontend tests.
+
+Never reduce the thresholds in `src/frontend/vitest.config.ts`. Ever.

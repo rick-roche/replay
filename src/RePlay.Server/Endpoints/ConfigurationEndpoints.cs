@@ -24,6 +24,26 @@ public static class ConfigurationEndpoints
             .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
+        config.MapPost("/discogs", PostConfigureDiscogs)
+            .WithName("ConfigureDiscogs")
+            .WithSummary("Configure or validate a Discogs profile")
+            .WithDescription("Validates a Discogs username or collection and stores the configuration in the user session.")
+            .Accepts<ConfigureDiscogsRequest>("application/json")
+            .Produces<ConfigureDiscogsResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
+        config.MapPost("/setlistfm", PostConfigureSetlistFm)
+            .WithName("ConfigureSetlistFm")
+            .WithSummary("Configure or validate a Setlist.fm username or ID")
+            .WithDescription("Validates the provided Setlist.fm identity and stores the configuration in the user session.")
+            .Accepts<ConfigureSetlistRequest>("application/json")
+            .Produces<ConfigureSetlistResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
         return group;
     }
 
@@ -83,19 +103,18 @@ public static class ConfigurationEndpoints
                     "Invalid Last.fm username or user not found");
             }
 
-            // Store configuration in session (in-memory for now)
-            // TODO: Persist to database
-            httpContext.Items["lastfm_config"] = new ExternalSourceConfig
+            sessionStore.StoreSourceConfig(sessionId, new ExternalSourceConfig
             {
                 Source = "lastfm",
                 ConfigValue = request.Username,
                 ConfiguredAt = DateTime.UtcNow
-            };
+            });
 
             var response = new ConfigureLastfmResponse
             {
                 Username = user.Username,
                 PlayCount = user.PlayCount,
+                ProfileUrl = user.ProfileUrl,
                 IsConfigured = true
             };
 
@@ -106,6 +125,132 @@ public static class ConfigurationEndpoints
             return ApiErrorExtensions.InternalServerError(
                 "LASTFM_CONFIG_ERROR",
                 "Error configuring Last.fm",
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Configure or validate a Setlist.fm username or ID.
+    /// </summary>
+    private static async Task<IResult> PostConfigureSetlistFm(
+        [FromBody] ConfigureSetlistRequest request,
+        ISetlistFmService setlistFmService,
+        ISessionStore sessionStore,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.UsernameOrId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USERNAME",
+                "Username or ID is required");
+        }
+
+        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId))
+        {
+            return ApiErrorExtensions.Unauthorized(
+                "NO_SESSION",
+                "No active session found");
+        }
+
+        var session = sessionStore.GetSession(sessionId);
+        if (session == null)
+        {
+            return ApiErrorExtensions.Unauthorized(
+                "INVALID_SESSION",
+                "Session not found or has been invalidated");
+        }
+
+        try
+        {
+            var user = await setlistFmService.GetUserAsync(request.UsernameOrId, cancellationToken);
+            if (user == null)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_SETLIST_USER",
+                    "Invalid Setlist.fm username or user not found");
+            }
+
+            sessionStore.StoreSourceConfig(sessionId, new ExternalSourceConfig
+            {
+                Source = "setlistfm",
+                ConfigValue = user.UserId,
+                ConfiguredAt = DateTime.UtcNow
+            });
+
+            var response = new ConfigureSetlistResponse
+            {
+                UserId = user.UserId,
+                DisplayName = user.DisplayName,
+                ProfileUrl = user.Url,
+                AttendedConcerts = user.AttendedConcerts,
+                IsConfigured = true
+            };
+
+            return Results.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "SETLIST_CONFIG_ERROR",
+                "Error configuring Setlist.fm",
+                ex.Message);
+        }
+    }
+
+    private static async Task<IResult> PostConfigureDiscogs(
+        [FromBody] ConfigureDiscogsRequest request,
+        IDiscogsService discogsService,
+        ISessionStore sessionStore,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.UsernameOrCollectionId))
+        {
+            return ApiErrorExtensions.BadRequest("MISSING_USERNAME_OR_COLLECTION", "Discogs username or collection ID is required");
+        }
+
+        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId))
+        {
+            return ApiErrorExtensions.Unauthorized("NO_SESSION", "No active session found");
+        }
+
+        var session = sessionStore.GetSession(sessionId);
+        if (session == null)
+        {
+            return ApiErrorExtensions.Unauthorized("INVALID_SESSION", "Session not found or has been invalidated");
+        }
+
+        try
+        {
+            var profile = await discogsService.GetProfileAsync(request.UsernameOrCollectionId, cancellationToken);
+            if (profile == null)
+            {
+                return ApiErrorExtensions.BadRequest("INVALID_DISCOGS_PROFILE", "Discogs profile not found or inaccessible");
+            }
+
+            sessionStore.StoreSourceConfig(sessionId, new ExternalSourceConfig
+            {
+                Source = "discogs",
+                ConfigValue = profile.Username,
+                ConfiguredAt = DateTime.UtcNow
+            });
+
+            var response = new ConfigureDiscogsResponse
+            {
+                Username = profile.Username,
+                CollectionUrl = profile.CollectionUrl,
+                ReleaseCount = profile.ReleaseCount,
+                IsConfigured = true
+            };
+
+            return Results.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "DISCOGS_CONFIG_ERROR",
+                "Error configuring Discogs",
                 ex.Message);
         }
     }

@@ -10,3 +10,23 @@ public sealed record FetchLastfmDataRequest
     public required string Username { get; init; }
     public required LastfmFilter Filter { get; init; }
 }
+
+/// <summary>
+/// Request to configure a Setlist.fm profile.
+/// </summary>
+public sealed record ConfigureSetlistRequest
+{
+    public required string UsernameOrId { get; init; }
+}
+
+/// <summary>
+/// Response containing Setlist.fm configuration details.
+/// </summary>
+public sealed record ConfigureSetlistResponse
+{
+    public required string UserId { get; init; }
+    public required string DisplayName { get; init; }
+    public string? ProfileUrl { get; init; }
+    public int AttendedConcerts { get; init; }
+    public required bool IsConfigured { get; init; }
+}

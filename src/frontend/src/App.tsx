@@ -5,6 +5,8 @@ import { useDataSource } from './contexts/DataSourceContext'
 import { DataSource } from './types/datasource'
 import { DataSourceSelector } from './components/DataSourceSelector'
 import { LastfmConfigForm } from './components/LastfmConfigForm'
+import { DiscogsConfigForm } from './components/DiscogsConfigForm'
+import { SetlistConfigForm } from './components/SetlistConfigForm'
 import { LastfmFilterForm } from './components/LastfmFilterForm'
 import { FetchDataButton, DataResults } from './components/DataFetchForm'
 import { MatchTracksButton } from './components/MatchTracksButton'
@@ -97,6 +99,16 @@ function App() {
                     <PlaylistConfigForm />
                     <CreatePlaylistButton />
                     <PlaylistConfirmation />
+                  </Flex>
+                )}
+                {selectedSource === DataSource.DISCOGS && (
+                  <Flex direction="column" gap="4">
+                    <DiscogsConfigForm />
+                  </Flex>
+                )}
+                {selectedSource === DataSource.SETLISTFM && (
+                  <Flex direction="column" gap="4">
+                    <SetlistConfigForm />
                   </Flex>
                 )}
               </Flex>
