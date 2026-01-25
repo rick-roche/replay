@@ -54,7 +54,7 @@ See stories in [user-stories.md](./user-stories.md) and [feature-spec.md](./feat
 ## Epic 10: UX & Usability Improvements
 
 - [x] Story 10.1 — Streamlined Playlist Creation Workflow
-- [ ] Story 10.2 — Automatic Fetch and Match by Default
+- [x] Story 10.2 — Automatic Fetch and Match by Default
 - [ ] Story 10.3 — Smart Defaults and Preset Discovery
 - [ ] Story 10.4 — Progressive Disclosure of Advanced Options
 - [ ] Story 10.5 — Compact Form Layout

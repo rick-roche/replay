@@ -14,10 +14,12 @@ interface ConfigContextValue {
   lastfmFilter: LastfmFilter
   isLoading: boolean
   error: string | null
+  autoFetch: boolean
   configureLastfm: (username: string) => Promise<void>
   configureDiscogs: (identifier: string) => Promise<void>
   configureSetlistFm: (usernameOrId: string) => Promise<void>
   updateFilter: (updates: Partial<LastfmFilter>) => void
+  setAutoFetch: (value: boolean) => void
   clearError: () => void
 }
 
@@ -41,6 +43,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(DEFAULT_FILTER)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [autoFetch, setAutoFetchState] = useState(true)
 
   // Load configuration and filter from localStorage on mount
   useEffect(() => {
@@ -135,6 +138,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setError(null)
   }
 
+  function setAutoFetch(value: boolean) {
+    setAutoFetchState(value)
+  }
+
   const value: ConfigContextValue = {
     lastfmConfig,
     discogsConfig,
@@ -142,10 +149,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     lastfmFilter,
     isLoading,
     error,
+    autoFetch,
     configureLastfm,
     configureDiscogs,
     configureSetlistFm,
     updateFilter,
+    setAutoFetch,
     clearError
   }
 

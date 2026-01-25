@@ -1,8 +1,10 @@
+import { useEffect } from 'react'
 import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucide-react'
 import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
 import { useAuth } from './contexts/AuthContext'
 import { useDataSource } from './contexts/DataSourceContext'
 import { useMatch } from './contexts/MatchContext'
+import { useConfig } from './contexts/ConfigContext'
 import { useWorkflow, WorkflowStep } from './contexts/WorkflowContext'
 import { DataSource } from './types/datasource'
 import { WorkflowStepper } from './components/WorkflowStepper'
@@ -18,12 +20,26 @@ import { MatchResults } from './components/MatchResults'
 import { PlaylistConfigForm } from './components/PlaylistConfigForm'
 import { CreatePlaylistButton } from './components/CreatePlaylistButton'
 import { PlaylistConfirmation } from './components/PlaylistConfirmation'
+import { AutoFetcher } from './components/AutoFetcher'
+import { AdvancedOptions } from './components/AdvancedOptions'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
   const { selectedSource } = useDataSource()
   const { matchedData } = useMatch()
-  const { markStepComplete, nextStep } = useWorkflow()
+  const { autoFetch } = useConfig()
+  const { markStepComplete, nextStep, completedSteps } = useWorkflow()
+
+  // Handle workflow progression in response to completed steps
+  useEffect(() => {
+    if (completedSteps.has(WorkflowStep.FETCH_AND_MATCH)) {
+      // Auto-advance to curate step when fetch+match is complete
+      if (matchedData && matchedData.tracks && matchedData.tracks.length > 0) {
+        markStepComplete(WorkflowStep.FETCH_AND_MATCH)
+        nextStep()
+      }
+    }
+  }, [matchedData, completedSteps, nextStep, markStepComplete])
 
   // Handle workflow progression
   const handleSourceSelected = () => {
@@ -149,6 +165,7 @@ function App() {
                       )}
                       {selectedSource === DataSource.DISCOGS && <DiscogsConfigForm />}
                       {selectedSource === DataSource.SETLISTFM && <SetlistConfigForm />}
+                      <AdvancedOptions />
                     </Flex>
                   </WorkflowStepContainer>
                 )}
@@ -164,9 +181,20 @@ function App() {
                     <Flex direction="column" gap="4">
                       {selectedSource === DataSource.LASTFM && (
                         <>
-                          <FetchDataButton />
-                          <DataResults />
-                          <MatchTracksButton />
+                          {autoFetch ? (
+                            <>
+                              <AutoFetcher />
+                              <DataResults />
+                              <MatchResults />
+                            </>
+                          ) : (
+                            <>
+                              <FetchDataButton />
+                              <DataResults />
+                              <MatchTracksButton />
+                              <MatchResults />
+                            </>
+                          )}
                         </>
                       )}
                     </Flex>
