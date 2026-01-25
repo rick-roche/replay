@@ -41,6 +41,7 @@ When acting on this repository:
 ### Commands
 
 - `aspire run`: Runs the application (including installing all dependencies).
+- `dotnet build`: Builds the dotnet solution. This should never have errors or warnings.
 - `dotnet test`: Runs the backend tests.
 - `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
 - `cd src/frontend && npm run test`: Runs the frontend tests.

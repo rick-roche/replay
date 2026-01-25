@@ -209,13 +209,13 @@ public class MockHttpClientHandler : HttpClientHandler
         var key = $"{request.Method} {request.RequestUri}";
 
         // Track request count
-        if (_requestCounts.ContainsKey(request.RequestUri.ToString()))
+        if (_requestCounts.ContainsKey(request.RequestUri?.ToString() ?? string.Empty))
         {
-            _requestCounts[request.RequestUri.ToString()]++;
+            _requestCounts[request.RequestUri?.ToString() ?? string.Empty]++;
         }
         else
         {
-            _requestCounts[request.RequestUri.ToString()] = 1;
+            _requestCounts[request.RequestUri?.ToString() ?? string.Empty] = 1;
         }
 
         if (_responses.TryGetValue(key, out var response))

@@ -17,7 +17,7 @@ public class MatchingEndpointsTests
         return mi!;
     }
 
-    private static async Task<IResult> InvokeAsync(MethodInfo mi, params object[] args)
+    private static async Task<IResult> InvokeAsync(MethodInfo mi, params object?[] args)
     {
         var task = (Task<IResult>)mi.Invoke(null, args)!;
         return await task.ConfigureAwait(false);
@@ -59,7 +59,7 @@ public class MatchingEndpointsTests
             new FakeSpotifyMatchingService(),
             new InMemorySessionStore(),
             ctx,
-            CancellationToken.None);
+            (object)CancellationToken.None);
 
         result.Should().BeOfType<UnauthorizedHttpResult>();
     }
@@ -77,7 +77,7 @@ public class MatchingEndpointsTests
             new FakeSpotifyMatchingService(),
             store,
             ctx,
-            CancellationToken.None);
+            (object)CancellationToken.None);
 
         result.Should().BeOfType<BadRequest<ApiError>>();
         ((BadRequest<ApiError>)result).Value!.Code.Should().Be("INVALID_REQUEST");
@@ -108,7 +108,7 @@ public class MatchingEndpointsTests
             fake,
             store,
             ctx,
-            CancellationToken.None);
+            (object)CancellationToken.None);
 
         result.Should().BeOfType<Ok<MatchedDataResponse>>();
         var ok = (Ok<MatchedDataResponse>)result;
@@ -126,7 +126,7 @@ public class MatchingEndpointsTests
             new FakeSpotifyMatchingService(),
             new InMemorySessionStore(),
             ctx,
-            CancellationToken.None);
+            (object)CancellationToken.None);
 
         result.Should().BeOfType<BadRequest<ApiError>>();
         ((BadRequest<ApiError>)result).Value!.Code.Should().Be("INVALID_QUERY");
@@ -142,7 +142,7 @@ public class MatchingEndpointsTests
             new FakeSpotifyMatchingService(),
             new InMemorySessionStore(),
             ctx,
-            CancellationToken.None);
+            (object)CancellationToken.None);
 
         result.Should().BeOfType<UnauthorizedHttpResult>();
     }
@@ -168,7 +168,7 @@ public class MatchingEndpointsTests
             fake,
             store,
             ctx,
-            CancellationToken.None);
+            (object)CancellationToken.None);
 
         result.Should().BeOfType<Ok<IReadOnlyList<SpotifyTrack>>>();
         var ok = (Ok<IReadOnlyList<SpotifyTrack>>)result;
