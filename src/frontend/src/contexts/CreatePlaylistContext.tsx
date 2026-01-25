@@ -10,6 +10,7 @@ interface PlaylistCreationState {
 interface CreatePlaylistContextType extends PlaylistCreationState {
   createPlaylist: (trackUris: string[], name: string, description: string | undefined, isPublic: boolean) => Promise<void>;
   clearPlaylist: () => void;
+  setPlaylistData: (playlistId: string, playlistUrl: string) => void;
 }
 
 const CreatePlaylistContext = createContext<CreatePlaylistContextType | undefined>(undefined);
@@ -75,8 +76,16 @@ export const CreatePlaylistProvider: React.FC<{ children: React.ReactNode }> = (
     });
   }, []);
 
+  const setPlaylistData = useCallback((playlistId: string, playlistUrl: string) => {
+    setState(prev => ({
+      ...prev,
+      playlistId,
+      playlistUrl,
+    }));
+  }, []);
+
   return (
-    <CreatePlaylistContext.Provider value={{ ...state, createPlaylist, clearPlaylist }}>
+    <CreatePlaylistContext.Provider value={{ ...state, createPlaylist, clearPlaylist, setPlaylistData }}>
       {children}
     </CreatePlaylistContext.Provider>
   );

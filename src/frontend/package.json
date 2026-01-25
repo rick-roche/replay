@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest --run --coverage",
     "test:ui": "vitest --ui",
     "knip": "knip",
     "generate-client": "openapi-typescript http://localhost:7511/openapi/v1.json --output src/api/generated-client.ts --root-types --root-types-no-schema-prefix",
