@@ -31,7 +31,7 @@ So that Re:Play can create playlists on my behalf.
 
 **As a user**
 I want my login session to persist
-So I don’t have to log in every time.
+So I don't have to log in every time.
 
 **Acceptance Criteria**
 
@@ -345,7 +345,7 @@ So I can listen immediately.
 
 **As a user**
 I want partial failures handled gracefully
-So I don’t lose work.
+So I don't lose work.
 
 **Acceptance Criteria**
 
@@ -366,5 +366,151 @@ So reliability can be monitored.
 * API request success/failure is logged
 * Match success rate is tracked
 * Playlist creation success is tracked
+
+---
+
+## Epic 10: UX & Usability Improvements
+
+---
+
+### Story 10.1 — Streamlined Playlist Creation Workflow
+
+**As a user**
+I want a streamlined, step-by-step workflow
+So I can create a playlist without excessive scrolling or clicking.
+
+**Acceptance Criteria**
+
+* Playlist creation follows a clear, linear workflow with visual indicators for current step
+* Each step is focused and shows only what's necessary for that step
+* Previous steps are collapsed to reduce visual clutter
+* Users can navigate between steps without losing their data
+* Responsive layout ensures no excessive scrolling on desktop or mobile
+* Progress indicator shows: Select Source → Configure → Fetch & Match → Curate → Create
+* Step transitions are smooth with brief loading states
+
+---
+
+### Story 10.2 — Automatic Fetch and Match by Default
+
+**As a user**
+I want data fetching and Spotify matching to happen automatically
+So I can see matched results without manual triggering.
+
+**Acceptance Criteria**
+
+* After selecting filters, fetching and matching occurs automatically without requiring separate clicks
+* Progress indicators show when fetching and matching are in progress
+* Results appear in real-time as matching completes
+* User can see which tracks matched and which failed to match
+* A toggle option allows advanced users to "fetch before match" if they want to review raw data first
+* The default behavior reduces required interactions from 2+ clicks to 0
+
+---
+
+### Story 10.3 — Smart Defaults and Preset Discovery
+
+**As a user**
+I want sensible defaults and discoverable presets
+So I can create a playlist with minimal configuration.
+
+**Acceptance Criteria**
+
+* Presets are prominently displayed during source selection
+* Each preset shows a brief description of what it does (e.g., "Top 50 tracks from last month")
+* Selecting a preset auto-populates all filters with sensible values
+* Presets automatically trigger fetch + match without additional clicks
+* Default preset for each source is pre-selected
+* User can customize preset values before execution
+* At least 3-4 presets per data source are available (e.g., for Last.fm: "This Week", "This Year", "All Time Favorites", "Custom")
+
+---
+
+### Story 10.4 — Progressive Disclosure of Advanced Options
+
+**As a user**
+I want simple options visible by default and advanced options hidden
+So I don't get overwhelmed by form controls.
+
+**Acceptance Criteria**
+
+* Basic configuration (source selection, preset choice) is always visible
+* Advanced filters (custom date ranges, max results) are hidden behind an "Advanced" or "More Options" toggle
+* Showing advanced options doesn't cause page reflow or excessive scrolling
+* When advanced options are visible, basic options remain accessible
+* Advanced options toggle state persists across source changes
+* Users who don't need advanced options never see them
+
+---
+
+### Story 10.5 — Compact Form Layout
+
+**As a user**
+I want forms to be compact and scannable
+So I can quickly see and modify my configuration.
+
+**Acceptance Criteria**
+
+* Configuration forms use compact spacing and minimal whitespace
+* Related form fields are grouped together logically
+* No more than 3-4 visible fields at once on the main configuration view
+* Form labels are clear and concise (3-5 words max)
+* Helper text is shown on hover or in collapsed state, not taking up space
+* Buttons are appropriately sized and positioned for mobile and desktop
+* Configuration section takes up no more than 25% of viewport height on initial load
+
+---
+
+### Story 10.6 — Results Preview and Validation
+
+**As a user**
+I want to see a preview of my results before creating the playlist
+So I can verify the results match my expectations.
+
+**Acceptance Criteria**
+
+* Results display shows: total tracks found, tracks matched to Spotify, unmatched tracks
+* A summary card shows key stats (e.g., "50 of 52 tracks matched successfully")
+* Users can scroll through matched tracks to preview before creation
+* Match quality indicators (confidence scores, match method) are visible
+* Unmatched tracks are clearly flagged and separated from matched tracks
+* A preview can be expanded inline without additional page navigation
+* Performance: results load and display within 2 seconds
+
+---
+
+### Story 10.7 — Mobile-First Responsive Design
+
+**As a user**
+I want the playlist creation workflow to work seamlessly on mobile
+So I can create playlists on any device.
+
+**Acceptance Criteria**
+
+* Layout adapts to mobile screens (320px+) without horizontal scrolling
+* Touch targets are at least 48x48 pixels for easy tapping
+* Form inputs are optimized for mobile (date pickers use native HTML5 inputs, dropdowns are accessible)
+* Step indicator and workflow are easy to follow on small screens
+* Results list is scrollable independently of the rest of the page
+* Curate and reorder functionality works with touch (drag-and-drop or swipe gestures)
+* Performance on mobile is optimized (lazy loading, minimal animations)
+
+---
+
+### Story 10.8 — Clear User Feedback and Error Handling
+
+**As a user**
+I want clear feedback on what's happening and what went wrong
+So I can understand the state and recover from errors.
+
+**Acceptance Criteria**
+
+* Loading states show a spinner with estimated time or percentage completion
+* Success states show a brief confirmation message (e.g., "50 tracks matched!")
+* Errors show a specific message with a suggested action (e.g., "Last.fm account not found. Check username and try again.")
+* Warnings are shown inline (e.g., "No matches found for 5 tracks" with option to view them)
+* Error messages are helpful and actionable, not technical jargon
+* Users can retry failed operations with a single click
+* Toast notifications for non-blocking updates don't block interaction
 
 ---

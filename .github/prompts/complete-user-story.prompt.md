@@ -1,6 +1,5 @@
 ---
 agent: 'agent'
-tools: ['vscode/runCommand', 'vscode/extensions', 'execute/testFailure', 'execute/getTerminalOutput', 'execute/runTask', 'execute/createAndRunTask', 'execute/runInTerminal', 'execute/runTests', 'read/problems', 'read/readFile', 'read/terminalSelection', 'read/terminalLastCommand', 'read/getTaskOutput', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'web/fetch']
 description: 'Complete a user story by generating or modifying code, tests, and documentation as needed.'
 ---
 

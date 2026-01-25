@@ -2,7 +2,11 @@ import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucid
 import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
 import { useAuth } from './contexts/AuthContext'
 import { useDataSource } from './contexts/DataSourceContext'
+import { useMatch } from './contexts/MatchContext'
+import { useWorkflow, WorkflowStep } from './contexts/WorkflowContext'
 import { DataSource } from './types/datasource'
+import { WorkflowStepper } from './components/WorkflowStepper'
+import { WorkflowStepContainer } from './components/WorkflowStepContainer'
 import { DataSourceSelector } from './components/DataSourceSelector'
 import { LastfmConfigForm } from './components/LastfmConfigForm'
 import { DiscogsConfigForm } from './components/DiscogsConfigForm'
@@ -18,6 +22,33 @@ import { PlaylistConfirmation } from './components/PlaylistConfirmation'
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
   const { selectedSource } = useDataSource()
+  const { matchedData } = useMatch()
+  const { markStepComplete, nextStep } = useWorkflow()
+
+  // Handle workflow progression
+  const handleSourceSelected = () => {
+    if (selectedSource) {
+      markStepComplete(WorkflowStep.SELECT_SOURCE)
+      nextStep()
+    }
+  }
+
+  const handleConfigured = () => {
+    markStepComplete(WorkflowStep.CONFIGURE)
+    nextStep()
+  }
+
+  const handleFetchedAndMatched = () => {
+    if (matchedData && matchedData.tracks && matchedData.tracks.length > 0) {
+      markStepComplete(WorkflowStep.FETCH_AND_MATCH)
+      nextStep()
+    }
+  }
+
+  const handleCurated = () => {
+    markStepComplete(WorkflowStep.CURATE)
+    nextStep()
+  }
 
   return (
     <Box className="min-h-screen">
@@ -87,29 +118,87 @@ function App() {
                     Ready to create some playlists from your music history?
                   </Text>
                 </Box>
-                <DataSourceSelector />
-                {selectedSource === DataSource.LASTFM && (
-                  <Flex direction="column" gap="4">
-                    <LastfmConfigForm />
-                    <LastfmFilterForm />
-                    <FetchDataButton />
-                    <DataResults />
-                    <MatchTracksButton />
-                    <MatchResults />
-                    <PlaylistConfigForm />
-                    <CreatePlaylistButton />
-                    <PlaylistConfirmation />
-                  </Flex>
+
+                {/* Workflow Stepper */}
+                <WorkflowStepper />
+
+                {/* Step 1: Select Source */}
+                <WorkflowStepContainer
+                  step={WorkflowStep.SELECT_SOURCE}
+                  title="Select Data Source"
+                  onComplete={handleSourceSelected}
+                  canComplete={selectedSource !== null}
+                >
+                  <DataSourceSelector />
+                </WorkflowStepContainer>
+
+                {/* Step 2: Configure */}
+                {selectedSource && (
+                  <WorkflowStepContainer
+                    step={WorkflowStep.CONFIGURE}
+                    title="Configure"
+                    onComplete={handleConfigured}
+                    canComplete={true}
+                  >
+                    <Flex direction="column" gap="4">
+                      {selectedSource === DataSource.LASTFM && (
+                        <>
+                          <LastfmConfigForm />
+                          <LastfmFilterForm />
+                        </>
+                      )}
+                      {selectedSource === DataSource.DISCOGS && <DiscogsConfigForm />}
+                      {selectedSource === DataSource.SETLISTFM && <SetlistConfigForm />}
+                    </Flex>
+                  </WorkflowStepContainer>
                 )}
-                {selectedSource === DataSource.DISCOGS && (
-                  <Flex direction="column" gap="4">
-                    <DiscogsConfigForm />
-                  </Flex>
+
+                {/* Step 3: Fetch & Match */}
+                {selectedSource && (
+                  <WorkflowStepContainer
+                    step={WorkflowStep.FETCH_AND_MATCH}
+                    title="Fetch & Match"
+                    onComplete={handleFetchedAndMatched}
+                    canComplete={matchedData !== null && (matchedData.tracks?.length ?? 0) > 0}
+                  >
+                    <Flex direction="column" gap="4">
+                      {selectedSource === DataSource.LASTFM && (
+                        <>
+                          <FetchDataButton />
+                          <DataResults />
+                          <MatchTracksButton />
+                        </>
+                      )}
+                    </Flex>
+                  </WorkflowStepContainer>
                 )}
-                {selectedSource === DataSource.SETLISTFM && (
-                  <Flex direction="column" gap="4">
-                    <SetlistConfigForm />
-                  </Flex>
+
+                {/* Step 4: Curate */}
+                {matchedData && (
+                  <WorkflowStepContainer
+                    step={WorkflowStep.CURATE}
+                    title="Curate Playlist"
+                    onComplete={handleCurated}
+                    canComplete={true}
+                  >
+                    <Flex direction="column" gap="4">
+                      <MatchResults />
+                    </Flex>
+                  </WorkflowStepContainer>
+                )}
+
+                {/* Step 5: Create */}
+                {matchedData && (
+                  <WorkflowStepContainer
+                    step={WorkflowStep.CREATE}
+                    title="Create Playlist"
+                  >
+                    <Flex direction="column" gap="4">
+                      <PlaylistConfigForm />
+                      <CreatePlaylistButton />
+                      <PlaylistConfirmation />
+                    </Flex>
+                  </WorkflowStepContainer>
                 )}
               </Flex>
             ) : (

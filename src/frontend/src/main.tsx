@@ -8,6 +8,7 @@ import { DataProvider } from './contexts/DataContext'
 import { MatchProvider } from './contexts/MatchContext'
 import { PlaylistProvider } from './contexts/PlaylistContext'
 import { CreatePlaylistProvider } from './contexts/CreatePlaylistContext'
+import { WorkflowProvider } from './contexts/WorkflowContext'
 import './index.css'
 import App from './App.tsx'
 
@@ -21,7 +22,9 @@ createRoot(document.getElementById('root')!).render(
               <MatchProvider>
                 <PlaylistProvider>
                   <CreatePlaylistProvider>
-                    <App />
+                    <WorkflowProvider>
+                      <App />
+                    </WorkflowProvider>
                   </CreatePlaylistProvider>
                 </PlaylistProvider>
               </MatchProvider>
