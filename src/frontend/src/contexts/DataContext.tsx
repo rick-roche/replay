@@ -2,20 +2,21 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
 
-type LastfmDataResponse = components['schemas']['LastfmDataResponse']
 type LastfmFilter = components['schemas']['LastfmFilter']
+type SetlistFmFilter = components['schemas']['SetlistFmFilter']
 type NormalizedDataResponse = components['schemas']['NormalizedDataResponse']
 type NormalizedTrack = components['schemas']['NormalizedTrack']
 type NormalizedAlbum = components['schemas']['NormalizedAlbum']
 type NormalizedArtist = components['schemas']['NormalizedArtist']
 
 interface DataContextValue {
-  data: LastfmDataResponse | null
+  data: components['schemas']['LastfmDataResponse'] | null
   normalizedData: NormalizedDataResponse | null
   isLoading: boolean
   error: string | null
   fetchData: (username: string, filter: LastfmFilter) => Promise<void>
   fetchMoreData: (username: string, filter: LastfmFilter) => Promise<NormalizedTrack[]>
+  fetchSetlistFmData: (userId: string, filter: SetlistFmFilter) => Promise<void>
   clearData: () => void
   clearError: () => void
 }
@@ -29,54 +30,6 @@ const albumKey = (a: { name?: string | null; artist?: string | null }) =>
   `${(a.name ?? '').toLowerCase()}|${(a.artist ?? '').toLowerCase()}`
 
 const artistKey = (a: { name?: string | null }) => `${(a.name ?? '').toLowerCase()}`
-
-const mergeUniqueTracks = (
-  existing: LastfmDataResponse['tracks'] | undefined,
-  incoming: LastfmDataResponse['tracks'] | undefined
-) => {
-  const seen = new Set(existing?.map(trackKey))
-  const merged = [...(existing ?? [])]
-  for (const t of incoming ?? []) {
-    const key = trackKey(t)
-    if (!seen.has(key)) {
-      seen.add(key)
-      merged.push(t)
-    }
-  }
-  return merged
-}
-
-const mergeUniqueAlbums = (
-  existing: LastfmDataResponse['albums'] | undefined,
-  incoming: LastfmDataResponse['albums'] | undefined
-) => {
-  const seen = new Set(existing?.map(albumKey))
-  const merged = [...(existing ?? [])]
-  for (const a of incoming ?? []) {
-    const key = albumKey(a)
-    if (!seen.has(key)) {
-      seen.add(key)
-      merged.push(a)
-    }
-  }
-  return merged
-}
-
-const mergeUniqueArtists = (
-  existing: LastfmDataResponse['artists'] | undefined,
-  incoming: LastfmDataResponse['artists'] | undefined
-) => {
-  const seen = new Set(existing?.map(artistKey))
-  const merged = [...(existing ?? [])]
-  for (const a of incoming ?? []) {
-    const key = artistKey(a)
-    if (!seen.has(key)) {
-      seen.add(key)
-      merged.push(a)
-    }
-  }
-  return merged
-}
 
 const mergeNormalizedTracks = (existing: NormalizedTrack[], incoming: NormalizedTrack[]) => {
   const seen = new Set(existing.map(trackKey))
@@ -118,10 +71,42 @@ const mergeNormalizedArtists = (existing: NormalizedArtist[], incoming: Normaliz
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<LastfmDataResponse | null>(null)
+  const [data, setData] = useState<components['schemas']['LastfmDataResponse'] | null>(null)
   const [normalizedData, setNormalizedData] = useState<NormalizedDataResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const toRawData = (normalized: NormalizedDataResponse | null): components['schemas']['LastfmDataResponse'] | null => {
+    if (!normalized) return null
+
+    const getPlayCount = (meta?: Record<string, unknown> | null) => {
+      if (!meta) return 0
+      const value = meta['playCount']
+      if (typeof value === 'number') return value
+      if (typeof value === 'string' && !Number.isNaN(Number(value))) return Number(value)
+      return 0
+    }
+
+    return {
+      dataType: normalized.dataType as components['schemas']['LastfmDataResponse']['dataType'],
+      tracks: (normalized.tracks ?? []).map((t) => ({
+        name: t.name ?? '',
+        artist: t.artist ?? '',
+        album: t.album ?? undefined,
+        playCount: getPlayCount((t as { sourceMetadata?: Record<string, unknown> | null })?.sourceMetadata)
+      })),
+      albums: (normalized.albums ?? []).map((a) => ({
+        name: a.name ?? '',
+        artist: a.artist ?? '',
+        playCount: getPlayCount((a as { sourceMetadata?: Record<string, unknown> | null })?.sourceMetadata)
+      })),
+      artists: (normalized.artists ?? []).map((a) => ({
+        name: a.name ?? '',
+        playCount: getPlayCount((a as { sourceMetadata?: Record<string, unknown> | null })?.sourceMetadata)
+      })),
+      totalResults: normalized.totalResults ?? 0
+    }
+  }
 
   async function fetchData(username: string, filter: LastfmFilter) {
     setIsLoading(true)
@@ -130,13 +115,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setNormalizedData(null)
 
     try {
-      // Fetch both raw and normalized data
-      const [rawData, normalized] = await Promise.all([
-        configApi.fetchLastfmData(username, filter),
-        configApi.fetchLastfmDataNormalized(username, filter)
-      ])
-      setData(rawData)
+      const normalized = await configApi.fetchLastfmDataNormalized(username, filter)
       setNormalizedData(normalized)
+      setData(toRawData(normalized))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
@@ -149,24 +130,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const [rawData, normalized] = await Promise.all([
-        configApi.fetchLastfmData(username, filter),
-        configApi.fetchLastfmDataNormalized(username, filter)
-      ])
+      const normalized = await configApi.fetchLastfmDataNormalized(username, filter)
 
       // If data types differ from existing, treat as a fresh set
-      if (!data || data.dataType !== rawData.dataType) {
-        setData(rawData)
+      if (!data || data.dataType !== normalized.dataType) {
         setNormalizedData(normalized)
+        setData(toRawData(normalized))
         return normalized.tracks ?? []
-      }
-
-      // Merge raw results without duplicates
-      const mergedRaw: LastfmDataResponse = {
-        ...rawData,
-        tracks: mergeUniqueTracks(data.tracks, rawData.tracks),
-        albums: mergeUniqueAlbums(data.albums, rawData.albums),
-        artists: mergeUniqueArtists(data.artists, rawData.artists)
       }
 
       // Merge normalized results without duplicates
@@ -174,14 +144,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const mergedNormalizedAlbums = mergeNormalizedAlbums(normalizedData?.albums ?? [], normalized.albums ?? [])
       const mergedNormalizedArtists = mergeNormalizedArtists(normalizedData?.artists ?? [], normalized.artists ?? [])
 
-      setData(mergedRaw)
-      setNormalizedData({
+      const mergedNormalized: NormalizedDataResponse = {
         ...normalized,
         tracks: mergedNormalizedTracks,
         albums: mergedNormalizedAlbums,
         artists: mergedNormalizedArtists,
-        totalResults: mergedNormalizedTracks.length || mergedNormalizedAlbums.length || mergedNormalizedArtists.length
-      })
+        totalResults: normalized.totalResults ?? (mergedNormalizedTracks.length || mergedNormalizedAlbums.length || mergedNormalizedArtists.length)
+      }
+
+      setNormalizedData(mergedNormalized)
+      setData(toRawData(mergedNormalized))
 
       // Return only the newly-added normalized tracks to allow matching append
       const existingKeys = new Set((normalizedData?.tracks ?? []).map(trackKey))
@@ -190,6 +162,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch more data')
       return []
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function fetchSetlistFmData(userId: string, filter: SetlistFmFilter) {
+    setIsLoading(true)
+    setError(null)
+    setData(null)
+    setNormalizedData(null)
+
+    try {
+      const normalized = await configApi.fetchSetlistFmDataNormalized(userId, filter)
+      setNormalizedData(normalized)
+      setData(null) // Setlist.fm data doesn't map to LastfmDataResponse
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch Setlist.fm data')
     } finally {
       setIsLoading(false)
     }
@@ -211,6 +200,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     error,
     fetchData,
     fetchMoreData,
+    fetchSetlistFmData,
     clearData,
     clearError
   }

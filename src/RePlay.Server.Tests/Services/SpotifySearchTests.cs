@@ -19,14 +19,14 @@ public class SpotifySearchTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchTracksAsync_ReturnsTopFiveAndMapsFields()
+    public async Task SearchTracksAsync_ReturnsTopFifteenAndMapsFields()
     {
         // Arrange
         var spotifyResponse = new
         {
             tracks = new
             {
-                items = Enumerable.Range(1, 10).Select(i => new
+                items = Enumerable.Range(1, 15).Select(i => new
                 {
                     id = $"id{i}",
                     name = $"Name {i}",
@@ -42,7 +42,7 @@ public class SpotifySearchTests : IDisposable
         var results = await _service.SearchTracksAsync("track:foo artist:bar", "token");
 
         // Assert
-        Assert.Equal(5, results.Count); // limited to top 5
+        Assert.Equal(15, results.Count); // limited to top 15
         Assert.Equal("id1", results[0].Id);
         Assert.Equal("Name 1", results[0].Name);
         Assert.Equal("Artist 1", results[0].Artist);

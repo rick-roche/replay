@@ -4,6 +4,7 @@ import { Theme } from '@radix-ui/themes'
 import { FetchDataButton, DataResults } from '@/components/DataFetchForm'
 import { DataProvider } from '@/contexts/DataContext'
 import { ConfigProvider } from '@/contexts/ConfigContext'
+import { DataSourceProvider } from '@/contexts/DataSourceContext'
 const appendMatchesMock = vi.fn()
 
 vi.mock('@/contexts/MatchContext', () => ({
@@ -27,7 +28,9 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
     <Theme>
       <ConfigProvider>
-        <DataProvider>{children}</DataProvider>
+        <DataSourceProvider>
+          <DataProvider>{children}</DataProvider>
+        </DataSourceProvider>
       </ConfigProvider>
     </Theme>
   )
@@ -41,6 +44,7 @@ describe('FetchDataButton', () => {
   })
 
   it('should render nothing when Last.fm is not configured', () => {
+    localStorage.setItem('replay:selected_source', 'lastfm')
     render(
       <TestWrapper>
         <FetchDataButton />
@@ -59,6 +63,7 @@ describe('FetchDataButton', () => {
       isConfigured: true
     }
     localStorage.setItem('replay:lastfm_config', JSON.stringify(config))
+    localStorage.setItem('replay:selected_source', 'lastfm')
 
     render(
       <TestWrapper>
@@ -78,6 +83,7 @@ describe('FetchDataButton', () => {
       isConfigured: true
     }
     localStorage.setItem('replay:lastfm_config', JSON.stringify(config))
+    localStorage.setItem('replay:selected_source', 'lastfm')
 
     render(
       <TestWrapper>
@@ -95,6 +101,7 @@ describe('FetchDataButton', () => {
       isConfigured: true
     }
     localStorage.setItem('replay:lastfm_config', JSON.stringify(config))
+    localStorage.setItem('replay:selected_source', 'lastfm')
 
     render(
       <TestWrapper>
@@ -114,6 +121,7 @@ describe('FetchDataButton', () => {
       isConfigured: true
     }
     localStorage.setItem('replay:lastfm_config', JSON.stringify(config))
+    localStorage.setItem('replay:selected_source', 'lastfm')
 
     render(
       <TestWrapper>

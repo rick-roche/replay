@@ -42,8 +42,21 @@ public static class AuthEndpoints
         // Default return url (fallback)
         returnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
 
+        // Get the request host to ensure cookie domain matches redirect URI
+        var requestHost = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}";
+        var dynamicRedirectUri = $"{requestHost}/api/auth/callback";
+
         // Store state in cookie for validation on callback
         httpContext.Response.Cookies.Append(StateCookieName, state, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !isDev,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromMinutes(10)
+        });
+
+        // Store the redirect URI used for this auth flow
+        httpContext.Response.Cookies.Append("replay_redirect_uri", dynamicRedirectUri, new CookieOptions
         {
             HttpOnly = true,
             Secure = !isDev,
@@ -62,7 +75,7 @@ public static class AuthEndpoints
 
         try
         {
-            var authUrl = authService.GetAuthorizationUrl(state);
+            var authUrl = authService.GetAuthorizationUrl(state, dynamicRedirectUri);
             return Results.Redirect(authUrl);
         }
         catch (ArgumentException ex)
@@ -118,8 +131,11 @@ public static class AuthEndpoints
             var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
             var isDev = env.IsDevelopment();
 
+            // Retrieve the redirect URI that was used for this auth flow
+            httpContext.Request.Cookies.TryGetValue("replay_redirect_uri", out var redirectUri);
+
             // Exchange authorization code for tokens
-            var session = await authService.ExchangeCodeAsync(code, cancellationToken);
+            var session = await authService.ExchangeCodeAsync(code, redirectUri, cancellationToken);
 
             // Store session
             sessionStore.StoreSession(session);
@@ -133,8 +149,9 @@ public static class AuthEndpoints
                 MaxAge = TimeSpan.FromDays(30)
             });
 
-            // Clean up state cookie
+            // Clean up cookies
             httpContext.Response.Cookies.Delete(StateCookieName);
+            httpContext.Response.Cookies.Delete("replay_redirect_uri");
 
             // Read return url
             httpContext.Request.Cookies.TryGetValue(ReturnUrlCookieName, out var returnUrl);

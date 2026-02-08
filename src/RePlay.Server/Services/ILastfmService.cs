@@ -1,6 +1,7 @@
-using System.Net.Http.Json;
+using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RePlay.Server.Configuration;
 using RePlay.Server.Models;
@@ -35,11 +36,13 @@ public sealed class LastfmService : ILastfmService
 {
     private readonly HttpClient _httpClient;
     private readonly LastfmOptions _options;
+    private readonly ILogger<LastfmService> _logger;
 
-    public LastfmService(HttpClient httpClient, IOptions<LastfmOptions> options)
+    public LastfmService(HttpClient httpClient, IOptions<LastfmOptions> options, ILogger<LastfmService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _logger = logger;
 
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
@@ -56,6 +59,11 @@ public sealed class LastfmService : ILastfmService
         }
 
         var url = BuildUrl("user.getinfo", new Dictionary<string, string>
+        {
+            { "user", username }
+        });
+
+        LogRequest("user.getinfo", new Dictionary<string, string>
         {
             { "user", username }
         });
@@ -129,26 +137,48 @@ public sealed class LastfmService : ILastfmService
 
         try
         {
-            var method = filter.DataType switch
-            {
-                LastfmDataType.Tracks => "user.getTopTracks",
-                LastfmDataType.Albums => "user.getTopAlbums",
-                LastfmDataType.Artists => "user.getTopArtists",
-                _ => throw new ArgumentException("Invalid data type", nameof(filter))
-            };
-
-            var period = ConvertTimePeriodToLastfmPeriod(filter.TimePeriod);
             var limit = Math.Min(filter.MaxResults, 500); // Last.fm API has a max of 500
 
             var parameters = new Dictionary<string, string>
             {
                 { "user", username },
-                { "period", period },
-                { "limit", limit.ToString() },
-                { "extended", "1" }
+                { "limit", limit.ToString() }
             };
 
+            string method;
+
+            if (filter.TimePeriod == LastfmTimePeriod.Custom)
+            {
+                var (from, to) = ConvertCustomDatesToEpoch(filter);
+
+                method = filter.DataType switch
+                {
+                    LastfmDataType.Tracks => "user.getWeeklyTrackChart",
+                    LastfmDataType.Albums => "user.getWeeklyAlbumChart",
+                    LastfmDataType.Artists => "user.getWeeklyArtistChart",
+                    _ => throw new ArgumentException("Invalid data type", nameof(filter))
+                };
+
+                parameters["from"] = from;
+                parameters["to"] = to;
+            }
+            else
+            {
+                method = filter.DataType switch
+                {
+                    LastfmDataType.Tracks => "user.getTopTracks",
+                    LastfmDataType.Albums => "user.getTopAlbums",
+                    LastfmDataType.Artists => "user.getTopArtists",
+                    _ => throw new ArgumentException("Invalid data type", nameof(filter))
+                };
+
+                var period = ConvertTimePeriodToLastfmPeriod(filter.TimePeriod);
+                parameters["period"] = period;
+                parameters["extended"] = "1";
+            }
+
             var url = BuildUrl(method, parameters);
+            LogRequest(method, parameters);
             var response = await _httpClient.GetAsync(url, cancellationToken);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -175,17 +205,23 @@ public sealed class LastfmService : ILastfmService
                 Artists = []
             };
 
-            if (filter.DataType == LastfmDataType.Tracks && root.TryGetProperty("toptracks", out var tracksElement))
+            if (filter.DataType == LastfmDataType.Tracks &&
+                TryGetResultElement(root, "toptracks", "weeklytrackchart", out var tracksElement))
             {
-                result = result with { Tracks = ParseTracks(tracksElement) };
+                var tracks = ParseTracks(tracksElement);
+                result = result with { Tracks = tracks, TotalResults = tracks.Count };
             }
-            else if (filter.DataType == LastfmDataType.Albums && root.TryGetProperty("topalbums", out var albumsElement))
+            else if (filter.DataType == LastfmDataType.Albums &&
+                     TryGetResultElement(root, "topalbums", "weeklyalbumchart", out var albumsElement))
             {
-                result = result with { Albums = ParseAlbums(albumsElement) };
+                var albums = ParseAlbums(albumsElement);
+                result = result with { Albums = albums, TotalResults = albums.Count };
             }
-            else if (filter.DataType == LastfmDataType.Artists && root.TryGetProperty("topartists", out var artistsElement))
+            else if (filter.DataType == LastfmDataType.Artists &&
+                     TryGetResultElement(root, "topartists", "weeklyartistchart", out var artistsElement))
             {
-                result = result with { Artists = ParseArtists(artistsElement) };
+                var artists = ParseArtists(artistsElement);
+                result = result with { Artists = artists, TotalResults = artists.Count };
             }
 
             return result;
@@ -213,6 +249,46 @@ public sealed class LastfmService : ILastfmService
         return $"{_options.ApiUrl}?{string.Join("&", queryParams)}";
     }
 
+    private void LogRequest(string method, IReadOnlyDictionary<string, string> parameters)
+    {
+        var paramString = string.Join(", ", parameters.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+        _logger.LogInformation("Requesting Last.fm API {Method} with parameters: {Parameters}", method, paramString);
+    }
+
+    private static (string From, string To) ConvertCustomDatesToEpoch(LastfmFilter filter)
+    {
+        if (!DateTimeOffset.TryParse(filter.CustomStartDate, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start))
+        {
+            throw new ArgumentException("Custom start date must be a valid ISO 8601 date", nameof(filter));
+        }
+
+        if (!DateTimeOffset.TryParse(filter.CustomEndDate, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end))
+        {
+            throw new ArgumentException("Custom end date must be a valid ISO 8601 date", nameof(filter));
+        }
+
+        var from = start.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        var to = end.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+
+        return (from, to);
+    }
+
+    private static bool TryGetResultElement(JsonElement root, string primaryProperty, string fallbackProperty, out JsonElement element)
+    {
+        if (root.TryGetProperty(primaryProperty, out element))
+        {
+            return true;
+        }
+
+        if (root.TryGetProperty(fallbackProperty, out element))
+        {
+            return true;
+        }
+
+        element = default;
+        return false;
+    }
+
     private static string ConvertTimePeriodToLastfmPeriod(LastfmTimePeriod period)
     {
         return period switch
@@ -228,6 +304,26 @@ public sealed class LastfmService : ILastfmService
         };
     }
 
+    private static string GetArtistName(JsonElement artistElement)
+    {
+        if (artistElement.TryGetProperty("name", out var artistName) && artistName.ValueKind is JsonValueKind.String)
+        {
+            return artistName.GetString() ?? "Unknown";
+        }
+
+        if (artistElement.TryGetProperty("#text", out var artistText) && artistText.ValueKind is JsonValueKind.String)
+        {
+            return artistText.GetString() ?? "Unknown";
+        }
+
+        if (artistElement.ValueKind is JsonValueKind.String)
+        {
+            return artistElement.GetString() ?? "Unknown";
+        }
+
+        return "Unknown";
+    }
+
     private static List<LastfmTrack> ParseTracks(JsonElement tracksElement)
     {
         var tracks = new List<LastfmTrack>();
@@ -240,9 +336,7 @@ public sealed class LastfmService : ILastfmService
                 {
                     var name = track.GetProperty("name").GetString() ?? "Unknown";
                     var artist = track.TryGetProperty("artist", out var artistElement)
-                        ? (artistElement.TryGetProperty("name", out var artistName) 
-                            ? artistName.GetString() ?? "Unknown"
-                            : artistElement.GetString() ?? "Unknown")
+                        ? GetArtistName(artistElement)
                         : "Unknown";
                     var playCount = int.TryParse(
                         track.GetProperty("playcount").GetString() ?? "0",
@@ -273,9 +367,7 @@ public sealed class LastfmService : ILastfmService
                 {
                     var name = album.GetProperty("name").GetString() ?? "Unknown";
                     var artist = album.TryGetProperty("artist", out var artistElement)
-                        ? (artistElement.TryGetProperty("name", out var artistName)
-                            ? artistName.GetString() ?? "Unknown"
-                            : artistElement.GetString() ?? "Unknown")
+                        ? GetArtistName(artistElement)
                         : "Unknown";
                     var playCount = int.TryParse(
                         album.GetProperty("playcount").GetString() ?? "0",

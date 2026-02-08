@@ -47,16 +47,19 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
         }
     }
 
-    public string GetAuthorizationUrl(string state)
+    public string GetAuthorizationUrl(string state, string? redirectUri = null)
     {
         ValidateConfiguration();
+
+        // Use provided redirect URI or fall back to configured default
+        var effectiveRedirectUri = redirectUri ?? _options.RedirectUri;
 
         var scopes = string.Join(" ", _options.Scopes);
         var queryParams = new Dictionary<string, string>
         {
             ["client_id"] = _options.ClientId,
             ["response_type"] = "code",
-            ["redirect_uri"] = _options.RedirectUri,
+            ["redirect_uri"] = effectiveRedirectUri,
             ["state"] = state,
             ["scope"] = scopes
         };
@@ -69,11 +72,18 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
 
     public async Task<AuthSession> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default)
     {
+        return await ExchangeCodeAsync(code, null, cancellationToken);
+    }
+
+    public async Task<AuthSession> ExchangeCodeAsync(string code, string? redirectUri, CancellationToken cancellationToken = default)
+    {
+        var effectiveRedirectUri = redirectUri ?? _options.RedirectUri;
+        
         var tokenResponse = await RequestTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
-            ["redirect_uri"] = _options.RedirectUri
+            ["redirect_uri"] = effectiveRedirectUri
         }, cancellationToken);
 
         var user = await GetUserProfileAsync(tokenResponse.AccessToken, cancellationToken);

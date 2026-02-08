@@ -4,9 +4,17 @@ import { Theme } from '@radix-ui/themes'
 import { FetchDataButton, DataResults } from './DataFetchForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
 import { DataProvider } from '@/contexts/DataContext'
+import { DataSourceProvider } from '@/contexts/DataSourceContext'
 import * as configApiModule from '@/api/config'
+import type { components } from '@/api/generated-client'
 
 const appendMatchesMock = vi.fn()
+type MatchedDataResponse = components['schemas']['MatchedDataResponse']
+
+const matchState: { matchedData: MatchedDataResponse | null; isLoading: boolean } = {
+  matchedData: null,
+  isLoading: false,
+}
 
 vi.mock('@/contexts/MatchContext', () => ({
   useMatch: () => ({
@@ -19,8 +27,8 @@ vi.mock('@/contexts/MatchContext', () => ({
     moveTrack: vi.fn(),
     applyManualMatch: vi.fn(),
     searchTracks: vi.fn(),
-    matchedData: null,
-    isLoading: false,
+    matchedData: matchState.matchedData,
+    isLoading: matchState.isLoading,
     error: null,
   }),
 }))
@@ -39,7 +47,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <Theme>
       <ConfigProvider>
-        <DataProvider>{children}</DataProvider>
+        <DataSourceProvider>
+          <DataProvider>{children}</DataProvider>
+        </DataSourceProvider>
       </ConfigProvider>
     </Theme>
   )
@@ -47,6 +57,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const setConfigured = (username = 'alice') => {
   localStorage.setItem('replay:lastfm_config', JSON.stringify({ username, playCount: 100, isConfigured: true }))
+  localStorage.setItem('replay:selected_source', 'lastfm')
 }
 
 const setFilter = (dataType: 'Tracks' | 'Albums' | 'Artists' = 'Tracks') => {
@@ -58,13 +69,15 @@ describe('DataFetchForm interactions', () => {
     vi.clearAllMocks()
     appendMatchesMock.mockReset()
     localStorage.clear()
+    matchState.matchedData = null
+    matchState.isLoading = false
   })
 
   it('shows loading state and disables button during fetch', async () => {
     setConfigured()
     setFilter('Tracks')
 
-    vi.mocked(configApi.fetchLastfmData).mockImplementation(() => new Promise(() => {}))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockImplementation(() => new Promise(() => {}))
 
     render(
       <Wrapper>
@@ -82,8 +95,8 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    const tracks = Array.from({ length: 15 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1 }))
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
+    const tracks = Array.from({ length: 15 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1, source: 'lastfm', sourceMetadata: { playCount: i + 1 } }))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
 
     render(
       <Wrapper>
@@ -106,8 +119,8 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Albums')
 
-    const albums = [{ name: 'al', artist: 'ar', playCount: 4 }]
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Albums', tracks: [], albums, artists: [] })
+    const albums = [{ name: 'al', artist: 'ar', playCount: 4, source: 'lastfm', sourceMetadata: { playCount: 4 } }]
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Albums', tracks: [], albums, artists: [] })
 
     render(
       <Wrapper>
@@ -130,8 +143,8 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Artists')
 
-    const artists = [{ name: 'artist', playCount: 7 }]
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Artists', tracks: [], albums: [], artists })
+    const artists = [{ name: 'artist', playCount: 7, source: 'lastfm', sourceMetadata: { playCount: 7 } }]
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Artists', tracks: [], albums: [], artists })
 
     render(
       <Wrapper>
@@ -154,7 +167,7 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Tracks', tracks: [], albums: [], artists: [] })
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Tracks', tracks: [], albums: [], artists: [] })
 
     render(
       <Wrapper>
@@ -174,7 +187,7 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    vi.mocked(configApi.fetchLastfmData).mockRejectedValue(new Error('Boom'))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValue(new Error('Boom'))
 
     render(
       <Wrapper>
@@ -194,21 +207,17 @@ describe('DataFetchForm interactions', () => {
     setFilter('Tracks')
 
     const firstTracks = [
-      { name: 't1', artist: 'a1', playCount: 1 },
-      { name: 't2', artist: 'a2', playCount: 2 },
+      { name: 't1', artist: 'a1', playCount: 1, source: 'lastfm', sourceMetadata: { playCount: 1 } },
+      { name: 't2', artist: 'a2', playCount: 2, source: 'lastfm', sourceMetadata: { playCount: 2 } },
     ]
     const moreTracks = [
-      { name: 't2', artist: 'a2', playCount: 2 }, // duplicate
-      { name: 't3', artist: 'a3', playCount: 3 },
+      { name: 't2', artist: 'a2', playCount: 2, source: 'lastfm', sourceMetadata: { playCount: 2 } }, // duplicate
+      { name: 't3', artist: 'a3', playCount: 3, source: 'lastfm', sourceMetadata: { playCount: 3 } },
     ]
 
-    vi.mocked(configApi.fetchLastfmData)
+    vi.mocked(configApi.fetchLastfmDataNormalized)
       .mockResolvedValueOnce({ dataType: 'Tracks', tracks: firstTracks, albums: [], artists: [] })
       .mockResolvedValueOnce({ dataType: 'Tracks', tracks: moreTracks, albums: [], artists: [] })
-
-    vi.mocked(configApi.fetchLastfmDataNormalized)
-      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: firstTracks.map((t) => ({ ...t, source: 'lastfm', sourceMetadata: {} })), albums: [], artists: [] })
-      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: moreTracks.map((t) => ({ ...t, source: 'lastfm', sourceMetadata: {} })), albums: [], artists: [] })
 
     render(
       <Wrapper>
@@ -235,5 +244,48 @@ describe('DataFetchForm interactions', () => {
     const calledWith = appendMatchesMock.mock.calls[0][0]
     expect(calledWith).toHaveLength(1)
     expect(calledWith[0].name).toBe('t3')
+  })
+
+  it('collapses results when matching is complete', async () => {
+    setConfigured()
+    setFilter('Tracks')
+
+    matchState.matchedData = {
+      tracks: [
+        {
+          sourceTrack: {
+            name: 't0',
+            artist: 'a0',
+            source: 'lastfm',
+            sourceMetadata: {},
+          },
+          match: null,
+        },
+      ],
+      totalTracks: 1,
+      matchedCount: 0,
+      unmatchedCount: 1,
+    }
+
+    const tracks = Array.from({ length: 3 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1, source: 'lastfm', sourceMetadata: { playCount: i + 1 } }))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
+
+    render(
+      <Wrapper>
+        <FetchDataButton />
+        <DataResults />
+      </Wrapper>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tracks Found/)).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Show/i })).toBeInTheDocument()
+    })
+    expect(screen.queryByText('t0')).not.toBeInTheDocument()
   })
 })

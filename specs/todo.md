@@ -18,7 +18,7 @@ See stories in [user-stories.md](./user-stories.md) and [feature-spec.md](./feat
 - [x] Story 3.1 — Select Data Source
 - [x] Story 3.2 — Filter Last.fm Data
 - [ ] Story 3.3 — Filter Discogs Collection
-- [ ] Story 3.4 — Filter Setlist.fm Concerts
+- [x] Story 3.4 — Filter Setlist.fm Concerts
 
 ## Epic 4: Presets
 
@@ -50,3 +50,14 @@ See stories in [user-stories.md](./user-stories.md) and [feature-spec.md](./feat
 
 - [ ] Story 9.1 — Handle Partial Failures
 - [ ] Story 9.2 — Capture Telemetry
+
+## Epic 10: UX & Usability Improvements
+
+- [x] Story 10.1 — Streamlined Playlist Creation Workflow
+- [x] Story 10.2 — Automatic Fetch and Match by Default
+- [ ] Story 10.3 — Smart Defaults and Preset Discovery
+- [ ] Story 10.4 — Progressive Disclosure of Advanced Options
+- [ ] Story 10.5 — Compact Form Layout
+- [ ] Story 10.6 — Results Preview and Validation
+- [ ] Story 10.7 — Mobile-First Responsive Design
+- [ ] Story 10.8 — Clear User Feedback and Error Handling

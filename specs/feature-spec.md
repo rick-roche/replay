@@ -1,5 +1,5 @@
 Below is a **product + system feature specification** you can hand directly to **AI agents (or human devs)** to incrementally design and build **Re:Play**.
-It’s written to be **implementation-agnostic**, but precise enough to drive architecture, API design, UI flows, and task breakdowns.
+It's written to be **implementation-agnostic**, but precise enough to drive architecture, API design, UI flows, and task breakdowns.
 
 ---
 
@@ -27,16 +27,26 @@ Supported **playlist destination**:
 
 ## 2. Core User Journey (Happy Path)
 
+### Current Optimized Path (Preferred)
+
 1. User opens Re:Play
 2. User logs in with Spotify (OAuth)
-3. User selects a **data source** (Last.fm / Discogs / Setlist.fm)
-4. User configures their external profile (username, collection, etc.)
-5. User applies **filters or presets**
-6. Re:Play fetches data from the selected source
-7. Re:Play attempts to **match tracks to Spotify**
-8. User reviews and curates matched tracks
-9. User creates a playlist on Spotify
-10. Playlist is saved to their Spotify account
+3. User selects a **data source** and **preset** (Last.fm / Discogs / Setlist.fm)
+4. User optionally configures external profile (username, collection, etc.)
+5. Re:Play **automatically fetches and matches** data from the selected source
+6. User reviews matched results (with summary stats)
+7. User optionally curates tracks (reorder, remove, add more)
+8. User creates a playlist on Spotify
+9. Playlist is saved to their Spotify account
+
+### Advanced Path (For Power Users)
+
+1-3. Same as above
+4. User configures external profile
+5. User toggles "Advanced: Fetch before match" to review raw data first
+6. User applies **filters** to refine data
+7. User manually triggers match when satisfied with raw data
+8-9. Same as above
 
 ---
 
@@ -105,7 +115,7 @@ Tokens or API keys should be stored securely and scoped to read-only access.
 
 **Source**
 
-* User’s personal collection
+* User's personal collection
 
 **Filters**
 
@@ -162,22 +172,34 @@ Tokens or API keys should be stored securely and scoped to read-only access.
 
 ## 5. Presets (UX Simplification Layer)
 
-Presets are **predefined filter configurations** that reduce cognitive load.
+Presets are **predefined filter configurations** that reduce cognitive load and accelerate workflow.
+
+### Preset Characteristics
+
+* **Discoverable**: Prominently displayed during source selection
+* **Quick-start**: Selecting a preset auto-populates filters AND automatically triggers fetch + match
+* **Informative**: Each preset shows a clear description (e.g., "Top 50 tracks from last month")
+* **Customizable**: User can edit preset values before execution
+* **Persistent**: At least 3-4 presets available per data source
 
 ### Example Presets
 
-| Preset Name           | Source     | Configuration                  |
-| --------------------- | ---------- | ------------------------------ |
-| Top 100 Tracks (2020) | Last.fm    | tracks + custom date range     |
-| Vinyl Favourites      | Discogs    | vinyl only, random order       |
-| Gig Memories          | Setlist.fm | last 10 concerts               |
-| Year in Review        | Last.fm    | top tracks from last 12 months |
+| Preset Name           | Source     | Configuration                     | Auto-Trigger |
+| --------------------- | ---------- | --------------------------------- | ------------- |
+| This Week             | Last.fm    | top tracks from last 7 days       | Yes           |
+| This Year             | Last.fm    | top tracks from last 12 months    | Yes           |
+| All Time Favorites    | Last.fm    | top tracks overall                | Yes           |
+| Custom                | Last.fm    | user-configured filters           | No (manual)   |
+| Vinyl Collection      | Discogs    | vinyl only, all years             | Yes           |
+| Recent Additions      | Discogs    | all formats, added this year      | Yes           |
+| Concert Memories      | Setlist.fm | last 10 concerts attended        | Yes           |
 
 Presets should be:
 
 * Editable after selection
-* Discoverable in UI
+* Discoverable in UI (not buried in menus)
 * Easy to add via config (not hard-coded)
+* Trigger automatic fetch + match by default
 
 ---
 
@@ -224,6 +246,13 @@ Each match should include:
 * Add more tracks from original query
 * See unmatched items
 
+### Results Preview & Validation
+
+* Display summary stats: Total tracks found, matched count, unmatched count
+* Show matches with confidence indicators
+* Clearly flag unmatched tracks separately
+* Performance target: Results load and display within 2 seconds
+
 ### Optional Enhancements
 
 * Sort by:
@@ -251,13 +280,66 @@ Each match should include:
 
 ---
 
-## 9. Non-Functional Requirements
+## 9. UX & Usability Requirements (NEW)
+
+### 9.1 Streamlined Workflow
+
+* **Stepped Experience**: Workflow follows clear progression: Select Source → Configure → Fetch & Match → Curate → Create
+* **Visual Progress**: Step indicator shows current position and completion
+* **Collapsed History**: Previous steps are hidden to reduce visual clutter
+* **State Preservation**: Users can navigate between steps without losing configuration
+
+### 9.2 Automatic Fetch & Match (Default Behavior)
+
+* After user selects a preset or applies filters, fetching and matching occur **automatically**
+* No separate "Fetch" button required
+* Real-time progress indicators show current operation
+* Results stream in as matches complete
+* **Advanced toggle** allows power users to "Fetch before match" if they want to review raw data first
+
+### 9.3 Progressive Disclosure
+
+* **Basic view by default**: Source selection, preset choice, minimal configuration
+* **Advanced options hidden**: Custom date ranges, max results, fetch-before-match toggle
+* **Clean layout**: Max 3-4 visible fields in configuration view
+* **No page reflow**: Showing advanced options doesn't cause unexpected layout changes
+
+### 9.4 Compact Forms
+
+* **Minimal whitespace**: Tight spacing to reduce scrolling
+* **Logical grouping**: Related fields grouped together
+* **Clear labels**: 3-5 word labels without jargon
+* **Inline help**: Helper text shown on hover or in collapsed state
+* **Limit**: Configuration section takes ≤25% of viewport height
+
+### 9.5 Mobile-First Responsive Design
+
+* Adapts to screens 320px+ without horizontal scrolling
+* Touch targets: Minimum 48x48 pixels
+* Native form inputs: Date pickers use HTML5 inputs, dropdowns accessible
+* Scrollable results: Independent scrolling for results vs. controls
+* Touch gestures: Drag-and-drop or swipe support for track reordering
+* Performance optimized: Lazy loading, minimal animations
+
+### 9.6 Clear Feedback & Error Handling
+
+* **Loading states**: Spinner with estimated time or percentage
+* **Success feedback**: Brief confirmation messages (e.g., "50 tracks matched!")
+* **Clear errors**: Specific message + suggested action (e.g., "Last.fm account not found. Check username.")
+* **Warnings**: Inline display of non-blocking issues (e.g., "No matches found for 5 tracks")
+* **Actionable**: No technical jargon; users can retry or dismiss
+* **Non-blocking notifications**: Toast messages don't block interaction
+
+---
+
+## 10. Non-Functional Requirements
 
 ### Performance
 
 * Pagination for large datasets
 * Background jobs for matching
 * Rate-limit handling per API
+* Results display within 2 seconds
 
 ### Security
 
@@ -269,16 +351,18 @@ Each match should include:
 
 * Partial failures should not break the flow
 * Graceful degradation when APIs are unavailable
+* Failed matches do not block playlist creation
 
 ---
 
-## 10. Observability & Debugging
+## 11. Observability & Debugging
 
 ### Required Telemetry
 
 * API request success/failure
 * Match success rate
 * Playlist creation success
+* Workflow completion rate and drop-off points
 
 ### Admin / Debug Mode (Optional)
 
@@ -288,7 +372,7 @@ Each match should include:
 
 ---
 
-## 11. Future Enhancements (Out of Scope for MVP)
+## 12. Future Enhancements (Out of Scope for MVP)
 
 * Multiple destination platforms (Apple Music, local M3U)
 * Mixing data sources in one playlist
@@ -299,14 +383,14 @@ Each match should include:
 
 ---
 
-## 12. AI-Agent-Friendly Task Decomposition
+## 13. AI-Agent-Friendly Task Decomposition
 
 This document supports decomposition into:
 
 * Auth agent (Spotify OAuth)
 * Source ingestion agents (Last.fm / Discogs / Setlist.fm)
 * Matching agent (Spotify search + scoring)
-* UI agent (filters, presets, curation)
+* UI/UX agent (workflow, forms, responsive design)
 * Playlist publishing agent
 * Preset configuration agent
 

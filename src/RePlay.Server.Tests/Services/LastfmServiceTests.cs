@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using RePlay.Server.Configuration;
 using RePlay.Server.Models;
@@ -25,7 +26,7 @@ public class LastfmServiceTests
             ApiUrl = "https://www.last.fm/2.0/"
         });
 
-        _service = new LastfmService(_httpClient, _options);
+        _service = new LastfmService(_httpClient, _options, NullLogger<LastfmService>.Instance);
     }
 
     [Fact]
@@ -228,6 +229,60 @@ public class LastfmServiceTests
         result.Artists.Should().HaveCount(1);
         result.Artists[0].Name.Should().Be("Artist 1");
         result.Artists[0].PlayCount.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task GetUserDataAsync_ShouldUseWeeklyCharts_ForCustomPeriod()
+    {
+        // Arrange
+        var username = "testuser";
+        var filter = new LastfmFilter
+        {
+            DataType = LastfmDataType.Tracks,
+            TimePeriod = LastfmTimePeriod.Custom,
+            CustomStartDate = "2024-01-01T00:00:00Z",
+            CustomEndDate = "2024-01-08T00:00:00Z",
+            MaxResults = 5
+        };
+
+        var responseJson = """
+            {
+                "weeklytrackchart": {
+                    "track": [
+                        {
+                            "name": "Weekly Track",
+                            "artist": { "#text": "Weekly Artist" },
+                            "playcount": "15"
+                        }
+                    ]
+                }
+            }
+            """;
+
+        var response = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(responseJson)
+        };
+        _httpMessageHandler.EnqueueResponse(response);
+
+        // Act
+        var result = await _service.GetUserDataAsync(username, filter);
+
+        // Assert
+        var expectedFrom = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds().ToString();
+        var expectedTo = new DateTimeOffset(2024, 1, 8, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds().ToString();
+
+        _httpMessageHandler.LastRequestUri.Should().NotBeNull();
+        var query = _httpMessageHandler.LastRequestUri!.Query;
+        query.Should().Contain("user.getWeeklyTrackChart");
+        query.Should().Contain($"from={expectedFrom}");
+        query.Should().Contain($"to={expectedTo}");
+
+        result.Should().NotBeNull();
+        result!.Tracks.Should().ContainSingle();
+        result.Tracks[0].Name.Should().Be("Weekly Track");
+        result.Tracks[0].Artist.Should().Be("Weekly Artist");
     }
 
     [Fact]
@@ -477,6 +532,8 @@ public class LastfmServiceTests
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
 
+        public Uri? LastRequestUri { get; private set; }
+
         public void EnqueueResponse(HttpResponseMessage response)
         {
             _responses.Enqueue(response);
@@ -486,6 +543,8 @@ public class LastfmServiceTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            LastRequestUri = request.RequestUri;
+
             if (_responses.Count == 0)
             {
                 throw new InvalidOperationException("No responses queued");

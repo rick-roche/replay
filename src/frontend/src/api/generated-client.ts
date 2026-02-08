@@ -335,6 +335,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/setlistfm/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Setlist.fm concert data with filters
+         * @description Fetches attended concerts from a user's Setlist.fm profile with optional filtering (date range, max concerts, max tracks). Tracks are deduplicated.
+         */
+        post: operations["FetchSetlistFmData"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/setlistfm/data/normalized": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch normalized Setlist.fm concert data
+         * @description Fetches Setlist.fm concert data and normalizes it to a canonical format for consistent matching across all data sources.
+         */
+        post: operations["FetchSetlistFmDataNormalized"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -378,6 +418,10 @@ export interface components {
         FetchLastfmDataRequest: {
             username: string;
             filter: components["schemas"]["LastfmFilter"];
+        };
+        FetchSetlistFmDataRequest: {
+            userId: string;
+            filter: components["schemas"]["SetlistFmFilter"];
         };
         LastfmAlbum: {
             name: string;
@@ -477,6 +521,39 @@ export interface components {
             /** Format: int32 */
             tracksAdded: number | string;
         };
+        SetlistConcert: {
+            id: string;
+            artist: string;
+            date?: null | string;
+            venue?: null | string;
+            city?: null | string;
+            country?: null | string;
+            tracks: components["schemas"]["SetlistTrack"][];
+        };
+        SetlistFmDataResponse: {
+            concerts: components["schemas"]["SetlistConcert"][];
+            tracks: components["schemas"]["SetlistTrack"][];
+            /** Format: int32 */
+            totalConcerts?: number | string;
+            /** Format: int32 */
+            totalTracks?: number | string;
+        };
+        SetlistFmFilter: {
+            startDate?: null | string;
+            endDate?: null | string;
+            /** Format: int32 */
+            maxConcerts?: number | string;
+            /** Format: int32 */
+            maxTracks?: number | string;
+        };
+        SetlistTrack: {
+            name: string;
+            artist: string;
+            concertDate?: null | string;
+            venue?: null | string;
+            city?: null | string;
+            country?: null | string;
+        };
         SpotifyMatch: {
             spotifyId: string;
             name: string;
@@ -509,6 +586,7 @@ export type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResp
 export type ConfigureSetlistRequest = components['schemas']['ConfigureSetlistRequest'];
 export type ConfigureSetlistResponse = components['schemas']['ConfigureSetlistResponse'];
 export type FetchLastfmDataRequest = components['schemas']['FetchLastfmDataRequest'];
+export type FetchSetlistFmDataRequest = components['schemas']['FetchSetlistFmDataRequest'];
 export type LastfmAlbum = components['schemas']['LastfmAlbum'];
 export type LastfmArtist = components['schemas']['LastfmArtist'];
 export type LastfmDataResponse = components['schemas']['LastfmDataResponse'];
@@ -526,6 +604,10 @@ export type NormalizedDataResponse = components['schemas']['NormalizedDataRespon
 export type NormalizedTrack = components['schemas']['NormalizedTrack'];
 export type PlaylistCreationRequest = components['schemas']['PlaylistCreationRequest'];
 export type PlaylistCreationResponse = components['schemas']['PlaylistCreationResponse'];
+export type SetlistConcert = components['schemas']['SetlistConcert'];
+export type SetlistFmDataResponse = components['schemas']['SetlistFmDataResponse'];
+export type SetlistFmFilter = components['schemas']['SetlistFmFilter'];
+export type SetlistTrack = components['schemas']['SetlistTrack'];
 export type SpotifyMatch = components['schemas']['SpotifyMatch'];
 export type SpotifyTrack = components['schemas']['SpotifyTrack'];
 export type $defs = Record<string, never>;
@@ -886,6 +968,90 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["FetchLastfmDataRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NormalizedDataResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    FetchSetlistFmData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FetchSetlistFmDataRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetlistFmDataResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    FetchSetlistFmDataNormalized: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FetchSetlistFmDataRequest"];
             };
         };
         responses: {

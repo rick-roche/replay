@@ -11,8 +11,9 @@ public interface ISpotifyAuthService
     /// Generate the Spotify OAuth authorization URL.
     /// </summary>
     /// <param name="state">Anti-forgery state token.</param>
+    /// <param name="redirectUri">Optional redirect URI to use instead of configured default.</param>
     /// <returns>Authorization URL to redirect user to.</returns>
-    string GetAuthorizationUrl(string state);
+    string GetAuthorizationUrl(string state, string? redirectUri = null);
 
     /// <summary>
     /// Exchange authorization code for access and refresh tokens.
@@ -21,6 +22,15 @@ public interface ISpotifyAuthService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authenticated session with tokens and user info.</returns>
     Task<AuthSession> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Exchange authorization code for access and refresh tokens.
+    /// </summary>
+    /// <param name="code">Authorization code from Spotify callback.</param>
+    /// <param name="redirectUri">The redirect URI that was used in the authorization request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Authenticated session with tokens and user info.</returns>
+    Task<AuthSession> ExchangeCodeAsync(string code, string? redirectUri, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Refresh an expired access token using the refresh token.

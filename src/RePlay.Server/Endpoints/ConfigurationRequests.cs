@@ -12,6 +12,15 @@ public sealed record FetchLastfmDataRequest
 }
 
 /// <summary>
+/// Request to fetch Setlist.fm concert data.
+/// </summary>
+public sealed record FetchSetlistFmDataRequest
+{
+    public required string UserId { get; init; }
+    public required SetlistFmFilter Filter { get; init; }
+}
+
+/// <summary>
 /// Request to configure a Setlist.fm profile.
 /// </summary>
 public sealed record ConfigureSetlistRequest

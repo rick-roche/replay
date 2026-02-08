@@ -31,16 +31,26 @@ public class AuthEndpointsTests
 
     private sealed class FakeAuthService : ISpotifyAuthService
     {
-        public Func<string, string>? OnGetAuthorizationUrl { get; set; }
-        public Func<string, CancellationToken, Task<AuthSession>>? OnExchangeCodeAsync { get; set; }
+        public Func<string, string?, string>? OnGetAuthorizationUrl { get; set; }
+        public Func<string, string?, CancellationToken, Task<AuthSession>>? OnExchangeCodeAsync { get; set; }
         public Func<string, CancellationToken, Task<AuthSession>>? OnRefreshTokenAsync { get; set; }
         public Func<string, CancellationToken, Task<SpotifyUser>>? OnGetUserProfileAsync { get; set; }
 
-        public string GetAuthorizationUrl(string state)
-            => OnGetAuthorizationUrl?.Invoke(state) ?? "https://auth.example/authorize";
+        public string GetAuthorizationUrl(string state, string? redirectUri = null)
+            => OnGetAuthorizationUrl?.Invoke(state, redirectUri) ?? "https://auth.example/authorize";
 
         public Task<AuthSession> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default)
-            => OnExchangeCodeAsync?.Invoke(code, cancellationToken) ?? Task.FromResult(new AuthSession
+            => OnExchangeCodeAsync?.Invoke(code, null, cancellationToken) ?? Task.FromResult(new AuthSession
+            {
+                SessionId = "sid",
+                AccessToken = "access",
+                RefreshToken = "refresh",
+                ExpiresAt = DateTime.UtcNow.AddHours(1),
+                User = new SpotifyUser { Id = "id", DisplayName = "name" }
+            });
+
+        public Task<AuthSession> ExchangeCodeAsync(string code, string? redirectUri, CancellationToken cancellationToken = default)
+            => OnExchangeCodeAsync?.Invoke(code, redirectUri, cancellationToken) ?? Task.FromResult(new AuthSession
             {
                 SessionId = "sid",
                 AccessToken = "access",
@@ -108,7 +118,7 @@ public class AuthEndpointsTests
     {
         var mi = GetPrivate("GetLogin");
         var ctx = ContextWithServices();
-        var auth = new FakeAuthService { OnGetAuthorizationUrl = s => "https://auth.example/authorize?state=" + s };
+        var auth = new FakeAuthService { OnGetAuthorizationUrl = (s, r) => "https://auth.example/authorize?state=" + s };
 
         var result = await InvokeAsync(mi, null!, auth, ctx);
 
@@ -123,7 +133,7 @@ public class AuthEndpointsTests
     {
         var mi = GetPrivate("GetLogin");
         var ctx = ContextWithServices();
-        var auth = new FakeAuthService { OnGetAuthorizationUrl = _ => throw new ArgumentException("bad config") };
+        var auth = new FakeAuthService { OnGetAuthorizationUrl = (_, __) => throw new ArgumentException("bad config") };
 
         var result = await InvokeAsync(mi, null!, auth, ctx);
 
@@ -180,7 +190,7 @@ public class AuthEndpointsTests
         var store = new InMemorySessionStore();
         var auth = new FakeAuthService
         {
-            OnExchangeCodeAsync = (code, ct) => Task.FromResult(NewSession("sid"))
+            OnExchangeCodeAsync = (code, state, ct) => Task.FromResult(NewSession("sid"))
         };
 
         var result = await InvokeAsync(mi, "code", "abc", null!, auth, store, ctx, CancellationToken.None);
@@ -201,7 +211,7 @@ public class AuthEndpointsTests
         var store = new InMemorySessionStore();
         var auth = new FakeAuthService
         {
-            OnExchangeCodeAsync = (code, ct) => throw new HttpRequestException("fail")
+            OnExchangeCodeAsync = (code, state, ct) => throw new HttpRequestException("fail")
         };
 
         var result = await InvokeAsync(mi, "code", "abc", null!, auth, store, ctx, CancellationToken.None);
