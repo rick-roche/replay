@@ -4,6 +4,7 @@ import { Theme } from '@radix-ui/themes'
 import { FetchDataButton, DataResults } from './DataFetchForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
 import { DataProvider } from '@/contexts/DataContext'
+import { DataSourceProvider } from '@/contexts/DataSourceContext'
 import * as configApiModule from '@/api/config'
 import type { components } from '@/api/generated-client'
 
@@ -46,7 +47,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <Theme>
       <ConfigProvider>
-        <DataProvider>{children}</DataProvider>
+        <DataSourceProvider>
+          <DataProvider>{children}</DataProvider>
+        </DataSourceProvider>
       </ConfigProvider>
     </Theme>
   )
@@ -54,6 +57,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const setConfigured = (username = 'alice') => {
   localStorage.setItem('replay:lastfm_config', JSON.stringify({ username, playCount: 100, isConfigured: true }))
+  localStorage.setItem('replay:selected_source', 'lastfm')
 }
 
 const setFilter = (dataType: 'Tracks' | 'Albums' | 'Artists' = 'Tracks') => {
@@ -73,7 +77,7 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    vi.mocked(configApi.fetchLastfmData).mockImplementation(() => new Promise(() => {}))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockImplementation(() => new Promise(() => {}))
 
     render(
       <Wrapper>
@@ -91,8 +95,8 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    const tracks = Array.from({ length: 15 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1 }))
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
+    const tracks = Array.from({ length: 15 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1, source: 'lastfm', sourceMetadata: { playCount: i + 1 } }))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
 
     render(
       <Wrapper>
@@ -115,8 +119,8 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Albums')
 
-    const albums = [{ name: 'al', artist: 'ar', playCount: 4 }]
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Albums', tracks: [], albums, artists: [] })
+    const albums = [{ name: 'al', artist: 'ar', playCount: 4, source: 'lastfm', sourceMetadata: { playCount: 4 } }]
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Albums', tracks: [], albums, artists: [] })
 
     render(
       <Wrapper>
@@ -139,8 +143,8 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Artists')
 
-    const artists = [{ name: 'artist', playCount: 7 }]
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Artists', tracks: [], albums: [], artists })
+    const artists = [{ name: 'artist', playCount: 7, source: 'lastfm', sourceMetadata: { playCount: 7 } }]
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Artists', tracks: [], albums: [], artists })
 
     render(
       <Wrapper>
@@ -163,7 +167,7 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Tracks', tracks: [], albums: [], artists: [] })
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Tracks', tracks: [], albums: [], artists: [] })
 
     render(
       <Wrapper>
@@ -183,7 +187,7 @@ describe('DataFetchForm interactions', () => {
     setConfigured()
     setFilter('Tracks')
 
-    vi.mocked(configApi.fetchLastfmData).mockRejectedValue(new Error('Boom'))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValue(new Error('Boom'))
 
     render(
       <Wrapper>
@@ -203,21 +207,17 @@ describe('DataFetchForm interactions', () => {
     setFilter('Tracks')
 
     const firstTracks = [
-      { name: 't1', artist: 'a1', playCount: 1 },
-      { name: 't2', artist: 'a2', playCount: 2 },
+      { name: 't1', artist: 'a1', playCount: 1, source: 'lastfm', sourceMetadata: { playCount: 1 } },
+      { name: 't2', artist: 'a2', playCount: 2, source: 'lastfm', sourceMetadata: { playCount: 2 } },
     ]
     const moreTracks = [
-      { name: 't2', artist: 'a2', playCount: 2 }, // duplicate
-      { name: 't3', artist: 'a3', playCount: 3 },
+      { name: 't2', artist: 'a2', playCount: 2, source: 'lastfm', sourceMetadata: { playCount: 2 } }, // duplicate
+      { name: 't3', artist: 'a3', playCount: 3, source: 'lastfm', sourceMetadata: { playCount: 3 } },
     ]
 
-    vi.mocked(configApi.fetchLastfmData)
+    vi.mocked(configApi.fetchLastfmDataNormalized)
       .mockResolvedValueOnce({ dataType: 'Tracks', tracks: firstTracks, albums: [], artists: [] })
       .mockResolvedValueOnce({ dataType: 'Tracks', tracks: moreTracks, albums: [], artists: [] })
-
-    vi.mocked(configApi.fetchLastfmDataNormalized)
-      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: firstTracks.map((t) => ({ ...t, source: 'lastfm', sourceMetadata: {} })), albums: [], artists: [] })
-      .mockResolvedValueOnce({ dataType: 'Tracks', tracks: moreTracks.map((t) => ({ ...t, source: 'lastfm', sourceMetadata: {} })), albums: [], artists: [] })
 
     render(
       <Wrapper>
@@ -267,8 +267,8 @@ describe('DataFetchForm interactions', () => {
       unmatchedCount: 1,
     }
 
-    const tracks = Array.from({ length: 3 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1 }))
-    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
+    const tracks = Array.from({ length: 3 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1, source: 'lastfm', sourceMetadata: { playCount: i + 1 } }))
+    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
 
     render(
       <Wrapper>

@@ -14,6 +14,7 @@ import { LastfmConfigForm } from './components/LastfmConfigForm'
 import { DiscogsConfigForm } from './components/DiscogsConfigForm'
 import { SetlistConfigForm } from './components/SetlistConfigForm'
 import { LastfmFilterForm } from './components/LastfmFilterForm'
+import { SetlistFmFilterForm } from './components/SetlistFmFilterForm'
 import { FetchDataButton, DataResults } from './components/DataFetchForm'
 import { MatchTracksButton } from './components/MatchTracksButton'
 import { MatchResults } from './components/MatchResults'
@@ -164,7 +165,12 @@ function App() {
                         </>
                       )}
                       {selectedSource === DataSource.DISCOGS && <DiscogsConfigForm />}
-                      {selectedSource === DataSource.SETLISTFM && <SetlistConfigForm />}
+                      {selectedSource === DataSource.SETLISTFM && (
+                        <>
+                          <SetlistConfigForm />
+                          <SetlistFmFilterForm />
+                        </>
+                      )}
                       <AdvancedOptions />
                     </Flex>
                   </WorkflowStepContainer>
@@ -180,6 +186,24 @@ function App() {
                   >
                     <Flex direction="column" gap="4">
                       {selectedSource === DataSource.LASTFM && (
+                        <>
+                          {autoFetch ? (
+                            <>
+                              <AutoFetcher />
+                              <DataResults />
+                              <MatchResults />
+                            </>
+                          ) : (
+                            <>
+                              <FetchDataButton />
+                              <DataResults />
+                              <MatchTracksButton />
+                              <MatchResults />
+                            </>
+                          )}
+                        </>
+                      )}
+                      {selectedSource === DataSource.SETLISTFM && (
                         <>
                           {autoFetch ? (
                             <>

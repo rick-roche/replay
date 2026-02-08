@@ -4,37 +4,54 @@ import { AlertCircle, CheckCircle2, Download, PlusCircle } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
 import { useData } from '../contexts/DataContext'
 import { useMatch } from '../contexts/MatchContext'
+import { useDataSource } from '../contexts/DataSourceContext'
+import { DataSource } from '../types/datasource'
 
 export function FetchDataButton() {
-  const { lastfmConfig, lastfmFilter } = useConfig()
-  const { isLoading, error, fetchData, fetchMoreData, clearError, data } = useData()
+  const { lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const { isLoading, error, fetchData, fetchSetlistFmData, fetchMoreData, clearError, data } = useData()
   const { appendMatches } = useMatch()
+  const { selectedSource } = useDataSource()
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
 
-  if (!lastfmConfig?.isConfigured) {
+  const isLastfmConfigured = lastfmConfig?.isConfigured
+  const isSetlistConfigured = setlistConfig?.isConfigured
+
+  if (!isLastfmConfigured && !isSetlistConfigured) {
     return null
   }
 
   const handleFetch = async () => {
     clearError()
     setInfoMessage(null)
-    await fetchData(lastfmConfig.username, lastfmFilter)
+    if (selectedSource === DataSource.LASTFM && isLastfmConfigured) {
+      await fetchData(lastfmConfig!.username, lastfmFilter)
+    } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
+      await fetchSetlistFmData(setlistConfig!.userId, setlistFmFilter)
+    }
   }
 
   const handleFetchMore = async () => {
     clearError()
     setInfoMessage(null)
-    const added = await fetchMoreData(lastfmConfig.username, lastfmFilter)
-    if (added.length === 0) {
-      setInfoMessage('No new tracks found to add')
-      return
+    if (selectedSource === DataSource.LASTFM && isLastfmConfigured) {
+      const added = await fetchMoreData(lastfmConfig!.username, lastfmFilter)
+      if (added.length === 0) {
+        setInfoMessage('No new tracks found to add')
+        return
+      }
+      await appendMatches(added)
+      setInfoMessage(`${added.length} new tracks fetched and added`)
+    } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
+      setInfoMessage('Fetch more not available for Setlist.fm')
     }
-    await appendMatches(added)
-    setInfoMessage(`${added.length} new tracks fetched and added`)
   }
 
-  const isDisabled = isLoading || !lastfmConfig.isConfigured
-  const canFetchMore = Boolean(data) && !isLoading
+  const isDisabled = isLoading || (!isLastfmConfigured && !isSetlistConfigured)
+  const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(data) && !isLoading
+
+  const sourceName = selectedSource === DataSource.LASTFM ? 'Last.fm' : 'Setlist.fm'
+  const dataTypeText = selectedSource === DataSource.LASTFM ? lastfmFilter.dataType.toLowerCase() : 'concerts'
 
   return (
     <Card>
@@ -44,7 +61,7 @@ export function FetchDataButton() {
             Fetch Data
           </Heading>
           <Text size="2" color="gray">
-            Retrieve {lastfmFilter.dataType.toLowerCase()} from Last.fm
+            Retrieve {dataTypeText} from {sourceName}
           </Text>
         </Box>
 
@@ -87,8 +104,9 @@ export function FetchDataButton() {
 }
 
 export function DataResults() {
-  const { data, isLoading } = useData()
+  const { data, normalizedData, isLoading } = useData()
   const { matchedData, isLoading: isMatching } = useMatch()
+  const { selectedSource } = useDataSource()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false)
 
@@ -106,29 +124,49 @@ export function DataResults() {
   }, [matchedData, isMatching, hasAutoCollapsed])
 
   if (isLoading) {
+    const sourceName = selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' : 'Last.fm'
     return (
       <Card>
         <Flex direction="column" align="center" gap="4" py="6">
           <Spinner />
           <Text size="2" color="gray">
-            Fetching data from Last.fm...
+            Fetching data from {sourceName}...
           </Text>
         </Flex>
       </Card>
     )
   }
 
-  if (!data) {
+  // For Last.fm, use data; for Setlist.fm use normalizedData
+  const displayData = data || normalizedData
+  if (!displayData) {
     return null
   }
 
-  const dataTypeLower = data.dataType.toLowerCase()
+  const getPlayCount = (item: Record<string, unknown>): number => {
+    // For Last.fm data, playCount is directly on the object
+    if ('playCount' in item && item.playCount !== undefined) {
+      const count = item.playCount
+      return typeof count === 'number' ? count : typeof count === 'string' ? Number(count) : 0
+    }
+    // For normalized data, it's in sourceMetadata
+    if ('sourceMetadata' in item && item.sourceMetadata && typeof item.sourceMetadata === 'object') {
+      const meta = item.sourceMetadata as Record<string, unknown>
+      if ('playCount' in meta && meta.playCount !== undefined) {
+        const count = meta.playCount
+        return typeof count === 'number' ? count : typeof count === 'string' ? Number(count) : 0
+      }
+    }
+    return 0
+  }
+
+  const dataTypeLower = displayData.dataType.toLowerCase()
   const dataCount =
-    data.dataType === 'Tracks'
-      ? data.tracks.length
-      : data.dataType === 'Albums'
-        ? data.albums.length
-        : data.artists.length
+    displayData.dataType === 'Tracks'
+      ? displayData.tracks.length
+      : displayData.dataType === 'Albums'
+        ? displayData.albums.length
+        : displayData.artists.length
   const summaryMessage =
     dataCount === 0
       ? `No ${dataTypeLower} found with the current filters.`
@@ -141,7 +179,7 @@ export function DataResults() {
           <Flex align="center" gap="2" className="text-green-500">
             <CheckCircle2 className="h-5 w-5" />
             <Heading size="4" weight="medium">
-              {data.dataType} Found
+              {displayData.dataType} Found
             </Heading>
           </Flex>
           <Button
@@ -159,13 +197,13 @@ export function DataResults() {
           </Text>
         ) : (
           <>
-            {data.dataType === 'Tracks' && data.tracks.length > 0 && (
+            {displayData.dataType === 'Tracks' && displayData.tracks.length > 0 && (
               <Box>
                 <Text size="2" weight="medium" className="block mb-2">
-                  {data.tracks.length} tracks found
+                  {displayData.tracks.length} tracks found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {data.tracks.slice(0, 10).map((track, idx) => (
+                  {displayData.tracks.slice(0, 10).map((track, idx) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -180,27 +218,27 @@ export function DataResults() {
                           </Text>
                         </Flex>
                         <Text size="1" color="gray">
-                          {track.playCount} plays
+                          {getPlayCount(track)} plays
                         </Text>
                       </Flex>
                     </Box>
                   ))}
-                  {data.tracks.length > 10 && (
+                  {displayData.tracks.length > 10 && (
                     <Text size="1" color="gray">
-                      ... and {data.tracks.length - 10} more
+                      ... and {displayData.tracks.length - 10} more
                     </Text>
                   )}
                 </Flex>
               </Box>
             )}
 
-            {data.dataType === 'Albums' && data.albums.length > 0 && (
+            {displayData.dataType === 'Albums' && displayData.albums.length > 0 && (
               <Box>
                 <Text size="2" weight="medium" className="block mb-2">
-                  {data.albums.length} albums found
+                  {displayData.albums.length} albums found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {data.albums.slice(0, 10).map((album, idx) => (
+                  {displayData.albums.slice(0, 10).map((album, idx) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -215,27 +253,27 @@ export function DataResults() {
                           </Text>
                         </Flex>
                         <Text size="1" color="gray">
-                          {album.playCount} plays
+                          {getPlayCount(album)} plays
                         </Text>
                       </Flex>
                     </Box>
                   ))}
-                  {data.albums.length > 10 && (
+                  {displayData.albums.length > 10 && (
                     <Text size="1" color="gray">
-                      ... and {data.albums.length - 10} more
+                      ... and {displayData.albums.length - 10} more
                     </Text>
                   )}
                 </Flex>
               </Box>
             )}
 
-            {data.dataType === 'Artists' && data.artists.length > 0 && (
+            {displayData.dataType === 'Artists' && displayData.artists.length > 0 && (
               <Box>
                 <Text size="2" weight="medium" className="block mb-2">
-                  {data.artists.length} artists found
+                  {displayData.artists.length} artists found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {data.artists.slice(0, 10).map((artist, idx) => (
+                  {displayData.artists.slice(0, 10).map((artist, idx) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -245,25 +283,25 @@ export function DataResults() {
                           {artist.name}
                         </Text>
                         <Text size="1" color="gray">
-                          {artist.playCount} plays
+                          {getPlayCount(artist)} plays
                         </Text>
                       </Flex>
                     </Box>
                   ))}
-                  {data.artists.length > 10 && (
+                  {displayData.artists.length > 10 && (
                     <Text size="1" color="gray">
-                      ... and {data.artists.length - 10} more
+                      ... and {displayData.artists.length - 10} more
                     </Text>
                   )}
                 </Flex>
               </Box>
             )}
 
-            {((data.dataType === 'Tracks' && data.tracks.length === 0) ||
-              (data.dataType === 'Albums' && data.albums.length === 0) ||
-              (data.dataType === 'Artists' && data.artists.length === 0)) && (
+            {((displayData.dataType === 'Tracks' && displayData.tracks.length === 0) ||
+              (displayData.dataType === 'Albums' && displayData.albums.length === 0) ||
+              (displayData.dataType === 'Artists' && displayData.artists.length === 0)) && (
               <Text size="2" color="gray">
-                No {data.dataType.toLowerCase()} found with the current filters.
+                No {displayData.dataType.toLowerCase()} found with the current filters.
               </Text>
             )}
           </>

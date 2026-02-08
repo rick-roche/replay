@@ -32,6 +32,26 @@ public static class SourcesEndpoints
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
+        var setlistfm = sources.MapGroup("/setlistfm");
+
+        setlistfm.MapPost("/data", PostFetchSetlistFmData)
+            .WithName("FetchSetlistFmData")
+            .WithSummary("Fetch Setlist.fm concert data with filters")
+            .WithDescription("Fetches attended concerts from a user's Setlist.fm profile with optional filtering (date range, max concerts, max tracks). Tracks are deduplicated.")
+            .Accepts<FetchSetlistFmDataRequest>("application/json")
+            .Produces<SetlistFmDataResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
+        setlistfm.MapPost("/data/normalized", PostFetchSetlistFmDataNormalized)
+            .WithName("FetchSetlistFmDataNormalized")
+            .WithSummary("Fetch normalized Setlist.fm concert data")
+            .WithDescription("Fetches Setlist.fm concert data and normalizes it to a canonical format for consistent matching across all data sources.")
+            .Accepts<FetchSetlistFmDataRequest>("application/json")
+            .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
         return group;
     }
 
@@ -209,6 +229,156 @@ public static class SourcesEndpoints
             return ApiErrorExtensions.InternalServerError(
                 "LASTFM_FETCH_ERROR",
                 "Error fetching Last.fm data",
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Fetch Setlist.fm concert data with specified filters.
+    /// </summary>
+    /// <param name="request">Contains user ID and filter options (date range, max concerts, max tracks).</param>
+    /// <param name="setlistFmService">Service for Setlist.fm API interactions.</param>
+    /// <param name="httpContext">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// 200 OK with SetlistFmDataResponse containing attended concerts and deduplicated tracks.
+    /// 400 Bad Request if request validation fails or fetch fails.
+    /// 500 Internal Server Error if an unexpected error occurs.
+    /// </returns>
+    private static async Task<IResult> PostFetchSetlistFmData(
+        [FromBody] FetchSetlistFmDataRequest request,
+        ISetlistFmService setlistFmService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        // Validate request
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USER_ID",
+                "User ID is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        // Validate date range if specified
+        if (!string.IsNullOrWhiteSpace(request.Filter.StartDate) && 
+            !string.IsNullOrWhiteSpace(request.Filter.EndDate))
+        {
+            if (!DateTime.TryParse(request.Filter.StartDate, out var startDate) ||
+                !DateTime.TryParse(request.Filter.EndDate, out var endDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            if (startDate > endDate)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_RANGE",
+                    "Start date must be before end date");
+            }
+        }
+
+        try
+        {
+            // Fetch data from Setlist.fm
+            var data = await setlistFmService.GetUserConcertsAsync(request.UserId, request.Filter, cancellationToken);
+            
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "SETLISTFM_FETCH_ERROR",
+                "Error fetching Setlist.fm data",
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Fetch Setlist.fm concert data and normalize it to canonical format for matching.
+    /// </summary>
+    /// <param name="request">Contains user ID and filter options (date range, max concerts, max tracks).</param>
+    /// <param name="setlistFmService">Service for Setlist.fm API interactions.</param>
+    /// <param name="httpContext">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// 200 OK with NormalizedDataResponse containing normalized tracks with preserved source metadata.
+    /// 400 Bad Request if request validation fails or fetch fails.
+    /// 500 Internal Server Error if an unexpected error occurs.
+    /// </returns>
+    private static async Task<IResult> PostFetchSetlistFmDataNormalized(
+        [FromBody] FetchSetlistFmDataRequest request,
+        ISetlistFmService setlistFmService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        // Validate request
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USER_ID",
+                "User ID is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        // Validate date range if specified
+        if (!string.IsNullOrWhiteSpace(request.Filter.StartDate) && 
+            !string.IsNullOrWhiteSpace(request.Filter.EndDate))
+        {
+            if (!DateTime.TryParse(request.Filter.StartDate, out var startDate) ||
+                !DateTime.TryParse(request.Filter.EndDate, out var endDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            if (startDate > endDate)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_RANGE",
+                    "Start date must be before end date");
+            }
+        }
+
+        try
+        {
+            // Fetch and normalize data from Setlist.fm
+            var data = await setlistFmService.GetUserConcertsNormalizedAsync(request.UserId, request.Filter, cancellationToken);
+            
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "SETLISTFM_FETCH_ERROR",
+                "Error fetching Setlist.fm data",
                 ex.Message);
         }
     }

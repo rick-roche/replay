@@ -8,8 +8,8 @@ import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
 
 export function AutoFetcher() {
-  const { lastfmConfig, lastfmFilter } = useConfig()
-  const { isLoading: isFetchLoading, error: fetchError, fetchData, data, normalizedData } = useData()
+  const { lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, data, normalizedData } = useData()
   const { isLoading: isMatchLoading, error: matchError, matchTracks } = useMatch()
   const { selectedSource } = useDataSource()
   const hasTriggeredFetch = useRef(false)
@@ -25,7 +25,16 @@ export function AutoFetcher() {
       hasTriggeredFetch.current = true
       fetchData(lastfmConfig.username, lastfmFilter)
     }
-  }, [lastfmConfig, lastfmFilter, selectedSource, fetchData])
+
+    if (
+      !hasTriggeredFetch.current &&
+      selectedSource === DataSource.SETLISTFM &&
+      setlistConfig?.isConfigured
+    ) {
+      hasTriggeredFetch.current = true
+      fetchSetlistFmData(setlistConfig.userId, setlistFmFilter)
+    }
+  }, [lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter, selectedSource, fetchData, fetchSetlistFmData])
 
   // Trigger match when data is fetched
   useEffect(() => {

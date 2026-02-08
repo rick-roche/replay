@@ -3,6 +3,7 @@ import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
 
 type LastfmFilter = components['schemas']['LastfmFilter']
+type SetlistFmFilter = components['schemas']['SetlistFmFilter']
 type NormalizedDataResponse = components['schemas']['NormalizedDataResponse']
 type NormalizedTrack = components['schemas']['NormalizedTrack']
 type NormalizedAlbum = components['schemas']['NormalizedAlbum']
@@ -15,6 +16,7 @@ interface DataContextValue {
   error: string | null
   fetchData: (username: string, filter: LastfmFilter) => Promise<void>
   fetchMoreData: (username: string, filter: LastfmFilter) => Promise<NormalizedTrack[]>
+  fetchSetlistFmData: (userId: string, filter: SetlistFmFilter) => Promise<void>
   clearData: () => void
   clearError: () => void
 }
@@ -165,6 +167,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function fetchSetlistFmData(userId: string, filter: SetlistFmFilter) {
+    setIsLoading(true)
+    setError(null)
+    setData(null)
+    setNormalizedData(null)
+
+    try {
+      const normalized = await configApi.fetchSetlistFmDataNormalized(userId, filter)
+      setNormalizedData(normalized)
+      setData(null) // Setlist.fm data doesn't map to LastfmDataResponse
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch Setlist.fm data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function clearData() {
     setData(null)
     setNormalizedData(null)
@@ -181,6 +200,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     error,
     fetchData,
     fetchMoreData,
+    fetchSetlistFmData,
     clearData,
     clearError
   }

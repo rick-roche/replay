@@ -18,7 +18,7 @@ See stories in [user-stories.md](./user-stories.md) and [feature-spec.md](./feat
 - [x] Story 3.1 — Select Data Source
 - [x] Story 3.2 — Filter Last.fm Data
 - [ ] Story 3.3 — Filter Discogs Collection
-- [ ] Story 3.4 — Filter Setlist.fm Concerts
+- [x] Story 3.4 — Filter Setlist.fm Concerts
 
 ## Epic 4: Presets
 
