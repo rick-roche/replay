@@ -63,7 +63,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         var searchResults = await SearchSpotifyAsync(query, accessToken, cancellationToken);
         
         return searchResults
-            .Take(5) // Limit to top 5 results
+            .Take(15) // Limit to top 15 results
             .Select(track => new SpotifyTrack
             {
                 Id = track.Id,
@@ -277,7 +277,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         CancellationToken cancellationToken)
     {
         var encodedQuery = Uri.EscapeDataString(query);
-        var url = $"{SearchEndpoint}?q={encodedQuery}&type=track&limit=10";
+        var url = $"{SearchEndpoint}?q={encodedQuery}&type=track&limit=15";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);

@@ -5,8 +5,15 @@ import { FetchDataButton, DataResults } from './DataFetchForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
 import { DataProvider } from '@/contexts/DataContext'
 import * as configApiModule from '@/api/config'
+import type { components } from '@/api/generated-client'
 
 const appendMatchesMock = vi.fn()
+type MatchedDataResponse = components['schemas']['MatchedDataResponse']
+
+const matchState: { matchedData: MatchedDataResponse | null; isLoading: boolean } = {
+  matchedData: null,
+  isLoading: false,
+}
 
 vi.mock('@/contexts/MatchContext', () => ({
   useMatch: () => ({
@@ -19,8 +26,8 @@ vi.mock('@/contexts/MatchContext', () => ({
     moveTrack: vi.fn(),
     applyManualMatch: vi.fn(),
     searchTracks: vi.fn(),
-    matchedData: null,
-    isLoading: false,
+    matchedData: matchState.matchedData,
+    isLoading: matchState.isLoading,
     error: null,
   }),
 }))
@@ -58,6 +65,8 @@ describe('DataFetchForm interactions', () => {
     vi.clearAllMocks()
     appendMatchesMock.mockReset()
     localStorage.clear()
+    matchState.matchedData = null
+    matchState.isLoading = false
   })
 
   it('shows loading state and disables button during fetch', async () => {
@@ -235,5 +244,48 @@ describe('DataFetchForm interactions', () => {
     const calledWith = appendMatchesMock.mock.calls[0][0]
     expect(calledWith).toHaveLength(1)
     expect(calledWith[0].name).toBe('t3')
+  })
+
+  it('collapses results when matching is complete', async () => {
+    setConfigured()
+    setFilter('Tracks')
+
+    matchState.matchedData = {
+      tracks: [
+        {
+          sourceTrack: {
+            name: 't0',
+            artist: 'a0',
+            source: 'lastfm',
+            sourceMetadata: {},
+          },
+          match: null,
+        },
+      ],
+      totalTracks: 1,
+      matchedCount: 0,
+      unmatchedCount: 1,
+    }
+
+    const tracks = Array.from({ length: 3 }, (_, i) => ({ name: `t${i}`, artist: `a${i}`, playCount: i + 1 }))
+    vi.mocked(configApi.fetchLastfmData).mockResolvedValue({ dataType: 'Tracks', tracks, albums: [], artists: [] })
+
+    render(
+      <Wrapper>
+        <FetchDataButton />
+        <DataResults />
+      </Wrapper>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tracks Found/)).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Show/i })).toBeInTheDocument()
+    })
+    expect(screen.queryByText('t0')).not.toBeInTheDocument()
   })
 })
