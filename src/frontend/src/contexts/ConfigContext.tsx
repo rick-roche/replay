@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
+import type { DiscogsFilter } from '../types/discogs'
 
 type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse']
 type ConfigureDiscogsResponse = components['schemas']['ConfigureDiscogsResponse']
@@ -13,6 +14,7 @@ interface ConfigContextValue {
   discogsConfig: ConfigureDiscogsResponse | null
   setlistConfig: ConfigureSetlistResponse | null
   lastfmFilter: LastfmFilter
+  discogsFilter: DiscogsFilter
   setlistFmFilter: SetlistFmFilter
   isLoading: boolean
   error: string | null
@@ -21,6 +23,7 @@ interface ConfigContextValue {
   configureDiscogs: (identifier: string) => Promise<void>
   configureSetlistFm: (usernameOrId: string) => Promise<void>
   updateFilter: (updates: Partial<LastfmFilter>) => void
+  updateDiscogsFilter: (updates: Partial<DiscogsFilter>) => void
   updateSetlistFmFilter: (updates: Partial<SetlistFmFilter>) => void
   setAutoFetch: (value: boolean) => void
   clearError: () => void
@@ -32,12 +35,17 @@ const LASTFM_CONFIG_KEY = 'replay:lastfm_config'
 const DISCOGS_CONFIG_KEY = 'replay:discogs_config'
 const SETLIST_CONFIG_KEY = 'replay:setlist_config'
 const LASTFM_FILTER_KEY = 'replay:lastfm_filter'
+const DISCOGS_FILTER_KEY = 'replay:discogs_filter'
 const SETLISTFM_FILTER_KEY = 'replay:setlistfm_filter'
 
 const DEFAULT_FILTER: LastfmFilter = {
   dataType: 'Tracks',
   timePeriod: 'Last12Months',
   maxResults: 50
+}
+
+const DEFAULT_DISCOGS_FILTER: DiscogsFilter = {
+  maxTracks: 100
 }
 
 const DEFAULT_SETLISTFM_FILTER: SetlistFmFilter = {
@@ -50,6 +58,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [discogsConfig, setDiscogsConfig] = useState<ConfigureDiscogsResponse | null>(null)
   const [setlistConfig, setSetlistConfig] = useState<ConfigureSetlistResponse | null>(null)
   const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(DEFAULT_FILTER)
+  const [discogsFilter, setDiscogsFilter] = useState<DiscogsFilter>(DEFAULT_DISCOGS_FILTER)
   const [setlistFmFilter, setSetlistFmFilter] = useState<SetlistFmFilter>(DEFAULT_SETLISTFM_FILTER)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +99,15 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setLastfmFilter(JSON.parse(storedFilter))
       } catch {
         localStorage.removeItem(LASTFM_FILTER_KEY)
+      }
+    }
+
+    const storedDiscogsFilter = localStorage.getItem(DISCOGS_FILTER_KEY)
+    if (storedDiscogsFilter) {
+      try {
+        setDiscogsFilter(JSON.parse(storedDiscogsFilter))
+      } catch {
+        localStorage.removeItem(DISCOGS_FILTER_KEY)
       }
     }
 
@@ -153,6 +171,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LASTFM_FILTER_KEY, JSON.stringify(newFilter))
   }
 
+  function updateDiscogsFilter(updates: Partial<DiscogsFilter>) {
+    const newFilter = { ...discogsFilter, ...updates }
+    setDiscogsFilter(newFilter)
+    // Persist to localStorage
+    localStorage.setItem(DISCOGS_FILTER_KEY, JSON.stringify(newFilter))
+  }
+
   function updateSetlistFmFilter(updates: Partial<SetlistFmFilter>) {
     const newFilter = { ...setlistFmFilter, ...updates }
     setSetlistFmFilter(newFilter)
@@ -173,6 +198,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     discogsConfig,
     setlistConfig,
     lastfmFilter,
+    discogsFilter,
     setlistFmFilter,
     isLoading,
     error,
@@ -181,6 +207,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     configureDiscogs,
     configureSetlistFm,
     updateFilter,
+    updateDiscogsFilter,
     updateSetlistFmFilter,
     setAutoFetch,
     clearError

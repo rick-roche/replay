@@ -32,6 +32,26 @@ public static class SourcesEndpoints
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
+        var discogs = sources.MapGroup("/discogs");
+
+        discogs.MapPost("/data", PostFetchDiscogsData)
+            .WithName("FetchDiscogsData")
+            .WithSummary("Fetch Discogs collection data with filters")
+            .WithDescription("Fetches tracks from a user's Discogs collection with optional filtering (release year range, media format, year added to collection, max results).")
+            .Accepts<FetchDiscogsDataRequest>("application/json")
+            .Produces<DiscogsDataResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
+        discogs.MapPost("/data/normalized", PostFetchDiscogsDataNormalized)
+            .WithName("FetchDiscogsDataNormalized")
+            .WithSummary("Fetch normalized Discogs collection data")
+            .WithDescription("Fetches Discogs collection data and normalizes it to a canonical format for consistent matching across all data sources.")
+            .Accepts<FetchDiscogsDataRequest>("application/json")
+            .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
         var setlistfm = sources.MapGroup("/setlistfm");
 
         setlistfm.MapPost("/data", PostFetchSetlistFmData)
@@ -229,6 +249,168 @@ public static class SourcesEndpoints
             return ApiErrorExtensions.InternalServerError(
                 "LASTFM_FETCH_ERROR",
                 "Error fetching Last.fm data",
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Fetch Discogs collection data with specified filters.
+    /// </summary>
+    /// <param name="request">Contains username/collection ID and filter options (release year range, media format, year added, max results).</param>
+    /// <param name="discogsService">Service for Discogs API interactions.</param>
+    /// <param name="httpContext">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// 200 OK with DiscogsDataResponse containing releases and extracted tracks.
+    /// 400 Bad Request if request validation fails or fetch fails.
+    /// 500 Internal Server Error if an unexpected error occurs.
+    /// </returns>
+    private static async Task<IResult> PostFetchDiscogsData(
+        [FromBody] FetchDiscogsDataRequest request,
+        IDiscogsService discogsService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        // Validate request
+        if (string.IsNullOrWhiteSpace(request.UsernameOrCollectionId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USERNAME",
+                "Username or collection ID is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        // Validate year ranges if specified
+        if ((request.Filter.MinReleaseYear.HasValue || request.Filter.MaxReleaseYear.HasValue) &&
+            request.Filter.MinReleaseYear.HasValue && request.Filter.MaxReleaseYear.HasValue &&
+            request.Filter.MinReleaseYear > request.Filter.MaxReleaseYear)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_YEAR_RANGE",
+                "Minimum release year must be less than or equal to maximum release year");
+        }
+
+        if ((request.Filter.MinYearAdded.HasValue || request.Filter.MaxYearAdded.HasValue) &&
+            request.Filter.MinYearAdded.HasValue && request.Filter.MaxYearAdded.HasValue &&
+            request.Filter.MinYearAdded > request.Filter.MaxYearAdded)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_YEAR_ADDED_RANGE",
+                "Minimum year added must be less than or equal to maximum year added");
+        }
+
+        try
+        {
+            // Fetch data from Discogs
+            var data = await discogsService.GetCollectionAsync(request.UsernameOrCollectionId, request.Filter, cancellationToken);
+            
+            if (data == null)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "DISCOGS_FETCH_FAILED",
+                    "Failed to fetch data from Discogs");
+            }
+
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "DISCOGS_FETCH_ERROR",
+                "Error fetching Discogs data",
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Fetch Discogs collection data and normalize it to canonical format for matching.
+    /// </summary>
+    /// <param name="request">Contains username/collection ID and filter options (release year range, media format, year added, max results).</param>
+    /// <param name="discogsService">Service for Discogs API interactions.</param>
+    /// <param name="httpContext">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// 200 OK with NormalizedDataResponse containing normalized tracks with preserved source metadata.
+    /// 400 Bad Request if request validation fails or fetch fails.
+    /// 500 Internal Server Error if an unexpected error occurs.
+    /// </returns>
+    private static async Task<IResult> PostFetchDiscogsDataNormalized(
+        [FromBody] FetchDiscogsDataRequest request,
+        IDiscogsService discogsService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        // Validate request
+        if (string.IsNullOrWhiteSpace(request.UsernameOrCollectionId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USERNAME",
+                "Username or collection ID is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        // Validate year ranges if specified
+        if ((request.Filter.MinReleaseYear.HasValue || request.Filter.MaxReleaseYear.HasValue) &&
+            request.Filter.MinReleaseYear.HasValue && request.Filter.MaxReleaseYear.HasValue &&
+            request.Filter.MinReleaseYear > request.Filter.MaxReleaseYear)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_YEAR_RANGE",
+                "Minimum release year must be less than or equal to maximum release year");
+        }
+
+        if ((request.Filter.MinYearAdded.HasValue || request.Filter.MaxYearAdded.HasValue) &&
+            request.Filter.MinYearAdded.HasValue && request.Filter.MaxYearAdded.HasValue &&
+            request.Filter.MinYearAdded > request.Filter.MaxYearAdded)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_YEAR_ADDED_RANGE",
+                "Minimum year added must be less than or equal to maximum year added");
+        }
+
+        try
+        {
+            // Fetch and normalize data from Discogs
+            var data = await discogsService.GetCollectionNormalizedAsync(request.UsernameOrCollectionId, request.Filter, cancellationToken);
+            
+            if (data == null)
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "DISCOGS_FETCH_FAILED",
+                    "Failed to fetch data from Discogs");
+            }
+
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "DISCOGS_FETCH_ERROR",
+                "Error fetching Discogs data",
                 ex.Message);
         }
     }

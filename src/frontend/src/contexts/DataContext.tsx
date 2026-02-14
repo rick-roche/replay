@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
+import type { DiscogsFilter } from '../types/discogs'
 
 type LastfmFilter = components['schemas']['LastfmFilter']
 type SetlistFmFilter = components['schemas']['SetlistFmFilter']
@@ -17,6 +18,7 @@ interface DataContextValue {
   fetchData: (username: string, filter: LastfmFilter) => Promise<void>
   fetchMoreData: (username: string, filter: LastfmFilter) => Promise<NormalizedTrack[]>
   fetchSetlistFmData: (userId: string, filter: SetlistFmFilter) => Promise<void>
+  fetchDiscogsData: (username: string, filter: DiscogsFilter) => Promise<void>
   clearData: () => void
   clearError: () => void
 }
@@ -184,6 +186,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function fetchDiscogsData(username: string, filter: DiscogsFilter) {
+    setIsLoading(true)
+    setError(null)
+    setData(null)
+    setNormalizedData(null)
+
+    try {
+      const normalized = await configApi.fetchDiscogsDataNormalized(username, filter)
+      setNormalizedData(normalized)
+      setData(null) // Discogs data doesn't map to LastfmDataResponse
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch Discogs data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function clearData() {
     setData(null)
     setNormalizedData(null)
@@ -201,6 +220,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     fetchData,
     fetchMoreData,
     fetchSetlistFmData,
+    fetchDiscogsData,
     clearData,
     clearError
   }

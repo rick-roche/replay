@@ -1,6 +1,7 @@
 import type { components } from './generated-client'
 import { client } from './client'
 import { handleApiError } from './errors'
+import type { DiscogsFilter, DiscogsDataResponse } from '../types/discogs'
 
 type ConfigureLastfmRequest = components['schemas']['ConfigureLastfmRequest']
 type ConfigureLastfmResponse = components['schemas']['ConfigureLastfmResponse']
@@ -74,6 +75,46 @@ export const configApi = {
     })
     if (error) handleApiError(error, 'Failed to fetch normalized Last.fm data')
     return data!
+  },
+
+  /**
+   * Fetch Discogs collection data with specified filters
+   */
+  async fetchDiscogsData(usernameOrCollectionId: string, filter: DiscogsFilter): Promise<DiscogsDataResponse> {
+    try {
+      const response = await fetch('/api/sources/discogs/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrCollectionId, filter })
+      })
+      if (!response.ok) {
+        handleApiError({ status: response.status }, 'Failed to fetch Discogs data')
+      }
+      return await response.json()
+    } catch (error) {
+      handleApiError(error, 'Failed to fetch Discogs data')
+      throw error
+    }
+  },
+
+  /**
+   * Fetch normalized Discogs collection data with specified filters
+   */
+  async fetchDiscogsDataNormalized(usernameOrCollectionId: string, filter: DiscogsFilter): Promise<NormalizedDataResponse> {
+    try {
+      const response = await fetch('/api/sources/discogs/data/normalized', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrCollectionId, filter })
+      })
+      if (!response.ok) {
+        handleApiError({ status: response.status }, 'Failed to fetch normalized Discogs data')
+      }
+      return await response.json()
+    } catch (error) {
+      handleApiError(error, 'Failed to fetch normalized Discogs data')
+      throw error
+    }
   },
 
   /**

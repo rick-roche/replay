@@ -42,9 +42,17 @@ public class ConfigurationEndpointsTests
     private sealed class FakeDiscogsService : IDiscogsService
     {
         public Func<string, CancellationToken, Task<DiscogsProfile?>>? OnGetProfileAsync { get; set; }
+        public Func<string, DiscogsFilter, CancellationToken, Task<DiscogsDataResponse?>>? OnGetCollectionAsync { get; set; }
+        public Func<string, DiscogsFilter, CancellationToken, Task<NormalizedDataResponse?>>? OnGetCollectionNormalizedAsync { get; set; }
 
         public Task<DiscogsProfile?> GetProfileAsync(string usernameOrCollectionId, CancellationToken cancellationToken = default)
             => OnGetProfileAsync?.Invoke(usernameOrCollectionId, cancellationToken) ?? Task.FromResult<DiscogsProfile?>(null);
+
+        public Task<DiscogsDataResponse?> GetCollectionAsync(string usernameOrCollectionId, DiscogsFilter filter, CancellationToken cancellationToken = default)
+            => OnGetCollectionAsync?.Invoke(usernameOrCollectionId, filter, cancellationToken) ?? Task.FromResult<DiscogsDataResponse?>(null);
+
+        public Task<NormalizedDataResponse?> GetCollectionNormalizedAsync(string usernameOrCollectionId, DiscogsFilter filter, CancellationToken cancellationToken = default)
+            => OnGetCollectionNormalizedAsync?.Invoke(usernameOrCollectionId, filter, cancellationToken) ?? Task.FromResult<NormalizedDataResponse?>(null);
     }
 
     private static HttpContext ContextWithSessionCookie(string? sessionId = "sid")

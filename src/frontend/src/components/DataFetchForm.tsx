@@ -8,16 +8,17 @@ import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
 
 export function FetchDataButton() {
-  const { lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter } = useConfig()
-  const { isLoading, error, fetchData, fetchSetlistFmData, fetchMoreData, clearError, data } = useData()
+  const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const { isLoading, error, fetchData, fetchSetlistFmData, fetchDiscogsData, fetchMoreData, clearError, data } = useData()
   const { appendMatches } = useMatch()
   const { selectedSource } = useDataSource()
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
 
   const isLastfmConfigured = lastfmConfig?.isConfigured
+  const isDiscogsConfigured = discogsConfig?.isConfigured
   const isSetlistConfigured = setlistConfig?.isConfigured
 
-  if (!isLastfmConfigured && !isSetlistConfigured) {
+  if (!isLastfmConfigured && !isDiscogsConfigured && !isSetlistConfigured) {
     return null
   }
 
@@ -26,6 +27,8 @@ export function FetchDataButton() {
     setInfoMessage(null)
     if (selectedSource === DataSource.LASTFM && isLastfmConfigured) {
       await fetchData(lastfmConfig!.username, lastfmFilter)
+    } else if (selectedSource === DataSource.DISCOGS && isDiscogsConfigured) {
+      await fetchDiscogsData(discogsConfig!.username, discogsFilter)
     } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
       await fetchSetlistFmData(setlistConfig!.userId, setlistFmFilter)
     }
@@ -42,16 +45,26 @@ export function FetchDataButton() {
       }
       await appendMatches(added)
       setInfoMessage(`${added.length} new tracks fetched and added`)
+    } else if (selectedSource === DataSource.DISCOGS && isDiscogsConfigured) {
+      setInfoMessage('Fetch more not available for Discogs')
     } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
       setInfoMessage('Fetch more not available for Setlist.fm')
     }
   }
 
-  const isDisabled = isLoading || (!isLastfmConfigured && !isSetlistConfigured)
+  const isDisabled = isLoading || (!isLastfmConfigured && !isDiscogsConfigured && !isSetlistConfigured)
   const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(data) && !isLoading
 
-  const sourceName = selectedSource === DataSource.LASTFM ? 'Last.fm' : 'Setlist.fm'
-  const dataTypeText = selectedSource === DataSource.LASTFM ? lastfmFilter.dataType.toLowerCase() : 'concerts'
+  const sourceName = 
+    selectedSource === DataSource.LASTFM ? 'Last.fm' :
+    selectedSource === DataSource.DISCOGS ? 'Discogs' :
+    selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' :
+    'source'
+  const dataTypeText = 
+    selectedSource === DataSource.LASTFM ? lastfmFilter.dataType.toLowerCase() :
+    selectedSource === DataSource.DISCOGS ? 'releases' :
+    selectedSource === DataSource.SETLISTFM ? 'concerts' :
+    'data'
 
   return (
     <Card>
@@ -124,7 +137,10 @@ export function DataResults() {
   }, [matchedData, isMatching, hasAutoCollapsed])
 
   if (isLoading) {
-    const sourceName = selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' : 'Last.fm'
+    const sourceName =
+      selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' :
+      selectedSource === DataSource.DISCOGS ? 'Discogs' :
+      'Last.fm'
     return (
       <Card>
         <Flex direction="column" align="center" gap="4" py="6">
