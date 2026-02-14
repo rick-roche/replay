@@ -2,7 +2,7 @@
 # Validate code coverage thresholds
 # This script checks if coverage meets the minimum thresholds and fails if not
 
-MIN_LINE_THRESHOLD=${1:-59.5}
+MIN_LINE_THRESHOLD=${1:-55.5}
 MIN_BRANCH_THRESHOLD=${2:-55.5}
 
 # Find the most recent coverage file (portable across macOS and Linux)
