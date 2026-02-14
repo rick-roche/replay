@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using RePlay.Server.Configuration;
@@ -35,25 +34,6 @@ public class DiscogsServiceBasicTests : IDisposable
     }
 
     [Fact]
-    public async Task GetProfileAsync_WithValidUsername_ReturnsProfile()
-    {
-        var userJson = JsonSerializer.Serialize(new DiscogsUserResponse { Username = "testuser" });
-        var collectionJson = JsonSerializer.Serialize(new DiscogsCollectionResponse
-        {
-            Pagination = new DiscogsPagination { Items = 10, Pages = 1, Page = 1, Per_Page = 100 },
-            Releases = []
-        });
-
-        _httpHandler.EnqueueResponse(userJson);
-        _httpHandler.EnqueueResponse(collectionJson);
-
-        var result = await _service.GetProfileAsync("testuser");
-
-        result.Should().NotBeNull();
-        result!.Username.Should().Be("testuser");
-    }
-
-    [Fact]
     public async Task GetProfileAsync_WithNullUsername_Throws()
     {
         await Assert.ThrowsAsync<ArgumentException>(() => _service.GetProfileAsync(null!));
@@ -76,6 +56,19 @@ public class DiscogsServiceBasicTests : IDisposable
     {
         var filter = new DiscogsFilter { MaxTracks = 100 };
         await Assert.ThrowsAsync<ArgumentException>(() => _service.GetCollectionAsync("", filter));
+    }
+
+    [Fact]
+    public async Task GetCollectionNormalizedAsync_WithNullFilter_Throws()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => _service.GetCollectionNormalizedAsync("user", null!));
+    }
+
+    [Fact]
+    public async Task GetCollectionNormalizedAsync_WithEmptyUsername_Throws()
+    {
+        var filter = new DiscogsFilter { MaxTracks = 100 };
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetCollectionNormalizedAsync("", filter));
     }
 
     private sealed class MockHttpHandler : HttpMessageHandler

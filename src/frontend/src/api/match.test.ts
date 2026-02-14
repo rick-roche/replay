@@ -1,0 +1,187 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { matchApi } from '@/api/match'
+import { client } from '@/api/client'
+
+vi.mock('@/api/client')
+vi.mock('@/api/errors', () => ({
+  handleApiError: vi.fn()
+}))
+
+describe('matchApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('matchTracksToSpotify', () => {
+    it('should send match request to API', async () => {
+      const mockRequest = {
+        tracks: [
+          { title: 'Track 1', artist: 'Artist 1' },
+          { title: 'Track 2', artist: 'Artist 2' }
+        ]
+      }
+
+      const mockResponse = {
+        tracks: [
+          {
+            id: '1',
+            name: 'Track 1',
+            artist: 'Artist 1',
+            album: 'Album 1',
+            uri: 'spotify:track:1',
+            match: null
+          },
+          {
+            id: '2',
+            name: 'Track 2',
+            artist: 'Artist 2',
+            album: 'Album 2',
+            uri: 'spotify:track:2',
+            match: null
+          }
+        ]
+      }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: mockResponse,
+        error: null
+      } as any)
+
+      const result = await matchApi.matchTracksToSpotify(mockRequest as any)
+
+      expect(result).toEqual(mockResponse)
+      expect(client.POST).toHaveBeenCalledWith(
+        '/api/api/match/spotify',
+        expect.objectContaining({
+          body: mockRequest
+        })
+      )
+    })
+
+    it('should handle API errors', async () => {
+      const mockError = { message: 'API Error' }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: undefined,
+        error: mockError
+      } as any)
+
+      const { handleApiError } = await import('@/api/errors')
+
+      const mockRequest = { tracks: [] }
+
+      try {
+        await matchApi.matchTracksToSpotify(mockRequest as any)
+      } catch {
+        // Expected to throw
+      }
+
+      expect(handleApiError).toHaveBeenCalled()
+    })
+
+    it('should include request body in POST call', async () => {
+      const mockRequest = {
+        tracks: [{ title: 'Test', artist: 'Test Artist' }]
+      }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: { tracks: [] },
+        error: null
+      } as any)
+
+      await matchApi.matchTracksToSpotify(mockRequest as any)
+
+      const call = vi.mocked(client.POST).mock.calls[0]
+      expect(call[1]?.body).toEqual(mockRequest)
+    })
+  })
+
+  describe('searchTracksForManualMatch', () => {
+    it('should search for tracks on Spotify', async () => {
+      const mockResults = [
+        {
+          id: '1',
+          name: 'Test Track',
+          artist: 'Test Artist',
+          album: 'Test Album',
+          uri: 'spotify:track:1'
+        }
+      ]
+
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: mockResults,
+        error: null
+      } as any)
+
+      const result = await matchApi.searchTracksForManualMatch('test query')
+
+      expect(result).toEqual(mockResults)
+      expect(client.GET).toHaveBeenCalledWith(
+        '/api/api/match/spotify/search',
+        expect.objectContaining({
+          params: {
+            query: {
+              query: 'test query'
+            }
+          }
+        })
+      )
+    })
+
+    it('should handle no results', async () => {
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: null,
+        error: null
+      } as any)
+
+      const result = await matchApi.searchTracksForManualMatch('nonexistent')
+
+      expect(result).toEqual([])
+    })
+
+    it('should handle API errors', async () => {
+      const mockError = { message: 'API Error' }
+
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: undefined,
+        error: mockError
+      } as any)
+
+      const { handleApiError } = await import('@/api/errors')
+
+      try {
+        await matchApi.searchTracksForManualMatch('test')
+      } catch {
+        // Expected
+      }
+
+      expect(handleApiError).toHaveBeenCalled()
+    })
+
+    it('should pass query parameter correctly', async () => {
+      const testQuery = 'Beatles Let It Be'
+
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: [],
+        error: null
+      } as any)
+
+      await matchApi.searchTracksForManualMatch(testQuery)
+
+      const call = vi.mocked(client.GET).mock.calls[0]
+      expect(call[1]?.params?.query?.query).toBe(testQuery)
+    })
+
+    it('should return empty array on null data', async () => {
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: null,
+        error: null
+      } as any)
+
+      const result = await matchApi.searchTracksForManualMatch('test')
+
+      expect(Array.isArray(result)).toBe(true)
+      expect(result.length).toBe(0)
+    })
+  })
+})

@@ -36,7 +36,11 @@ jobs:
           --logger "trx;LogFileName=test-results.trx"
           --settings "coverlet.runsettings"
 
+      - name: Validate coverage thresholds
+        run: bash scripts/validate-coverage.sh 80.0 75.0 80.0
+
       - name: Generate coverage report
+        if: always()
         uses: danielpalme/ReportGenerator-GitHub-Action@5
         with:
           reports: "TestResults/**/coverage.cobertura.xml"
@@ -44,9 +48,11 @@ jobs:
           reporttypes: "MarkdownSummary;HtmlInline_AzurePipelines"
 
       - name: Write coverage to Job Summary
+        if: always()
         run: cat coveragereport/Summary.md >> $GITHUB_STEP_SUMMARY
 
       - name: Upload HTML coverage report (artifact)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-backend
@@ -80,6 +86,7 @@ jobs:
         run: npm run test
 
       - name: Upload coverage artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-frontend
