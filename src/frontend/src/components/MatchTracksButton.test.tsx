@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { Theme } from '@radix-ui/themes'
 import { MatchTracksButton } from '@/components/MatchTracksButton'
 import { DataProvider } from '@/contexts/DataContext'

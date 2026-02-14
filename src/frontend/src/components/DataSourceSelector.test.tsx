@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { Theme } from '@radix-ui/themes'
 import { DataSourceSelector } from '@/components/DataSourceSelector'
 import { DataSourceProvider } from '@/contexts/DataSourceContext'
-import { DataSource } from '@/types/datasource'
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (

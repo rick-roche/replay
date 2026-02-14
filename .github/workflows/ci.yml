@@ -37,7 +37,7 @@ jobs:
           --settings "coverlet.runsettings"
 
       - name: Validate coverage thresholds
-        run: bash scripts/validate-coverage.sh 80.0 75.0 80.0
+        run: bash scripts/validate-coverage.sh
 
       - name: Generate coverage report
         if: always()

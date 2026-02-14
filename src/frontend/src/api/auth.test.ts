@@ -9,9 +9,6 @@ describe('authApi', () => {
 
   describe('login', () => {
     it('should redirect to login endpoint', () => {
-      const originalHref = window.location.href
-      const locationHrefMock = vi.fn()
-
       Object.defineProperty(window, 'location', {
         value: { href: '' },
         writable: true
@@ -88,7 +85,7 @@ describe('authApi', () => {
 
       await authApi.getSession()
 
-      const callArgs = (global.fetch as any).mock.calls[0]
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
       expect(callArgs[1]).toHaveProperty('credentials', 'include')
     })
   })
@@ -145,7 +142,7 @@ describe('authApi', () => {
 
       await authApi.refresh()
 
-      const callArgs = (global.fetch as any).mock.calls[0]
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
       expect(callArgs[1]).toHaveProperty('method', 'POST')
     })
   })
@@ -174,7 +171,7 @@ describe('authApi', () => {
 
       await authApi.logout()
 
-      const callArgs = (global.fetch as any).mock.calls[0]
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
       expect(callArgs[1]).toHaveProperty('credentials', 'include')
     })
 
@@ -185,7 +182,7 @@ describe('authApi', () => {
 
       await authApi.logout()
 
-      const callArgs = (global.fetch as any).mock.calls[0]
+      const callArgs = vi.mocked(global.fetch).mock.calls[0]
       expect(callArgs[0]).toBe('/api/auth/logout')
     })
 

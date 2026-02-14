@@ -6,7 +6,6 @@ import { ConfigProvider } from '@/contexts/ConfigContext'
 import { DataProvider } from '@/contexts/DataContext'
 import { MatchProvider } from '@/contexts/MatchContext'
 import { DataSourceProvider } from '@/contexts/DataSourceContext'
-import { DataSource } from '@/types/datasource'
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (

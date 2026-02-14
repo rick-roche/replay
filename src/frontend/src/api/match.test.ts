@@ -45,9 +45,9 @@ describe('matchApi', () => {
       vi.mocked(client.POST).mockResolvedValueOnce({
         data: mockResponse,
         error: null
-      } as any)
+      })
 
-      const result = await matchApi.matchTracksToSpotify(mockRequest as any)
+      const result = await matchApi.matchTracksToSpotify(mockRequest as Parameters<typeof matchApi.matchTracksToSpotify>[0])
 
       expect(result).toEqual(mockResponse)
       expect(client.POST).toHaveBeenCalledWith(
@@ -64,14 +64,14 @@ describe('matchApi', () => {
       vi.mocked(client.POST).mockResolvedValueOnce({
         data: undefined,
         error: mockError
-      } as any)
+      })
 
       const { handleApiError } = await import('@/api/errors')
 
       const mockRequest = { tracks: [] }
 
       try {
-        await matchApi.matchTracksToSpotify(mockRequest as any)
+        await matchApi.matchTracksToSpotify(mockRequest as Parameters<typeof matchApi.matchTracksToSpotify>[0])
       } catch {
         // Expected to throw
       }
@@ -87,9 +87,9 @@ describe('matchApi', () => {
       vi.mocked(client.POST).mockResolvedValueOnce({
         data: { tracks: [] },
         error: null
-      } as any)
+      })
 
-      await matchApi.matchTracksToSpotify(mockRequest as any)
+      await matchApi.matchTracksToSpotify(mockRequest as Parameters<typeof matchApi.matchTracksToSpotify>[0])
 
       const call = vi.mocked(client.POST).mock.calls[0]
       expect(call[1]?.body).toEqual(mockRequest)
@@ -111,7 +111,7 @@ describe('matchApi', () => {
       vi.mocked(client.GET).mockResolvedValueOnce({
         data: mockResults,
         error: null
-      } as any)
+      })
 
       const result = await matchApi.searchTracksForManualMatch('test query')
 
@@ -132,7 +132,7 @@ describe('matchApi', () => {
       vi.mocked(client.GET).mockResolvedValueOnce({
         data: null,
         error: null
-      } as any)
+      })
 
       const result = await matchApi.searchTracksForManualMatch('nonexistent')
 
@@ -145,7 +145,7 @@ describe('matchApi', () => {
       vi.mocked(client.GET).mockResolvedValueOnce({
         data: undefined,
         error: mockError
-      } as any)
+      })
 
       const { handleApiError } = await import('@/api/errors')
 
@@ -164,7 +164,7 @@ describe('matchApi', () => {
       vi.mocked(client.GET).mockResolvedValueOnce({
         data: [],
         error: null
-      } as any)
+      })
 
       await matchApi.searchTracksForManualMatch(testQuery)
 
@@ -176,7 +176,7 @@ describe('matchApi', () => {
       vi.mocked(client.GET).mockResolvedValueOnce({
         data: null,
         error: null
-      } as any)
+      })
 
       const result = await matchApi.searchTracksForManualMatch('test')
 
