@@ -320,34 +320,22 @@ public sealed class DiscogsService : IDiscogsService
 
     private static List<DiscogsTrack> ExtractTracksFromRelease(DiscogsReleaseDetail release)
     {
-        var tracks = new List<DiscogsTrack>();
-
-        if (release.Tracklist == null || release.Tracklist.Count == 0)
+        if (release?.Tracklist == null || release.Tracklist.Count == 0)
         {
-            return tracks;
+            return [];
         }
 
         var primaryArtist = release.Artists?.FirstOrDefault()?.Name ?? "Unknown";
 
-        foreach (var track in release.Tracklist)
-        {
-            if (string.IsNullOrWhiteSpace(track.Title))
-            {
-                continue;
-            }
-
-            // Use track artist if available, otherwise use release artist
-            var trackArtist = track.Artists?.FirstOrDefault()?.Name ?? primaryArtist;
-
-            tracks.Add(new DiscogsTrack
+        return release.Tracklist
+            .Where(track => !string.IsNullOrWhiteSpace(track.Title))
+            .Select(track => new DiscogsTrack
             {
                 Name = track.Title,
-                Artist = trackArtist,
+                Artist = track.Artists?.FirstOrDefault()?.Name ?? primaryArtist,
                 Album = release.Title,
                 ReleaseYear = release.Year
-            });
-        }
-
-        return tracks;
+            })
+            .ToList();
     }
 }
