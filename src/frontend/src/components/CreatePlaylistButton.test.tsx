@@ -1,24 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { Theme } from '@radix-ui/themes'
 import { CreatePlaylistButton } from '@/components/CreatePlaylistButton'
 import { PlaylistProvider } from '@/contexts/PlaylistContext'
 import { MatchProvider } from '@/contexts/MatchContext'
 import { CreatePlaylistProvider } from '@/contexts/CreatePlaylistContext'
-import type { components } from '@/api/generated-client'
-
-type NormalizedTrack = components['schemas']['NormalizedTrack']
-
-function createMockTrack(name: string = 'Test Track'): NormalizedTrack {
-  return {
-    name,
-    artist: 'Test Artist',
-    album: 'Test Album',
-    source: 'spotify',
-    sourceMetadata: {},
-  }
-}
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
