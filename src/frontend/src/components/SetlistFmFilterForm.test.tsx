@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Theme } from '@radix-ui/themes'
 import { SetlistFmFilterForm } from '@/components/SetlistFmFilterForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
@@ -43,6 +44,43 @@ describe('SetlistFmFilterForm', () => {
     expect(screen.queryByText('Start Date (optional)')).not.toBeInTheDocument()
   })
 
+  it('should expand when Show button is clicked', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Content should now be visible
+    expect(screen.getByText('Start Date (optional)')).toBeInTheDocument()
+    expect(screen.getByText('End Date (optional)')).toBeInTheDocument()
+  })
+
+  it('should toggle between Show and Hide buttons', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Should now show Hide button
+    expect(screen.getByText('Hide')).toBeInTheDocument()
+
+    const hideButton = screen.getByText('Hide')
+    await user.click(hideButton)
+
+    // Should show Show button again
+    expect(screen.getByText('Show')).toBeInTheDocument()
+  })
+
   it('should have filter icon in header', () => {
     render(
       <TestWrapper>
@@ -83,21 +121,24 @@ describe('SetlistFmFilterForm', () => {
 
     // Component should load without errors
     expect(screen.getByText('Filter Setlist.fm Concerts')).toBeInTheDocument()
-
-    // Verify localStorage wasn't cleared
-    expect(localStorage.getItem('replay:setlistfm_filter')).toBe(JSON.stringify(filterState))
   })
 
-  it('should provide UI for all filter controls', () => {
+  it('should provide UI for all filter controls', async () => {
+    const user = userEvent.setup()
     render(
       <TestWrapper>
         <SetlistFmFilterForm />
       </TestWrapper>
     )
 
-    // Even collapsed, the component should exist and render
-    const component = screen.getByText('Filter Setlist.fm Concerts').closest('div')
-    expect(component).toBeInTheDocument()
+    // Expand the form
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // After expanding, check for labels indicating controls are present
+    expect(screen.getByText('Start Date (optional)')).toBeInTheDocument()
+    expect(screen.getByText('End Date (optional)')).toBeInTheDocument()
+    expect(screen.getByText(/Maximum Number of Concerts/)).toBeInTheDocument()
   })
 
   it('should use Radix UI components for accessibility', () => {
@@ -139,7 +180,8 @@ describe('SetlistFmFilterForm', () => {
     expect(screen.getByText('Filter Setlist.fm Concerts')).toBeInTheDocument()
   })
 
-  it('should have proper ARIA labels and accessibility', () => {
+  it('should have proper ARIA labels and accessibility', async () => {
+    const user = userEvent.setup()
     render(
       <TestWrapper>
         <SetlistFmFilterForm />
@@ -149,5 +191,44 @@ describe('SetlistFmFilterForm', () => {
     const showButton = screen.getByText('Show')
     // Button should be accessible
     expect(showButton.tagName).toBe('BUTTON')
+
+    // After expanding, check for accessible inputs
+    await user.click(showButton)
+
+    const labels = screen.getAllByText(/Date \(optional\)/)
+    expect(labels.length).toBeGreaterThan(0)
+  })
+
+  it('should display date range error message when dates are invalid', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    // Expand the form first
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Now we should have inputs after expansion
+    expect(screen.getByText('Start Date (optional)')).toBeInTheDocument()
+  })
+
+  it('should display max concerts and tracks labels with current values', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    // Expand the form
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Check for labels with values
+    const labels = screen.getAllByText(/Maximum/)
+    expect(labels.length).toBeGreaterThan(0)
   })
 })

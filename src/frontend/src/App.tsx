@@ -14,6 +14,7 @@ import { LastfmConfigForm } from './components/LastfmConfigForm'
 import { DiscogsConfigForm } from './components/DiscogsConfigForm'
 import { SetlistConfigForm } from './components/SetlistConfigForm'
 import { LastfmFilterForm } from './components/LastfmFilterForm'
+import { DiscogsFilterForm } from './components/DiscogsFilterForm'
 import { SetlistFmFilterForm } from './components/SetlistFmFilterForm'
 import { FetchDataButton, DataResults } from './components/DataFetchForm'
 import { MatchTracksButton } from './components/MatchTracksButton'
@@ -164,7 +165,12 @@ function App() {
                           <LastfmFilterForm />
                         </>
                       )}
-                      {selectedSource === DataSource.DISCOGS && <DiscogsConfigForm />}
+                      {selectedSource === DataSource.DISCOGS && (
+                        <>
+                          <DiscogsConfigForm />
+                          <DiscogsFilterForm />
+                        </>
+                      )}
                       {selectedSource === DataSource.SETLISTFM && (
                         <>
                           <SetlistConfigForm />
@@ -204,6 +210,24 @@ function App() {
                         </>
                       )}
                       {selectedSource === DataSource.SETLISTFM && (
+                        <>
+                          {autoFetch ? (
+                            <>
+                              <AutoFetcher />
+                              <DataResults />
+                              <MatchResults />
+                            </>
+                          ) : (
+                            <>
+                              <FetchDataButton />
+                              <DataResults />
+                              <MatchTracksButton />
+                              <MatchResults />
+                            </>
+                          )}
+                        </>
+                      )}
+                      {selectedSource === DataSource.DISCOGS && (
                         <>
                           {autoFetch ? (
                             <>

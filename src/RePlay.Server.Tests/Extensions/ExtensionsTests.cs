@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
@@ -10,6 +11,22 @@ namespace RePlay.Server.Tests.Extensions;
 
 public class ExtensionsTests
 {
+    [Fact]
+    public void AddServiceDefaults_Succeeds()
+    {
+        var builder = new HostApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = Environments.Development,
+            ContentRootPath = System.IO.Directory.GetCurrentDirectory()
+        });
+
+        // Exercise method under test
+        var result = Microsoft.Extensions.Hosting.Extensions.AddServiceDefaults(builder);
+
+        // Should return the builder for method chaining
+        result.Should().NotBeNull();
+    }
+
     [Fact]
     public void AddDefaultHealthChecks_RegistersHealthCheckService()
     {
@@ -63,6 +80,26 @@ public class ExtensionsTests
         Microsoft.Extensions.Hosting.Extensions.ConfigureOpenTelemetry(builder);
 
         // Simply building the provider should succeed
+        var sp = builder.Services.BuildServiceProvider();
+        sp.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddOpenTelemetryExporters_Enabled_WithOtlpEndpoint()
+    {
+        var builder = new HostApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = Environments.Development,
+            ContentRootPath = System.IO.Directory.GetCurrentDirectory()
+        });
+
+        // Configure OTLP endpoint
+        builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:4317";
+
+        // Exercise method under test
+        Microsoft.Extensions.Hosting.Extensions.ConfigureOpenTelemetry(builder);
+
+        // Building the provider should succeeed
         var sp = builder.Services.BuildServiceProvider();
         sp.Should().NotBeNull();
     }

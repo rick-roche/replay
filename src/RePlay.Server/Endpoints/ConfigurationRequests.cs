@@ -12,6 +12,15 @@ public sealed record FetchLastfmDataRequest
 }
 
 /// <summary>
+/// Request to fetch Discogs collection data.
+/// </summary>
+public sealed record FetchDiscogsDataRequest
+{
+    public required string UsernameOrCollectionId { get; init; }
+    public required DiscogsFilter Filter { get; init; }
+}
+
+/// <summary>
 /// Request to fetch Setlist.fm concert data.
 /// </summary>
 public sealed record FetchSetlistFmDataRequest

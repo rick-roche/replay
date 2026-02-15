@@ -8,8 +8,8 @@ import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
 
 export function AutoFetcher() {
-  const { lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter } = useConfig()
-  const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, data, normalizedData } = useData()
+  const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, fetchDiscogsData, normalizedData } = useData()
   const { isLoading: isMatchLoading, error: matchError, matchTracks } = useMatch()
   const { selectedSource } = useDataSource()
   const hasTriggeredFetch = useRef(false)
@@ -28,13 +28,22 @@ export function AutoFetcher() {
 
     if (
       !hasTriggeredFetch.current &&
+      selectedSource === DataSource.DISCOGS &&
+      discogsConfig?.isConfigured
+    ) {
+      hasTriggeredFetch.current = true
+      fetchDiscogsData(discogsConfig.username, discogsFilter)
+    }
+
+    if (
+      !hasTriggeredFetch.current &&
       selectedSource === DataSource.SETLISTFM &&
       setlistConfig?.isConfigured
     ) {
       hasTriggeredFetch.current = true
       fetchSetlistFmData(setlistConfig.userId, setlistFmFilter)
     }
-  }, [lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter, selectedSource, fetchData, fetchSetlistFmData])
+  }, [lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter, selectedSource, fetchData, fetchDiscogsData, fetchSetlistFmData])
 
   // Trigger match when data is fetched
   useEffect(() => {
@@ -54,13 +63,19 @@ export function AutoFetcher() {
   const error = fetchError || matchError
 
   if (isLoading) {
+    const sourceName = 
+      selectedSource === DataSource.LASTFM ? 'Last.fm' :
+      selectedSource === DataSource.DISCOGS ? 'Discogs' :
+      selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' :
+      'source'
+    
     return (
       <Card>
         <Flex direction="column" align="center" gap="4" py="6">
           <Spinner />
           <Flex direction="column" align="center" gap="2">
             <Text size="2" weight="medium">
-              {isFetchLoading ? 'Fetching data from ' + (selectedSource === DataSource.LASTFM ? 'Last.fm' : 'source') : 'Matching to Spotify'}
+              {isFetchLoading ? `Fetching data from ${sourceName}` : 'Matching to Spotify'}
             </Text>
             <Text size="1" color="gray">
               This may take a moment...
@@ -89,7 +104,7 @@ export function AutoFetcher() {
     )
   }
 
-  if (data && normalizedData) {
+  if (normalizedData) {
     return (
       <Card>
         <Flex direction="column" gap="4">

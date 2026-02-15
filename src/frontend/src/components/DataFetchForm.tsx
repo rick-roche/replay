@@ -6,18 +6,24 @@ import { useData } from '../contexts/DataContext'
 import { useMatch } from '../contexts/MatchContext'
 import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
+import type { components } from '../api/generated-client'
+
+type NormalizedTrack = components['schemas']['NormalizedTrack']
+type NormalizedAlbum = components['schemas']['NormalizedAlbum']
+type NormalizedArtist = components['schemas']['NormalizedArtist']
 
 export function FetchDataButton() {
-  const { lastfmConfig, lastfmFilter, setlistConfig, setlistFmFilter } = useConfig()
-  const { isLoading, error, fetchData, fetchSetlistFmData, fetchMoreData, clearError, data } = useData()
+  const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const { isLoading, error, fetchData, fetchSetlistFmData, fetchDiscogsData, fetchMoreData, clearError, normalizedData } = useData()
   const { appendMatches } = useMatch()
   const { selectedSource } = useDataSource()
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
 
   const isLastfmConfigured = lastfmConfig?.isConfigured
+  const isDiscogsConfigured = discogsConfig?.isConfigured
   const isSetlistConfigured = setlistConfig?.isConfigured
 
-  if (!isLastfmConfigured && !isSetlistConfigured) {
+  if (!isLastfmConfigured && !isDiscogsConfigured && !isSetlistConfigured) {
     return null
   }
 
@@ -26,6 +32,8 @@ export function FetchDataButton() {
     setInfoMessage(null)
     if (selectedSource === DataSource.LASTFM && isLastfmConfigured) {
       await fetchData(lastfmConfig!.username, lastfmFilter)
+    } else if (selectedSource === DataSource.DISCOGS && isDiscogsConfigured) {
+      await fetchDiscogsData(discogsConfig!.username, discogsFilter)
     } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
       await fetchSetlistFmData(setlistConfig!.userId, setlistFmFilter)
     }
@@ -42,16 +50,26 @@ export function FetchDataButton() {
       }
       await appendMatches(added)
       setInfoMessage(`${added.length} new tracks fetched and added`)
+    } else if (selectedSource === DataSource.DISCOGS && isDiscogsConfigured) {
+      setInfoMessage('Fetch more not available for Discogs')
     } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
       setInfoMessage('Fetch more not available for Setlist.fm')
     }
   }
 
-  const isDisabled = isLoading || (!isLastfmConfigured && !isSetlistConfigured)
-  const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(data) && !isLoading
+  const isDisabled = isLoading || (!isLastfmConfigured && !isDiscogsConfigured && !isSetlistConfigured)
+  const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(normalizedData) && !isLoading
 
-  const sourceName = selectedSource === DataSource.LASTFM ? 'Last.fm' : 'Setlist.fm'
-  const dataTypeText = selectedSource === DataSource.LASTFM ? lastfmFilter.dataType.toLowerCase() : 'concerts'
+  const sourceName = 
+    selectedSource === DataSource.LASTFM ? 'Last.fm' :
+    selectedSource === DataSource.DISCOGS ? 'Discogs' :
+    selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' :
+    'source'
+  const dataTypeText = 
+    selectedSource === DataSource.LASTFM ? lastfmFilter.dataType.toLowerCase() :
+    selectedSource === DataSource.DISCOGS ? 'releases' :
+    selectedSource === DataSource.SETLISTFM ? 'concerts' :
+    'data'
 
   return (
     <Card>
@@ -104,7 +122,7 @@ export function FetchDataButton() {
 }
 
 export function DataResults() {
-  const { data, normalizedData, isLoading } = useData()
+  const { normalizedData, isLoading } = useData()
   const { matchedData, isLoading: isMatching } = useMatch()
   const { selectedSource } = useDataSource()
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -124,7 +142,10 @@ export function DataResults() {
   }, [matchedData, isMatching, hasAutoCollapsed])
 
   if (isLoading) {
-    const sourceName = selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' : 'Last.fm'
+    const sourceName =
+      selectedSource === DataSource.SETLISTFM ? 'Setlist.fm' :
+      selectedSource === DataSource.DISCOGS ? 'Discogs' :
+      'Last.fm'
     return (
       <Card>
         <Flex direction="column" align="center" gap="4" py="6">
@@ -137,8 +158,8 @@ export function DataResults() {
     )
   }
 
-  // For Last.fm, use data; for Setlist.fm use normalizedData
-  const displayData = data || normalizedData
+  // Use normalizedData for all sources
+  const displayData = normalizedData
   if (!displayData) {
     return null
   }
@@ -203,7 +224,7 @@ export function DataResults() {
                   {displayData.tracks.length} tracks found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {displayData.tracks.slice(0, 10).map((track, idx) => (
+                  {displayData.tracks.slice(0, 10).map((track: NormalizedTrack, idx: number) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -238,7 +259,7 @@ export function DataResults() {
                   {displayData.albums.length} albums found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {displayData.albums.slice(0, 10).map((album, idx) => (
+                  {displayData.albums.slice(0, 10).map((album: NormalizedAlbum, idx: number) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -273,7 +294,7 @@ export function DataResults() {
                   {displayData.artists.length} artists found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {displayData.artists.slice(0, 10).map((artist, idx) => (
+                  {displayData.artists.slice(0, 10).map((artist: NormalizedArtist, idx: number) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
