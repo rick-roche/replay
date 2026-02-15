@@ -28,6 +28,10 @@ public class PlaylistEndpointsTests
         public Func<PlaylistCreationRequest, string, string, CancellationToken, Task<PlaylistCreationResponse>>? OnCreatePlaylistAsync { get; set; }
         public Func<string, string, CancellationToken, Task<IReadOnlyList<SpotifyTrack>>>? OnSearchTracksAsync { get; set; }
         public Func<IReadOnlyList<NormalizedTrack>, string, CancellationToken, Task<MatchedDataResponse>>? OnMatchTracksAsync { get; set; }
+        public Func<IReadOnlyList<NormalizedAlbum>, string, CancellationToken, Task<MatchedAlbumsResponse>>? OnMatchAlbumsAsync { get; set; }
+        public Func<string, string, CancellationToken, Task<IReadOnlyList<SpotifyAlbumInfo>>>? OnSearchAlbumsAsync { get; set; }
+        public Func<IReadOnlyList<NormalizedArtist>, string, CancellationToken, Task<MatchedArtistsResponse>>? OnMatchArtistsAsync { get; set; }
+        public Func<string, string, CancellationToken, Task<IReadOnlyList<SpotifyArtistInfo>>>? OnSearchArtistsAsync { get; set; }
 
         public Task<PlaylistCreationResponse> CreatePlaylistAsync(PlaylistCreationRequest request, string accessToken, string userId, CancellationToken cancellationToken = default)
             => OnCreatePlaylistAsync?.Invoke(request, accessToken, userId, cancellationToken) 
@@ -38,6 +42,18 @@ public class PlaylistEndpointsTests
 
         public Task<MatchedDataResponse> MatchTracksAsync(IReadOnlyList<NormalizedTrack> tracks, string accessToken, CancellationToken cancellationToken = default)
             => OnMatchTracksAsync?.Invoke(tracks, accessToken, cancellationToken) ?? Task.FromResult(new MatchedDataResponse { Tracks = [] });
+
+        public Task<MatchedAlbumsResponse> MatchAlbumsAsync(IReadOnlyList<NormalizedAlbum> albums, string accessToken, CancellationToken cancellationToken = default)
+            => OnMatchAlbumsAsync?.Invoke(albums, accessToken, cancellationToken) ?? Task.FromResult(new MatchedAlbumsResponse { Albums = [] });
+
+        public Task<IReadOnlyList<SpotifyAlbumInfo>> SearchAlbumsAsync(string query, string accessToken, CancellationToken cancellationToken = default)
+            => OnSearchAlbumsAsync?.Invoke(query, accessToken, cancellationToken) ?? Task.FromResult<IReadOnlyList<SpotifyAlbumInfo>>(Array.Empty<SpotifyAlbumInfo>());
+
+        public Task<MatchedArtistsResponse> MatchArtistsAsync(IReadOnlyList<NormalizedArtist> artists, string accessToken, CancellationToken cancellationToken = default)
+            => OnMatchArtistsAsync?.Invoke(artists, accessToken, cancellationToken) ?? Task.FromResult(new MatchedArtistsResponse { Artists = [] });
+
+        public Task<IReadOnlyList<SpotifyArtistInfo>> SearchArtistsAsync(string query, string accessToken, CancellationToken cancellationToken = default)
+            => OnSearchArtistsAsync?.Invoke(query, accessToken, cancellationToken) ?? Task.FromResult<IReadOnlyList<SpotifyArtistInfo>>(Array.Empty<SpotifyArtistInfo>());
     }
 
     private static HttpContext ContextWithSessionCookie(string? sessionId = "sid")

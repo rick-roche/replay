@@ -6,6 +6,10 @@ import { ManualSearchModal } from './ManualSearchModal';
 import type { components } from '@/api/generated-client';
 
 type MatchedTrack = components['schemas']['MatchedTrack']
+type MatchedAlbum = components['schemas']['MatchedAlbum']
+type MatchedArtist = components['schemas']['MatchedArtist']
+type SpotifyMatch = components['schemas']['SpotifyMatch']
+type NormalizedTrack = components['schemas']['NormalizedTrack']
 type MatchMethod = 'Exact' | 'Normalized' | 'Fuzzy' | 'AlbumBased'
 type SpotifyTrack = components['schemas']['SpotifyTrack']
 
@@ -228,7 +232,7 @@ const MatchedTrackRow = ({ matchedTrack, trackIndex }: { matchedTrack: MatchedTr
 };
 
 export function MatchResults() {
-  const { matchedData, isLoading, moveTrack } = useMatch();
+  const { matchedData, matchedAlbums, matchedArtists, isLoading, moveTrack } = useMatch();
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const handleDrop = (toIndex: number) => {
@@ -241,23 +245,91 @@ export function MatchResults() {
     return (
       <Card>
         <Flex direction="column" gap="3">
-          <Heading size="4">Matching tracks...</Heading>
+          <Heading size="4">Matching...</Heading>
           <Text size="2" color="gray">
-            Please wait while we find your tracks on Spotify
+            Please wait while we match your data to Spotify
           </Text>
         </Flex>
       </Card>
     );
   }
 
-  if (!matchedData) {
+  // Extract tracks from matched data - could be from tracks, albums, or artists
+  let tracks: MatchedTrack[] = [];
+  let totalMatchedTracks = 0;
+  let totalUnmatchedItems = 0;
+  let matchName = 'Matching Complete';
+
+  if (matchedData?.tracks) {
+    // Direct track matches
+    tracks = matchedData.tracks;
+    totalMatchedTracks = typeof matchedData.matchedCount === 'string' 
+      ? parseInt(matchedData.matchedCount, 10) 
+      : matchedData.matchedCount ?? 0;
+    totalUnmatchedItems = typeof matchedData.unmatchedCount === 'string'
+      ? parseInt(matchedData.unmatchedCount, 10)
+      : matchedData.unmatchedCount ?? 0;
+    matchName = 'Tracks Matched';
+  } else if (matchedAlbums?.albums) {
+    // Extract tracks from matched albums
+    matchedAlbums.albums.forEach((album: MatchedAlbum) => {
+      if (album.match?.tracks) {
+        album.match.tracks.forEach((track: SpotifyMatch) => {
+          const sourceTrack: NormalizedTrack = {
+            name: track.name,
+            artist: track.artist,
+            album: album.match?.name || undefined,
+            source: 'album',
+            sourceMetadata: {},
+          };
+          tracks.push({
+            sourceTrack,
+            match: track,
+            isMatched: true,
+          } as MatchedTrack);
+        });
+      }
+    });
+    totalMatchedTracks = typeof matchedAlbums.matchedCount === 'string'
+      ? parseInt(matchedAlbums.matchedCount, 10)
+      : matchedAlbums.matchedCount ?? 0;
+    totalUnmatchedItems = typeof matchedAlbums.unmatchedCount === 'string'
+      ? parseInt(matchedAlbums.unmatchedCount, 10)
+      : matchedAlbums.unmatchedCount ?? 0;
+    matchName = 'Albums Matched';
+  } else if (matchedArtists?.artists) {
+    // Extract tracks from matched artists
+    matchedArtists.artists.forEach((artist: MatchedArtist) => {
+      if (artist.match?.topTracks) {
+        artist.match.topTracks.forEach((track: SpotifyMatch) => {
+          const sourceTrack: NormalizedTrack = {
+            name: track.name,
+            artist: track.artist,
+            source: 'artist',
+            sourceMetadata: {},
+          };
+          tracks.push({
+            sourceTrack,
+            match: track,
+            isMatched: true,
+          } as MatchedTrack);
+        });
+      }
+    });
+    totalMatchedTracks = typeof matchedArtists.matchedCount === 'string'
+      ? parseInt(matchedArtists.matchedCount, 10)
+      : matchedArtists.matchedCount ?? 0;
+    totalUnmatchedItems = typeof matchedArtists.unmatchedCount === 'string'
+      ? parseInt(matchedArtists.unmatchedCount, 10)
+      : matchedArtists.unmatchedCount ?? 0;
+    matchName = 'Artists Matched';
+  }
+
+  if (tracks.length === 0) {
     return null;
   }
 
-  const { tracks, matchedCount, unmatchedCount, totalTracks } = matchedData;
-  const matchedCountNum = typeof matchedCount === 'string' ? parseInt(matchedCount, 10) : matchedCount ?? 0;
-  const unmatchedCountNum = typeof unmatchedCount === 'string' ? parseInt(unmatchedCount, 10) : unmatchedCount ?? 0;
-  const totalTracksNum = typeof totalTracks === 'string' ? parseInt(totalTracks, 10) : totalTracks ?? 0;
+  const totalTracksNum = tracks.length;
 
   return (
     <Card>
@@ -265,12 +337,12 @@ export function MatchResults() {
         <Flex direction="column" gap="2">
           <Flex align="center" gap="2">
             <CheckCircle2Icon size={20} color="var(--green-9)" />
-            <Heading size="5">Matching Complete</Heading>
+            <Heading size="5">{matchName}</Heading>
           </Flex>
           <Flex gap="4">
             <Flex align="center" gap="2">
               <Text size="2" weight="bold">
-                Total:
+                Total Tracks:
               </Text>
               <Badge color="gray" variant="soft">
                 {totalTracksNum}
@@ -278,19 +350,19 @@ export function MatchResults() {
             </Flex>
             <Flex align="center" gap="2">
               <Text size="2" weight="bold">
-                Matched:
+                Matched Items:
               </Text>
               <Badge color="green" variant="soft">
-                {matchedCountNum}
+                {totalMatchedTracks}
               </Badge>
             </Flex>
-            {unmatchedCountNum > 0 && (
+            {totalUnmatchedItems > 0 && (
               <Flex align="center" gap="2">
                 <Text size="2" weight="bold">
                   Unmatched:
                 </Text>
                 <Badge color="red" variant="soft">
-                  {unmatchedCountNum}
+                  {totalUnmatchedItems}
                 </Badge>
               </Flex>
             )}

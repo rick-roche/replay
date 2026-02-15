@@ -275,6 +275,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/api/match/spotify/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match normalized albums to Spotify
+         * @description Attempts to find Spotify matches for normalized albums and loads tracks from each matched album.
+         */
+        post: operations["MatchAlbumsToSpotify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/api/match/spotify/albums/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Spotify for albums
+         * @description Searches Spotify for albums matching the given query. Returns up to 5 results.
+         */
+        get: operations["SearchSpotifyAlbums"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/api/match/spotify/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match normalized artists to Spotify
+         * @description Attempts to find Spotify matches for normalized artists and loads top tracks from each matched artist.
+         */
+        post: operations["MatchArtistsToSpotify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/api/match/spotify/artists/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Spotify for artists
+         * @description Searches Spotify for artists matching the given query. Returns up to 5 results.
+         */
+        get: operations["SearchSpotifyArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/playlist/create": {
         parameters: {
             query?: never;
@@ -434,6 +514,44 @@ export interface components {
         };
         /** @enum {unknown} */
         LastfmTimePeriod: "Last7Days" | "Last1Month" | "Last3Months" | "Last6Months" | "Last12Months" | "Overall" | "Custom";
+        MatchAlbumsRequest: {
+            albums: components["schemas"]["NormalizedAlbum"][];
+        };
+        MatchArtistsRequest: {
+            artists: components["schemas"]["NormalizedArtist"][];
+        };
+        MatchedAlbum: {
+            sourceAlbum: components["schemas"]["NormalizedAlbum"];
+            match?: null | components["schemas"]["SpotifyAlbumMatch"];
+            isMatched?: boolean;
+        };
+        MatchedAlbumsResponse: {
+            albums: components["schemas"]["MatchedAlbum"][];
+            /** Format: int32 */
+            totalAlbums?: number | string;
+            /** Format: int32 */
+            matchedCount?: number | string;
+            /** Format: int32 */
+            unmatchedCount?: number | string;
+            /** Format: int32 */
+            totalTracks?: number | string;
+        };
+        MatchedArtist: {
+            sourceArtist: components["schemas"]["NormalizedArtist"];
+            match?: null | components["schemas"]["SpotifyArtistMatch"];
+            isMatched?: boolean;
+        };
+        MatchedArtistsResponse: {
+            artists: components["schemas"]["MatchedArtist"][];
+            /** Format: int32 */
+            totalArtists?: number | string;
+            /** Format: int32 */
+            matchedCount?: number | string;
+            /** Format: int32 */
+            unmatchedCount?: number | string;
+            /** Format: int32 */
+            totalTracks?: number | string;
+        };
         MatchedDataResponse: {
             tracks: components["schemas"]["MatchedTrack"][];
             /** Format: int32 */
@@ -502,6 +620,40 @@ export interface components {
             /** Format: int32 */
             maxTracks?: number | string;
         };
+        SpotifyAlbumInfo: {
+            id: string;
+            name: string;
+            artist: string;
+            releaseDate?: null | string;
+            uri: string;
+            /** Format: int32 */
+            totalTracks?: number | string;
+        };
+        SpotifyAlbumMatch: {
+            spotifyId: string;
+            name: string;
+            artist: string;
+            uri: string;
+            tracks: components["schemas"]["SpotifyMatch"][];
+            /** Format: int32 */
+            confidence: number | string;
+            method: components["schemas"]["MatchMethod"];
+        };
+        SpotifyArtistInfo: {
+            id: string;
+            name: string;
+            uri: string;
+            genres?: string[];
+        };
+        SpotifyArtistMatch: {
+            spotifyId: string;
+            name: string;
+            uri: string;
+            topTracks: components["schemas"]["SpotifyMatch"][];
+            /** Format: int32 */
+            confidence: number | string;
+            method: components["schemas"]["MatchMethod"];
+        };
         SpotifyMatch: {
             spotifyId: string;
             name: string;
@@ -541,6 +693,12 @@ export type FetchSetlistFmDataRequest = components['schemas']['FetchSetlistFmDat
 export type LastfmDataType = components['schemas']['LastfmDataType'];
 export type LastfmFilter = components['schemas']['LastfmFilter'];
 export type LastfmTimePeriod = components['schemas']['LastfmTimePeriod'];
+export type MatchAlbumsRequest = components['schemas']['MatchAlbumsRequest'];
+export type MatchArtistsRequest = components['schemas']['MatchArtistsRequest'];
+export type MatchedAlbum = components['schemas']['MatchedAlbum'];
+export type MatchedAlbumsResponse = components['schemas']['MatchedAlbumsResponse'];
+export type MatchedArtist = components['schemas']['MatchedArtist'];
+export type MatchedArtistsResponse = components['schemas']['MatchedArtistsResponse'];
 export type MatchedDataResponse = components['schemas']['MatchedDataResponse'];
 export type MatchedTrack = components['schemas']['MatchedTrack'];
 export type MatchMethod = components['schemas']['MatchMethod'];
@@ -552,6 +710,10 @@ export type NormalizedTrack = components['schemas']['NormalizedTrack'];
 export type PlaylistCreationRequest = components['schemas']['PlaylistCreationRequest'];
 export type PlaylistCreationResponse = components['schemas']['PlaylistCreationResponse'];
 export type SetlistFmFilter = components['schemas']['SetlistFmFilter'];
+export type SpotifyAlbumInfo = components['schemas']['SpotifyAlbumInfo'];
+export type SpotifyAlbumMatch = components['schemas']['SpotifyAlbumMatch'];
+export type SpotifyArtistInfo = components['schemas']['SpotifyArtistInfo'];
+export type SpotifyArtistMatch = components['schemas']['SpotifyArtistMatch'];
 export type SpotifyMatch = components['schemas']['SpotifyMatch'];
 export type SpotifyTrack = components['schemas']['SpotifyTrack'];
 export type $defs = Record<string, never>;
@@ -778,6 +940,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpotifyTrack"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    MatchAlbumsToSpotify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchAlbumsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchedAlbumsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    SearchSpotifyAlbums: {
+        parameters: {
+            query?: {
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpotifyAlbumInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    MatchArtistsToSpotify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchArtistsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchedArtistsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    SearchSpotifyArtists: {
+        parameters: {
+            query?: {
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpotifyArtistInfo"][];
                 };
             };
             /** @description Bad Request */

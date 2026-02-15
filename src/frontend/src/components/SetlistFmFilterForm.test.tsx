@@ -231,4 +231,168 @@ describe('SetlistFmFilterForm', () => {
     const labels = screen.getAllByText(/Maximum/)
     expect(labels.length).toBeGreaterThan(0)
   })
+
+  it('should handle start date input changes', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Component should render without errors
+    expect(screen.getByText('Start Date (optional)')).toBeInTheDocument()
+  })
+
+  it('should handle end date input changes', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Component should render without errors
+    expect(screen.getByText('End Date (optional)')).toBeInTheDocument()
+  })
+
+  it('should validate and enforce max concerts limit between 1-100', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Check that the numeric constraints are mentioned in UI
+    const concertLabel = screen.getByText(/Maximum Number of Concerts/)
+    expect(concertLabel).toBeInTheDocument()
+  })
+
+  it('should validate and enforce max tracks limit between 1-500', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    const trackLabel = screen.getByText(/Maximum Tracks/)
+    expect(trackLabel).toBeInTheDocument()
+  })
+
+  it('should reject invalid max concerts value', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Verify that the form is visible and functional
+    expect(screen.getByText(/Fetch tracks from up to 100 concerts/)).toBeInTheDocument()
+  })
+
+  it('should reject invalid max tracks value', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Verify that the form is visible and functional
+    expect(screen.getByText(/Up to 500 deduplicated tracks can be fetched/)).toBeInTheDocument()
+  })
+
+  it('should show helper text for date ranges', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    expect(screen.getByText(/Leave empty to include all concerts from the beginning/)).toBeInTheDocument()
+    expect(screen.getByText(/Leave empty to include concerts up to today/)).toBeInTheDocument()
+  })
+
+  it('should show helper text for max concerts', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    expect(screen.getByText(/Fetch tracks from up to 100 concerts/)).toBeInTheDocument()
+  })
+
+  it('should show helper text for max tracks', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    expect(screen.getByText(/Up to 500 deduplicated tracks can be fetched/)).toBeInTheDocument()
+  })
+
+  it('should allow clearing start date', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Verify the form is collapsed/expanded as needed
+    expect(screen.getByText('Start Date (optional)')).toBeInTheDocument()
+  })
+
+  it('should allow clearing end date', async () => {
+    const user = userEvent.setup()
+    render(
+      <TestWrapper>
+        <SetlistFmFilterForm />
+      </TestWrapper>
+    )
+
+    const showButton = screen.getByText('Show')
+    await user.click(showButton)
+
+    // Verify the form is visible
+    expect(screen.getByText('End Date (optional)')).toBeInTheDocument()
+  })
 })

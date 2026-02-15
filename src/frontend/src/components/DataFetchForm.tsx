@@ -123,13 +123,13 @@ export function FetchDataButton() {
 
 export function DataResults() {
   const { normalizedData, isLoading } = useData()
-  const { matchedData, isLoading: isMatching } = useMatch()
+  const { matchedData, matchedAlbums, matchedArtists, isLoading: isMatching } = useMatch()
   const { selectedSource } = useDataSource()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false)
 
   useEffect(() => {
-    if (!matchedData || isMatching) {
+    if ((!matchedData && !matchedAlbums && !matchedArtists) || isMatching) {
       setIsCollapsed(false)
       setHasAutoCollapsed(false)
       return
@@ -139,7 +139,7 @@ export function DataResults() {
       setIsCollapsed(true)
       setHasAutoCollapsed(true)
     }
-  }, [matchedData, isMatching, hasAutoCollapsed])
+  }, [matchedData, matchedAlbums, matchedArtists, isMatching, hasAutoCollapsed])
 
   if (isLoading) {
     const sourceName =
