@@ -551,15 +551,499 @@ public class SpotifyMatchingServiceTests : IDisposable
         _mockHandler?.Dispose();
     }
 
+    [Fact]
+    public async Task MatchArtistsAsync_WithNoMatches_ReturnsUnmatched()
+    {
+        // Arrange
+        var artists = new List<NormalizedArtist>
+        {
+            new()
+            {
+                Name = "Unknown Artist",
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        var spotifyResponse = new
+        {
+            artists = new
+            {
+                items = Array.Empty<object>()
+            }
+        };
+
+        _mockHandler.SetResponse(JsonSerializer.Serialize(spotifyResponse));
+
+        // Act
+        var result = await _service.MatchArtistsAsync(artists, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Artists);
+        Assert.False(result.Artists[0].IsMatched);
+        Assert.Null(result.Artists[0].Match);
+        Assert.Equal(0, result.MatchedCount);
+        Assert.Equal(1, result.UnmatchedCount);
+    }
+
+    [Fact]
+    public async Task MatchArtistsAsync_WithFuzzyMatch_ReturnsFuzzyConfidence()
+    {
+        // Arrange
+        var artists = new List<NormalizedArtist>
+        {
+            new()
+            {
+                Name = "The Beatls",
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        var artistSearchResponse = new
+        {
+            artists = new
+            {
+                items = new[]
+                {
+                    new
+                    {
+                        id = "artistId123",
+                        name = "The Beatles",
+                        uri = "spotify:artist:artistId123",
+                        genres = new[] { "rock", "pop" }
+                    }
+                }
+            }
+        };
+
+        var topTracksResponse = new
+        {
+            tracks = new[]
+            {
+                new
+                {
+                    id = "trackId1",
+                    name = "Hey Jude",
+                    uri = "spotify:track:trackId1",
+                    artists = new[] { new { name = "The Beatles" } },
+                    album = new { name = "Hey Jude" }
+                }
+            }
+        };
+
+        _mockHandler.SetResponses(
+            JsonSerializer.Serialize(artistSearchResponse),
+            JsonSerializer.Serialize(topTracksResponse)
+        );
+
+        // Act
+        var result = await _service.MatchArtistsAsync(artists, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Artists);
+        Assert.True(result.Artists[0].IsMatched);
+        Assert.NotNull(result.Artists[0].Match);
+        Assert.Equal(70, result.Artists[0].Match!.Confidence);
+        Assert.Equal(MatchMethod.Fuzzy, result.Artists[0].Match!.Method);
+    }
+
+    [Fact]
+    public async Task SearchTracksAsync_WithEmptyQuery_ReturnsEmpty()
+    {
+        // Act
+        var result = await _service.SearchTracksAsync("", "test_access_token");
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task SearchAlbumsAsync_WithEmptyQuery_ReturnsEmpty()
+    {
+        // Act
+        var result = await _service.SearchAlbumsAsync("", "test_access_token");
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task SearchArtistsAsync_WithEmptyQuery_ReturnsEmpty()
+    {
+        // Act
+        var result = await _service.SearchArtistsAsync("", "test_access_token");
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task MatchAlbumsAsync_WithNormalizedMatch_ReturnsGoodConfidence()
+    {
+        // Arrange
+        var albums = new List<NormalizedAlbum>
+        {
+            new()
+            {
+                Name = "rumours",
+                Artist = "fleetwood mac",
+                Tracks = new List<NormalizedTrack>(),
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        var albumSearchResponse = new
+        {
+            albums = new
+            {
+                items = new[]
+                {
+                    new
+                    {
+                        id = "albumId123",
+                        name = "Rumours",
+                        uri = "spotify:album:albumId123",
+                        release_date = "1977-02-04",
+                        total_tracks = 40,
+                        artists = new[] { new { name = "Fleetwood Mac" } }
+                    }
+                }
+            }
+        };
+
+        var albumTracksResponse = new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = "trackId1",
+                    name = "Dreams",
+                    uri = "spotify:track:trackId1",
+                    artists = new[] { new { name = "Fleetwood Mac" } },
+                    album = new { name = "Rumours" }
+                }
+            }
+        };
+
+        _mockHandler.SetResponses(
+            JsonSerializer.Serialize(albumSearchResponse),
+            JsonSerializer.Serialize(albumTracksResponse)
+        );
+
+        // Act
+        var result = await _service.MatchAlbumsAsync(albums, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Albums);
+        Assert.True(result.Albums[0].IsMatched);
+        Assert.Equal(90, result.Albums[0].Match!.Confidence);
+        Assert.Equal(MatchMethod.Normalized, result.Albums[0].Match!.Method);
+    }
+
+    [Fact]
+    public async Task SearchTracksAsync_WithWhitespaceQuery_ReturnsEmpty()
+    {
+        // Act
+        var result = await _service.SearchTracksAsync("   ", "test_access_token");
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task SearchAlbumsAsync_WithWhitespaceQuery_ReturnsEmpty()
+    {
+        // Act
+        var result = await _service.SearchAlbumsAsync("   ", "test_access_token");
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task SearchArtistsAsync_WithWhitespaceQuery_ReturnsEmpty()
+    {
+        // Act
+        var result = await _service.SearchArtistsAsync("   ", "test_access_token");
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task CreatePlaylistAsync_WithValidRequest_ReturnsPlaylistResponse()
+    {
+        // Arrange
+        var request = new PlaylistCreationRequest
+        {
+            Name = "My Playlist",
+            Description = "A test playlist",
+            IsPublic = true,
+            TrackUris = new List<string> { "spotify:track:1", "spotify:track:2" }
+        };
+
+        var createPlaylistResponse = new
+        {
+            id = "playlistId123",
+            uri = "spotify:playlist:playlistId123",
+            external_urls = new { spotify = "https://open.spotify.com/playlist/playlistId123" }
+        };
+
+        var addTracksResponse = new
+        {
+            snapshot_id = "snapshot123"
+        };
+
+        _mockHandler.SetResponses(
+            JsonSerializer.Serialize(createPlaylistResponse),
+            JsonSerializer.Serialize(addTracksResponse)
+        );
+
+        // Act
+        var result = await _service.CreatePlaylistAsync(request, "test_access_token", "user123");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("playlistId123", result.PlaylistId);
+        Assert.Equal(2, result.TracksAdded);
+    }
+
+    [Fact]
+    public async Task CreatePlaylistAsync_WithEmptyTrackUris_ThrowsException()
+    {
+        // Arrange
+        var request = new PlaylistCreationRequest
+        {
+            Name = "Empty Playlist",
+            Description = "No tracks",
+            IsPublic = false,
+            TrackUris = new List<string>()
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.CreatePlaylistAsync(request, "test_access_token", "user123")
+        );
+    }
+
+    [Fact]
+    public async Task CreatePlaylistAsync_WithNullRequest_ThrowsException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => _service.CreatePlaylistAsync(null!, "test_access_token", "user123")
+        );
+    }
+
+    [Fact]
+    public async Task CreatePlaylistAsync_WithEmptyAccessToken_ThrowsException()
+    {
+        // Arrange
+        var request = new PlaylistCreationRequest
+        {
+            Name = "My Playlist",
+            Description = "A test playlist",
+            IsPublic = true,
+            TrackUris = new List<string> { "spotify:track:1" }
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _service.CreatePlaylistAsync(request, "", "user123")
+        );
+    }
+
+    [Fact]
+    public async Task CreatePlaylistAsync_WithEmptyUserId_ThrowsException()
+    {
+        // Arrange
+        var request = new PlaylistCreationRequest
+        {
+            Name = "My Playlist",
+            Description = "A test playlist",
+            IsPublic = true,
+            TrackUris = new List<string> { "spotify:track:1" }
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _service.CreatePlaylistAsync(request, "token", "")
+        );
+    }
+
+    [Fact]
+    public async Task SearchTracksAsync_WithValidQuery_ReturnsLimitedResults()
+    {
+        // Arrange
+        var spotifyResponse = new
+        {
+            tracks = new
+            {
+                items = new[]
+                {
+                    new { id = "1", name = "Track 1", uri = "spotify:track:1", artists = new[] { new { name = "Artist 1" } }, album = new { name = "Album 1" } },
+                    new { id = "2", name = "Track 2", uri = "spotify:track:2", artists = new[] { new { name = "Artist 2" } }, album = new { name = "Album 2" } },
+                    new { id = "3", name = "Track 3", uri = "spotify:track:3", artists = new[] { new { name = "Artist 3" } }, album = new { name = "Album 3" } }
+                }
+            }
+        };
+
+        _mockHandler.SetResponse(JsonSerializer.Serialize(spotifyResponse));
+
+        // Act
+        var result = await _service.SearchTracksAsync("test", "test_access_token");
+
+        // Assert
+        Assert.NotEmpty(result);
+        Assert.All(result, track => Assert.NotNull(track.Name));
+    }
+
+    [Fact]
+    public async Task SearchAlbumsAsync_WithValidQuery_ReturnsLimitedResults()
+    {
+        // Arrange
+        var spotifyResponse = new
+        {
+            albums = new
+            {
+                items = new[]
+                {
+                    new { id = "1", name = "Album 1", uri = "spotify:album:1", release_date = "2020-01-01", total_tracks = 10, artists = new[] { new { name = "Artist 1" } } },
+                    new { id = "2", name = "Album 2", uri = "spotify:album:2", release_date = "2021-01-01", total_tracks = 12, artists = new[] { new { name = "Artist 2" } } }
+                }
+            }
+        };
+
+        _mockHandler.SetResponse(JsonSerializer.Serialize(spotifyResponse));
+
+        // Act
+        var result = await _service.SearchAlbumsAsync("test", "test_access_token");
+
+        // Assert
+        Assert.NotEmpty(result);
+        Assert.All(result, album => Assert.NotNull(album.Name));
+    }
+
+    [Fact]
+    public async Task SearchArtistsAsync_WithValidQuery_ReturnsLimitedResults()
+    {
+        // Arrange
+        var spotifyResponse = new
+        {
+            artists = new
+            {
+                items = new[]
+                {
+                    new { id = "1", name = "Artist 1", uri = "spotify:artist:1", genres = new[] { "rock" } },
+                    new { id = "2", name = "Artist 2", uri = "spotify:artist:2", genres = new[] { "pop" } }
+                }
+            }
+        };
+
+        _mockHandler.SetResponse(JsonSerializer.Serialize(spotifyResponse));
+
+        // Act
+        var result = await _service.SearchArtistsAsync("test", "test_access_token");
+
+        // Assert
+        Assert.NotEmpty(result);
+        Assert.All(result, artist => Assert.NotNull(artist.Name));
+    }
+
+    [Fact]
+    public async Task MatchTracksAsync_HttpErrorResponse_ReturnsNoMatches()
+    {
+        // Arrange
+        var tracks = new List<NormalizedTrack>
+        {
+            new()
+            {
+                Name = "Test Track",
+                Artist = "Test Artist",
+                Album = null,
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        _mockHandler.SetResponseError(HttpStatusCode.BadRequest, "Bad request");
+
+        // Act
+        var result = await _service.MatchTracksAsync(tracks, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Tracks);
+        Assert.False(result.Tracks[0].IsMatched);
+        Assert.Null(result.Tracks[0].Match);
+    }
+
+    [Fact]
+    public async Task MatchAlbumsAsync_HttpErrorResponse_ReturnsNoMatches()
+    {
+        // Arrange
+        var albums = new List<NormalizedAlbum>
+        {
+            new()
+            {
+                Name = "Test Album",
+                Artist = "Test Artist",
+                Tracks = new List<NormalizedTrack>(),
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        _mockHandler.SetResponseError(HttpStatusCode.BadRequest, "Bad request");
+
+        // Act
+        var result = await _service.MatchAlbumsAsync(albums, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Albums);
+        Assert.False(result.Albums[0].IsMatched);
+        Assert.Null(result.Albums[0].Match);
+    }
+
+    [Fact]
+    public async Task MatchArtistsAsync_HttpErrorResponse_ReturnsNoMatches()
+    {
+        // Arrange
+        var artists = new List<NormalizedArtist>
+        {
+            new()
+            {
+                Name = "Test Artist",
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        _mockHandler.SetResponseError(HttpStatusCode.BadRequest, "Bad request");
+
+        // Act
+        var result = await _service.MatchArtistsAsync(artists, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Artists);
+        Assert.False(result.Artists[0].IsMatched);
+        Assert.Null(result.Artists[0].Match);
+    }
+
     private sealed class MockHttpMessageHandler : HttpMessageHandler
     {
         private string _response = string.Empty;
         private readonly Queue<string> _responses = new();
+        private HttpStatusCode _statusCode = HttpStatusCode.OK;
+        private string _errorContent = string.Empty;
 
         public void SetResponse(string response)
         {
             _response = response;
             _responses.Clear();
+            _statusCode = HttpStatusCode.OK;
         }
 
         public void SetResponses(params string[] responses)
@@ -569,6 +1053,15 @@ public class SpotifyMatchingServiceTests : IDisposable
             {
                 _responses.Enqueue(response);
             }
+            _statusCode = HttpStatusCode.OK;
+        }
+
+        public void SetResponseError(HttpStatusCode statusCode, string errorContent)
+        {
+            _statusCode = statusCode;
+            _errorContent = errorContent;
+            _responses.Clear();
+            _response = string.Empty;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(
@@ -579,8 +1072,8 @@ public class SpotifyMatchingServiceTests : IDisposable
             
             return Task.FromResult(new HttpResponseMessage
             {
-                StatusCode = HttpStatusCode.OK,
-                Content = new StringContent(responseContent)
+                StatusCode = _statusCode,
+                Content = new StringContent(responseContent ?? _errorContent)
             });
         }
     }
