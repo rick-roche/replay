@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
-import { configApi } from '../api/config'
+import { sourcesApi } from '../api/sources'
 import type { DiscogsFilter } from '../types/discogs'
 
 type LastfmFilter = components['schemas']['LastfmFilter']
@@ -11,7 +11,6 @@ type NormalizedAlbum = components['schemas']['NormalizedAlbum']
 type NormalizedArtist = components['schemas']['NormalizedArtist']
 
 interface DataContextValue {
-  data: components['schemas']['LastfmDataResponse'] | null
   normalizedData: NormalizedDataResponse | null
   isLoading: boolean
   error: string | null
@@ -73,53 +72,18 @@ const mergeNormalizedArtists = (existing: NormalizedArtist[], incoming: Normaliz
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<components['schemas']['LastfmDataResponse'] | null>(null)
   const [normalizedData, setNormalizedData] = useState<NormalizedDataResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const toRawData = (normalized: NormalizedDataResponse | null): components['schemas']['LastfmDataResponse'] | null => {
-    if (!normalized) return null
-
-    const getPlayCount = (meta?: Record<string, unknown> | null) => {
-      if (!meta) return 0
-      const value = meta['playCount']
-      if (typeof value === 'number') return value
-      if (typeof value === 'string' && !Number.isNaN(Number(value))) return Number(value)
-      return 0
-    }
-
-    return {
-      dataType: normalized.dataType as components['schemas']['LastfmDataResponse']['dataType'],
-      tracks: (normalized.tracks ?? []).map((t) => ({
-        name: t.name ?? '',
-        artist: t.artist ?? '',
-        album: t.album ?? undefined,
-        playCount: getPlayCount((t as { sourceMetadata?: Record<string, unknown> | null })?.sourceMetadata)
-      })),
-      albums: (normalized.albums ?? []).map((a) => ({
-        name: a.name ?? '',
-        artist: a.artist ?? '',
-        playCount: getPlayCount((a as { sourceMetadata?: Record<string, unknown> | null })?.sourceMetadata)
-      })),
-      artists: (normalized.artists ?? []).map((a) => ({
-        name: a.name ?? '',
-        playCount: getPlayCount((a as { sourceMetadata?: Record<string, unknown> | null })?.sourceMetadata)
-      })),
-      totalResults: normalized.totalResults ?? 0
-    }
-  }
-
   async function fetchData(username: string, filter: LastfmFilter) {
     setIsLoading(true)
     setError(null)
-    setData(null)
     setNormalizedData(null)
 
     try {
-      const normalized = await configApi.fetchLastfmDataNormalized(username, filter)
+      const normalized = await sourcesApi.fetchLastfmData(username, filter)
       setNormalizedData(normalized)
-      setData(toRawData(normalized))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
@@ -132,12 +96,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const normalized = await configApi.fetchLastfmDataNormalized(username, filter)
+      const normalized = await sourcesApi.fetchLastfmData(username, filter)
 
       // If data types differ from existing, treat as a fresh set
-      if (!data || data.dataType !== normalized.dataType) {
+      if (!normalizedData || normalizedData.dataType !== normalized.dataType) {
         setNormalizedData(normalized)
-        setData(toRawData(normalized))
         return normalized.tracks ?? []
       }
 
@@ -155,7 +118,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
 
       setNormalizedData(mergedNormalized)
-      setData(toRawData(mergedNormalized))
 
       // Return only the newly-added normalized tracks to allow matching append
       const existingKeys = new Set((normalizedData?.tracks ?? []).map(trackKey))
@@ -172,13 +134,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   async function fetchSetlistFmData(userId: string, filter: SetlistFmFilter) {
     setIsLoading(true)
     setError(null)
-    setData(null)
     setNormalizedData(null)
 
     try {
-      const normalized = await configApi.fetchSetlistFmDataNormalized(userId, filter)
+      const normalized = await sourcesApi.fetchSetlistFmData(userId, filter)
       setNormalizedData(normalized)
-      setData(null) // Setlist.fm data doesn't map to LastfmDataResponse
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch Setlist.fm data')
     } finally {
@@ -189,13 +149,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   async function fetchDiscogsData(username: string, filter: DiscogsFilter) {
     setIsLoading(true)
     setError(null)
-    setData(null)
     setNormalizedData(null)
 
     try {
-      const normalized = await configApi.fetchDiscogsDataNormalized(username, filter)
+      const normalized = await sourcesApi.fetchDiscogsData(username, filter)
       setNormalizedData(normalized)
-      setData(null) // Discogs data doesn't map to LastfmDataResponse
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch Discogs data')
     } finally {
@@ -204,7 +162,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   function clearData() {
-    setData(null)
     setNormalizedData(null)
   }
 
@@ -213,7 +170,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const value: DataContextValue = {
-    data,
     normalizedData,
     isLoading,
     error,

@@ -9,7 +9,7 @@ import { DataSource } from '../types/datasource'
 
 export function AutoFetcher() {
   const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
-  const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, fetchDiscogsData, data, normalizedData } = useData()
+  const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, fetchDiscogsData, normalizedData } = useData()
   const { isLoading: isMatchLoading, error: matchError, matchTracks } = useMatch()
   const { selectedSource } = useDataSource()
   const hasTriggeredFetch = useRef(false)
@@ -104,7 +104,7 @@ export function AutoFetcher() {
     )
   }
 
-  if (data && normalizedData) {
+  if (normalizedData) {
     return (
       <Card>
         <Flex direction="column" gap="4">

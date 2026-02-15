@@ -6,10 +6,15 @@ import { useData } from '../contexts/DataContext'
 import { useMatch } from '../contexts/MatchContext'
 import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
+import type { components } from '../api/generated-client'
+
+type NormalizedTrack = components['schemas']['NormalizedTrack']
+type NormalizedAlbum = components['schemas']['NormalizedAlbum']
+type NormalizedArtist = components['schemas']['NormalizedArtist']
 
 export function FetchDataButton() {
   const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
-  const { isLoading, error, fetchData, fetchSetlistFmData, fetchDiscogsData, fetchMoreData, clearError, data } = useData()
+  const { isLoading, error, fetchData, fetchSetlistFmData, fetchDiscogsData, fetchMoreData, clearError, normalizedData } = useData()
   const { appendMatches } = useMatch()
   const { selectedSource } = useDataSource()
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
@@ -53,7 +58,7 @@ export function FetchDataButton() {
   }
 
   const isDisabled = isLoading || (!isLastfmConfigured && !isDiscogsConfigured && !isSetlistConfigured)
-  const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(data) && !isLoading
+  const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(normalizedData) && !isLoading
 
   const sourceName = 
     selectedSource === DataSource.LASTFM ? 'Last.fm' :
@@ -117,7 +122,7 @@ export function FetchDataButton() {
 }
 
 export function DataResults() {
-  const { data, normalizedData, isLoading } = useData()
+  const { normalizedData, isLoading } = useData()
   const { matchedData, isLoading: isMatching } = useMatch()
   const { selectedSource } = useDataSource()
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -153,8 +158,8 @@ export function DataResults() {
     )
   }
 
-  // For Last.fm, use data; for Setlist.fm use normalizedData
-  const displayData = data || normalizedData
+  // Use normalizedData for all sources
+  const displayData = normalizedData
   if (!displayData) {
     return null
   }
@@ -219,7 +224,7 @@ export function DataResults() {
                   {displayData.tracks.length} tracks found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {displayData.tracks.slice(0, 10).map((track, idx) => (
+                  {displayData.tracks.slice(0, 10).map((track: NormalizedTrack, idx: number) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -254,7 +259,7 @@ export function DataResults() {
                   {displayData.albums.length} albums found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {displayData.albums.slice(0, 10).map((album, idx) => (
+                  {displayData.albums.slice(0, 10).map((album: NormalizedAlbum, idx: number) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"
@@ -289,7 +294,7 @@ export function DataResults() {
                   {displayData.artists.length} artists found
                 </Text>
                 <Flex direction="column" gap="2">
-                  {displayData.artists.slice(0, 10).map((artist, idx) => (
+                  {displayData.artists.slice(0, 10).map((artist: NormalizedArtist, idx: number) => (
                     <Box
                       key={idx}
                       className="text-sm p-2 rounded border border-zinc-700"

@@ -4,20 +4,22 @@ import { renderHook, act } from '@testing-library/react'
 import { Theme } from '@radix-ui/themes'
 import { DataProvider, useData } from '@/contexts/DataContext'
 import { ConfigProvider } from '@/contexts/ConfigContext'
-import * as configApiModule from '@/api/config'
+import * as sourcesApiModule from '@/api/sources'
 
-// Mock the config API
-vi.mock('@/api/config', () => ({
-  configApi: {
-    fetchLastfmDataNormalized: vi.fn()
+// Mock the sources API
+vi.mock('@/api/sources', () => ({
+  sourcesApi: {
+    fetchLastfmData: vi.fn(),
+    fetchSetlistFmData: vi.fn(),
+    fetchDiscogsData: vi.fn()
   }
 }))
 
-const configApi = configApiModule.configApi
+const sourcesApi = sourcesApiModule.sourcesApi
 
 // Test component that uses data context
 function TestComponent() {
-  const { data, isLoading, error } = useData()
+  const { normalizedData, isLoading, error } = useData()
 
   if (isLoading) {
     return <div>Loading...</div>
@@ -27,16 +29,16 @@ function TestComponent() {
     return <div>Error: {error}</div>
   }
 
-  if (!data) {
+  if (!normalizedData) {
     return <div>No data</div>
   }
 
   return (
     <div>
-      <div>Data Type: {data.dataType}</div>
-      <div>Tracks: {data.tracks.length}</div>
-      <div>Albums: {data.albums.length}</div>
-      <div>Artists: {data.artists.length}</div>
+      <div>Data Type: {normalizedData.dataType}</div>
+      <div>Tracks: {normalizedData.tracks.length}</div>
+      <div>Albums: {normalizedData.albums.length}</div>
+      <div>Artists: {normalizedData.artists.length}</div>
     </div>
   )
 }
@@ -84,7 +86,7 @@ describe('DataContext', () => {
   it('should show error when fetch fails', async () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValueOnce(new Error('Network error'))
+    vi.mocked(sourcesApi.fetchLastfmData).mockRejectedValueOnce(new Error('Network error'))
 
     const filter = {
       dataType: 'Tracks' as const,
@@ -97,13 +99,13 @@ describe('DataContext', () => {
     })
 
     expect(result.current.error).toBe('Network error')
-    expect(result.current.data).toBeNull()
+    expect(result.current.normalizedData).toBeNull()
   })
 
   it('should handle non-Error exceptions during fetch', async () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValueOnce('string error')
+    vi.mocked(sourcesApi.fetchLastfmData).mockRejectedValueOnce('string error')
 
     const filter = {
       dataType: 'Tracks' as const,
@@ -137,7 +139,7 @@ describe('DataContext', () => {
       })
     })
 
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockReturnValueOnce(apiPromise)
+    vi.mocked(sourcesApi.fetchLastfmData).mockReturnValueOnce(apiPromise)
 
     const filter = {
       dataType: 'Tracks' as const,
@@ -167,7 +169,7 @@ describe('DataContext', () => {
       artists: []
     }
 
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce(mockNormalized)
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce(mockNormalized)
 
     const filter = {
       dataType: 'Tracks' as const,
@@ -179,8 +181,8 @@ describe('DataContext', () => {
       await result.current.fetchData('testuser', filter)
     })
 
-    expect(result.current.data?.dataType).toBe('Tracks')
-    expect(result.current.data?.tracks).toHaveLength(1)
+    expect(result.current.normalizedData?.dataType).toBe('Tracks')
+    expect(result.current.normalizedData?.tracks).toHaveLength(1)
     expect(result.current.normalizedData).toEqual(mockNormalized)
     expect(result.current.error).toBeNull()
   })
@@ -189,7 +191,7 @@ describe('DataContext', () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
     // First, set an error
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValueOnce(new Error('Error 1'))
+    vi.mocked(sourcesApi.fetchLastfmData).mockRejectedValueOnce(new Error('Error 1'))
 
     const filter = {
       dataType: 'Tracks' as const,
@@ -204,7 +206,7 @@ describe('DataContext', () => {
     expect(result.current.error).toBe('Error 1')
 
     // Now succeed
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 0,
@@ -224,7 +226,7 @@ describe('DataContext', () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
     // Set initial data
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 1,
@@ -243,10 +245,10 @@ describe('DataContext', () => {
       await result.current.fetchData('testuser', filter)
     })
 
-    expect(result.current.data?.tracks.length).toBe(1)
+    expect(result.current.normalizedData?.tracks.length).toBe(1)
 
     // Fetch again (should clear old data)
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Albums',
       source: 'lastfm',
       totalResults: 1,
@@ -259,14 +261,14 @@ describe('DataContext', () => {
       await result.current.fetchData('testuser', { ...filter, dataType: 'Albums' })
     })
 
-    expect(result.current.data?.albums.length).toBe(1)
-    expect(result.current.data?.tracks.length).toBe(0)
+    expect(result.current.normalizedData?.albums.length).toBe(1)
+    expect(result.current.normalizedData?.tracks.length).toBe(0)
   })
 
   it('should provide clearData function', async () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 1,
@@ -283,20 +285,20 @@ describe('DataContext', () => {
       })
     })
 
-    expect(result.current.data).not.toBeNull()
+    expect(result.current.normalizedData).not.toBeNull()
 
     act(() => {
       result.current.clearData()
     })
 
-    expect(result.current.data).toBeNull()
+    expect(result.current.normalizedData).toBeNull()
     expect(result.current.normalizedData).toBeNull()
   })
 
   it('should provide clearError function', async () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValueOnce(new Error('Test error'))
+    vi.mocked(sourcesApi.fetchLastfmData).mockRejectedValueOnce(new Error('Test error'))
 
     await act(async () => {
       await result.current.fetchData('testuser', {
@@ -339,7 +341,7 @@ describe('DataContext', () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
     // Initial fetch with one track
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 1,
@@ -353,10 +355,10 @@ describe('DataContext', () => {
       await result.current.fetchData('testuser', filter)
     })
 
-    expect(result.current.data?.tracks).toHaveLength(1)
+    expect(result.current.normalizedData?.tracks).toHaveLength(1)
 
     // Fetch more with same type
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 1,
@@ -370,7 +372,7 @@ describe('DataContext', () => {
     })
 
     // Should have merged data (2 unique tracks)
-    expect(result.current.data?.tracks).toHaveLength(2)
+    expect(result.current.normalizedData?.tracks).toHaveLength(2)
     expect(result.current.normalizedData?.tracks).toHaveLength(2)
   })
 
@@ -378,7 +380,7 @@ describe('DataContext', () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
     // Initial fetch with Tracks
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 1,
@@ -392,11 +394,11 @@ describe('DataContext', () => {
       await result.current.fetchData('testuser', filter1)
     })
 
-    expect(result.current.data?.dataType).toBe('Tracks')
-    expect(result.current.data?.tracks).toHaveLength(1)
+    expect(result.current.normalizedData?.dataType).toBe('Tracks')
+    expect(result.current.normalizedData?.tracks).toHaveLength(1)
 
     // Fetch with different type
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Albums',
       source: 'lastfm',
       totalResults: 1,
@@ -411,16 +413,16 @@ describe('DataContext', () => {
     })
 
     // Should have replaced data
-    expect(result.current.data?.dataType).toBe('Albums')
-    expect(result.current.data?.albums).toHaveLength(1)
-    expect(result.current.data?.tracks).toHaveLength(0)
+    expect(result.current.normalizedData?.dataType).toBe('Albums')
+    expect(result.current.normalizedData?.albums).toHaveLength(1)
+    expect(result.current.normalizedData?.tracks).toHaveLength(0)
   })
 
   it('should return empty array on fetchMoreData error', async () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
     // Initial successful fetch
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 1,
@@ -435,7 +437,7 @@ describe('DataContext', () => {
     })
 
     // Mock error for fetchMoreData
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockRejectedValueOnce(new Error('API Error'))
+    vi.mocked(sourcesApi.fetchLastfmData).mockRejectedValueOnce(new Error('API Error'))
 
     let newTracks: components['schemas']['NormalizedTrack'][] = []
     await act(async () => {
@@ -450,7 +452,7 @@ describe('DataContext', () => {
     const { result } = renderHook(() => useData(), { wrapper: HookTestWrapper })
 
     // Initial fetch
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 2,
@@ -467,10 +469,10 @@ describe('DataContext', () => {
       await result.current.fetchData('testuser', filter)
     })
 
-    expect(result.current.data?.tracks).toHaveLength(2)
+    expect(result.current.normalizedData?.tracks).toHaveLength(2)
 
     // Fetch more with duplicate + new track
-    vi.mocked(configApi.fetchLastfmDataNormalized).mockResolvedValueOnce({
+    vi.mocked(sourcesApi.fetchLastfmData).mockResolvedValueOnce({
       dataType: 'Tracks',
       source: 'lastfm',
       totalResults: 2,
@@ -487,7 +489,7 @@ describe('DataContext', () => {
     })
 
     // Should have 3 unique tracks (1, 2, 3)
-    expect(result.current.data?.tracks).toHaveLength(3)
+    expect(result.current.normalizedData?.tracks).toHaveLength(3)
     expect(result.current.normalizedData?.tracks).toHaveLength(3)
   })
 })
