@@ -43,4 +43,53 @@ public interface ISpotifyMatchingService
         PlaylistCreationRequest request,
         string accessToken,
         string userId,
-        CancellationToken cancellationToken = default);}
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Matches a list of normalized albums to Spotify albums and retrieves tracks from each album.
+    /// </summary>
+    /// <param name="albums">Normalized albums to match.</param>
+    /// <param name="accessToken">Spotify access token for API authentication.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matched albums with their tracks and confidence scores.</returns>
+    Task<MatchedAlbumsResponse> MatchAlbumsAsync(
+        IReadOnlyList<NormalizedAlbum> albums,
+        string accessToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Matches a list of normalized artists to Spotify artists and retrieves top tracks from each artist.
+    /// </summary>
+    /// <param name="artists">Normalized artists to match.</param>
+    /// <param name="accessToken">Spotify access token for API authentication.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matched artists with their top tracks and confidence scores.</returns>
+    Task<MatchedArtistsResponse> MatchArtistsAsync(
+        IReadOnlyList<NormalizedArtist> artists,
+        string accessToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches Spotify for albums matching the given query.
+    /// </summary>
+    /// <param name="query">Album name and/or artist name to search for.</param>
+    /// <param name="accessToken">Spotify access token for API authentication.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of Spotify albums matching the query (up to 5 results).</returns>
+    Task<IReadOnlyList<SpotifyAlbumInfo>> SearchAlbumsAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches Spotify for artists matching the given query.
+    /// </summary>
+    /// <param name="query">Artist name to search for.</param>
+    /// <param name="accessToken">Spotify access token for API authentication.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of Spotify artists matching the query (up to 5 results).</returns>
+    Task<IReadOnlyList<SpotifyArtistInfo>> SearchArtistsAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken = default);
+}

@@ -75,6 +75,102 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
             .ToList();
     }
 
+    public async Task<MatchedAlbumsResponse> MatchAlbumsAsync(
+        IReadOnlyList<NormalizedAlbum> albums,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        var matchedAlbums = new List<MatchedAlbum>();
+
+        foreach (var album in albums)
+        {
+            var match = await MatchSingleAlbumAsync(album, accessToken, cancellationToken);
+            matchedAlbums.Add(new MatchedAlbum
+            {
+                SourceAlbum = album,
+                Match = match
+            });
+        }
+
+        return new MatchedAlbumsResponse
+        {
+            Albums = matchedAlbums
+        };
+    }
+
+    public async Task<MatchedArtistsResponse> MatchArtistsAsync(
+        IReadOnlyList<NormalizedArtist> artists,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        var matchedArtists = new List<MatchedArtist>();
+
+        foreach (var artist in artists)
+        {
+            var match = await MatchSingleArtistAsync(artist, accessToken, cancellationToken);
+            matchedArtists.Add(new MatchedArtist
+            {
+                SourceArtist = artist,
+                Match = match
+            });
+        }
+
+        return new MatchedArtistsResponse
+        {
+            Artists = matchedArtists
+        };
+    }
+
+    public async Task<IReadOnlyList<SpotifyAlbumInfo>> SearchAlbumsAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Array.Empty<SpotifyAlbumInfo>();
+        }
+
+        var searchResults = await SearchSpotifyAlbumsAsync(query, accessToken, cancellationToken);
+        
+        return searchResults
+            .Take(5) // Limit to top 5 results
+            .Select(album => new SpotifyAlbumInfo
+            {
+                Id = album.Id,
+                Name = album.Name,
+                Artist = string.Join(", ", album.Artists.Select(a => a.Name)),
+                ReleaseDate = album.ReleaseDate,
+                Uri = album.Uri,
+                TotalTracks = album.TotalTracks
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<SpotifyArtistInfo>> SearchArtistsAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Array.Empty<SpotifyArtistInfo>();
+        }
+
+        var searchResults = await SearchSpotifyArtistsAsync(query, accessToken, cancellationToken);
+        
+        return searchResults
+            .Take(5) // Limit to top 5 results
+            .Select(artist => new SpotifyArtistInfo
+            {
+                Id = artist.Id,
+                Name = artist.Name,
+                Uri = artist.Uri,
+                Genres = artist.Genres?.ToList() ?? []
+            })
+            .ToList();
+    }
+
     public async Task<PlaylistCreationResponse> CreatePlaylistAsync(
         PlaylistCreationRequest request,
         string accessToken,
@@ -295,6 +391,320 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         return searchResponse?.Tracks?.Items ?? Array.Empty<SpotifySearchTrack>();
     }
 
+    private async Task<SpotifyAlbumMatch?> MatchSingleAlbumAsync(
+        NormalizedAlbum album,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        // Build search query: album + artist
+        var query = $"album:{album.Name} artist:{album.Artist}";
+        var searchResults = await SearchSpotifyAlbumsAsync(query, accessToken, cancellationToken);
+
+        if (searchResults.Count == 0)
+        {
+            return null; // No matches found
+        }
+
+        // Try matching strategies in order of confidence
+        var matchedSpotifyAlbum = TryExactAlbumMatch(album, searchResults)
+            ?? TryNormalizedAlbumMatch(album, searchResults)
+            ?? TryFuzzyAlbumMatch(album, searchResults);
+
+        if (matchedSpotifyAlbum == null)
+        {
+            return null;
+        }
+
+        // Fetch tracks for matched album
+        var tracks = await FetchAlbumTracksAsync(matchedSpotifyAlbum.Id, accessToken, cancellationToken);
+
+        return new SpotifyAlbumMatch
+        {
+            SpotifyId = matchedSpotifyAlbum.Id,
+            Name = matchedSpotifyAlbum.Name,
+            Artist = string.Join(", ", matchedSpotifyAlbum.Artists.Select(a => a.Name)),
+            Uri = matchedSpotifyAlbum.Uri,
+            Tracks = tracks,
+            Confidence = matchedSpotifyAlbum.Confidence,
+            Method = matchedSpotifyAlbum.Method
+        };
+    }
+
+    private async Task<SpotifyArtistMatch?> MatchSingleArtistAsync(
+        NormalizedArtist artist,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        // Build search query: artist name
+        var query = $"artist:{artist.Name}";
+        var searchResults = await SearchSpotifyArtistsAsync(query, accessToken, cancellationToken);
+
+        if (searchResults.Count == 0)
+        {
+            return null; // No matches found
+        }
+
+        // Try matching strategies in order of confidence
+        var matchedSpotifyArtist = TryExactArtistMatch(artist, searchResults)
+            ?? TryNormalizedArtistMatch(artist, searchResults)
+            ?? TryFuzzyArtistMatch(artist, searchResults);
+
+        if (matchedSpotifyArtist == null)
+        {
+            return null;
+        }
+
+        // Fetch top tracks for matched artist
+        var topTracks = await FetchArtistTopTracksAsync(matchedSpotifyArtist.Id, accessToken, cancellationToken);
+
+        return new SpotifyArtistMatch
+        {
+            SpotifyId = matchedSpotifyArtist.Id,
+            Name = matchedSpotifyArtist.Name,
+            Uri = matchedSpotifyArtist.Uri,
+            TopTracks = topTracks,
+            Confidence = matchedSpotifyArtist.Confidence,
+            Method = matchedSpotifyArtist.Method
+        };
+    }
+
+    private SpotifyAlbumData? TryExactAlbumMatch(
+        NormalizedAlbum album,
+        IReadOnlyList<SpotifyAlbumData> searchResults)
+    {
+        var result = searchResults.FirstOrDefault(sr =>
+            sr.Name.Equals(album.Name, StringComparison.Ordinal) &&
+            sr.Artists.Any(a => a.Name.Equals(album.Artist, StringComparison.Ordinal)));
+
+        if (result != null)
+        {
+            return result with { Confidence = ExactMatchConfidence, Method = MatchMethod.Exact };
+        }
+        return null;
+    }
+
+    private SpotifyAlbumData? TryNormalizedAlbumMatch(
+        NormalizedAlbum album,
+        IReadOnlyList<SpotifyAlbumData> searchResults)
+    {
+        var normalizedAlbumName = Normalize(album.Name);
+        var normalizedArtistName = Normalize(album.Artist);
+
+        var result = searchResults.FirstOrDefault(sr =>
+            Normalize(sr.Name) == normalizedAlbumName &&
+            sr.Artists.Any(a => Normalize(a.Name) == normalizedArtistName));
+
+        if (result != null)
+        {
+            return result with { Confidence = NormalizedMatchConfidence, Method = MatchMethod.Normalized };
+        }
+        return null;
+    }
+
+    private SpotifyAlbumData? TryFuzzyAlbumMatch(
+        NormalizedAlbum album,
+        IReadOnlyList<SpotifyAlbumData> searchResults)
+    {
+        var normalizedAlbumName = Normalize(album.Name);
+        var normalizedArtistName = Normalize(album.Artist);
+
+        foreach (var result in searchResults)
+        {
+            var albumSimilarity = CalculateSimilarity(normalizedAlbumName, Normalize(result.Name));
+            var artistSimilarity = result.Artists
+                .Select(a => CalculateSimilarity(normalizedArtistName, Normalize(a.Name)))
+                .Max();
+
+            // Both album and artist must meet threshold
+            if (albumSimilarity >= FuzzyMatchThreshold && artistSimilarity >= FuzzyMatchThreshold)
+            {
+                return result with { Confidence = FuzzyMatchConfidence, Method = MatchMethod.Fuzzy };
+            }
+        }
+
+        return null;
+    }
+
+    private SpotifyArtistData? TryExactArtistMatch(
+        NormalizedArtist artist,
+        IReadOnlyList<SpotifyArtistData> searchResults)
+    {
+        var result = searchResults.FirstOrDefault(sr =>
+            sr.Name.Equals(artist.Name, StringComparison.Ordinal));
+
+        if (result != null)
+        {
+            return result with { Confidence = ExactMatchConfidence, Method = MatchMethod.Exact };
+        }
+        return null;
+    }
+
+    private SpotifyArtistData? TryNormalizedArtistMatch(
+        NormalizedArtist artist,
+        IReadOnlyList<SpotifyArtistData> searchResults)
+    {
+        var normalizedArtistName = Normalize(artist.Name);
+
+        var result = searchResults.FirstOrDefault(sr =>
+            Normalize(sr.Name) == normalizedArtistName);
+
+        if (result != null)
+        {
+            return result with { Confidence = NormalizedMatchConfidence, Method = MatchMethod.Normalized };
+        }
+        return null;
+    }
+
+    private SpotifyArtistData? TryFuzzyArtistMatch(
+        NormalizedArtist artist,
+        IReadOnlyList<SpotifyArtistData> searchResults)
+    {
+        var normalizedArtistName = Normalize(artist.Name);
+
+        foreach (var result in searchResults)
+        {
+            var artistSimilarity = CalculateSimilarity(normalizedArtistName, Normalize(result.Name));
+
+            // Artist must meet threshold
+            if (artistSimilarity >= FuzzyMatchThreshold)
+            {
+                return result with { Confidence = FuzzyMatchConfidence, Method = MatchMethod.Fuzzy };
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<List<SpotifyMatch>> FetchAlbumTracksAsync(
+        string albumId,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        var url = $"https://api.spotify.com/v1/albums/{albumId}/tracks?limit=50";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var tracksResponse = JsonSerializer.Deserialize<SpotifyAlbumTracksResponse>(json);
+
+        var tracks = new List<SpotifyMatch>();
+        if (tracksResponse?.Items != null)
+        {
+            foreach (var track in tracksResponse.Items)
+            {
+                tracks.Add(new SpotifyMatch
+                {
+                    SpotifyId = track.Id,
+                    Name = track.Name,
+                    Artist = string.Join(", ", track.Artists.Select(a => a.Name)),
+                    Album = track.Album?.Name,
+                    Uri = track.Uri,
+                    Confidence = 100,
+                    Method = MatchMethod.Exact
+                });
+            }
+        }
+
+        return tracks;
+    }
+
+    private async Task<List<SpotifyMatch>> FetchArtistTopTracksAsync(
+        string artistId,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        var url = $"https://api.spotify.com/v1/artists/{artistId}/top-tracks?market=US";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var topTracksResponse = JsonSerializer.Deserialize<SpotifyArtistTopTracksResponse>(json);
+
+        var tracks = new List<SpotifyMatch>();
+        if (topTracksResponse?.Tracks != null)
+        {
+            foreach (var track in topTracksResponse.Tracks)
+            {
+                tracks.Add(new SpotifyMatch
+                {
+                    SpotifyId = track.Id,
+                    Name = track.Name,
+                    Artist = string.Join(", ", track.Artists.Select(a => a.Name)),
+                    Album = track.Album?.Name,
+                    Uri = track.Uri,
+                    Confidence = 100,
+                    Method = MatchMethod.Exact
+                });
+            }
+        }
+
+        return tracks;
+    }
+
+    private async Task<IReadOnlyList<SpotifyAlbumData>> SearchSpotifyAlbumsAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        var encodedQuery = Uri.EscapeDataString(query);
+        var url = $"{SearchEndpoint}?q={encodedQuery}&type=album&limit=15";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Array.Empty<SpotifyAlbumData>();
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var searchResponse = JsonSerializer.Deserialize<SpotifyAlbumSearchResponse>(json);
+
+        return searchResponse?.Albums?.Items ?? Array.Empty<SpotifyAlbumData>();
+    }
+
+    private async Task<IReadOnlyList<SpotifyArtistData>> SearchSpotifyArtistsAsync(
+        string query,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        var encodedQuery = Uri.EscapeDataString(query);
+        var url = $"{SearchEndpoint}?q={encodedQuery}&type=artist&limit=15";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Array.Empty<SpotifyArtistData>();
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var searchResponse = JsonSerializer.Deserialize<SpotifyArtistSearchResponse>(json);
+
+        return searchResponse?.Artists?.Items ?? Array.Empty<SpotifyArtistData>();
+    }
+
     private static SpotifyMatch CreateMatch(
         SpotifySearchTrack track,
         int confidence,
@@ -418,6 +828,71 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
     );
 
     private sealed record SpotifyAlbum(
+        [property: JsonPropertyName("name")] string Name
+    );
+
+    // DTOs for Album Search
+    private sealed record SpotifyAlbumSearchResponse(
+        [property: JsonPropertyName("albums")] SpotifyAlbumsResponse? Albums
+    );
+
+    private sealed record SpotifyAlbumsResponse(
+        [property: JsonPropertyName("items")] SpotifyAlbumData[] Items
+    );
+
+    private sealed record SpotifyAlbumData(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("uri")] string Uri,
+        [property: JsonPropertyName("release_date")] string? ReleaseDate,
+        [property: JsonPropertyName("total_tracks")] int TotalTracks,
+        [property: JsonPropertyName("artists")] SpotifyArtistDto[] Artists,
+        int Confidence = 0,
+        MatchMethod Method = MatchMethod.Exact
+    );
+
+    private sealed record SpotifyAlbumTracksResponse(
+        [property: JsonPropertyName("items")] SpotifyTrackData[] Items
+    );
+
+    private sealed record SpotifyTrackData(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("uri")] string Uri,
+        [property: JsonPropertyName("artists")] SpotifyArtistDto[] Artists,
+        [property: JsonPropertyName("album")] SpotifyAlbumDto? Album = null
+    );
+
+    private sealed record SpotifyArtistDto(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("id")] string? Id = null,
+        [property: JsonPropertyName("uri")] string? Uri = null,
+        [property: JsonPropertyName("genres")] string[]? Genres = null
+    );
+
+    // DTOs for Artist Search
+    private sealed record SpotifyArtistSearchResponse(
+        [property: JsonPropertyName("artists")] SpotifyArtistsResponse? Artists
+    );
+
+    private sealed record SpotifyArtistsResponse(
+        [property: JsonPropertyName("items")] SpotifyArtistData[] Items
+    );
+
+    private sealed record SpotifyArtistData(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("uri")] string Uri,
+        [property: JsonPropertyName("genres")] string[]? Genres = null,
+        int Confidence = 0,
+        MatchMethod Method = MatchMethod.Exact
+    );
+
+    private sealed record SpotifyArtistTopTracksResponse(
+        [property: JsonPropertyName("tracks")] SpotifyTrackData[] Tracks
+    );
+
+    private sealed record SpotifyAlbumDto(
         [property: JsonPropertyName("name")] string Name
     );
 }

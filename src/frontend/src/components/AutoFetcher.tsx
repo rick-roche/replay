@@ -10,7 +10,7 @@ import { DataSource } from '../types/datasource'
 export function AutoFetcher() {
   const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
   const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, fetchDiscogsData, normalizedData } = useData()
-  const { isLoading: isMatchLoading, error: matchError, matchTracks } = useMatch()
+  const { isLoading: isMatchLoading, error: matchError, matchTracks, matchAlbums, matchArtists } = useMatch()
   const { selectedSource } = useDataSource()
   const hasTriggeredFetch = useRef(false)
   const hasTriggeredMatch = useRef(false)
@@ -47,17 +47,18 @@ export function AutoFetcher() {
 
   // Trigger match when data is fetched
   useEffect(() => {
-    if (
-      !hasTriggeredMatch.current &&
-      normalizedData &&
-      normalizedData.tracks &&
-      normalizedData.tracks.length > 0 &&
-      !isFetchLoading
-    ) {
+    if (!hasTriggeredMatch.current && normalizedData && !isFetchLoading) {
       hasTriggeredMatch.current = true
-      matchTracks(normalizedData.tracks)
+      
+      if (normalizedData.tracks && normalizedData.tracks.length > 0) {
+        matchTracks(normalizedData.tracks)
+      } else if (normalizedData.albums && normalizedData.albums.length > 0) {
+        matchAlbums(normalizedData.albums)
+      } else if (normalizedData.artists && normalizedData.artists.length > 0) {
+        matchArtists(normalizedData.artists)
+      }
     }
-  }, [normalizedData, isFetchLoading, matchTracks])
+  }, [normalizedData, isFetchLoading, matchTracks, matchAlbums, matchArtists])
 
   const isLoading = isFetchLoading || isMatchLoading
   const error = fetchError || matchError

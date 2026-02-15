@@ -295,6 +295,256 @@ public class SpotifyMatchingServiceTests : IDisposable
         Assert.Equal(2, result.TotalTracks);
     }
 
+    [Fact]
+    public async Task MatchAlbumsAsync_WithExactAlbumMatch_ReturnsHighConfidence()
+    {
+        // Arrange
+        var albums = new List<NormalizedAlbum>
+        {
+            new()
+            {
+                Name = "Rumours",
+                Artist = "Fleetwood Mac",
+                Tracks = new List<NormalizedTrack>(),
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        // Album search response
+        var albumSearchResponse = new
+        {
+            albums = new
+            {
+                items = new[]
+                {
+                    new
+                    {
+                        id = "albumId123",
+                        name = "Rumours",
+                        uri = "spotify:album:albumId123",
+                        release_date = "1977-02-04",
+                        total_tracks = 40,
+                        artists = new[] { new { name = "Fleetwood Mac" } }
+                    }
+                }
+            }
+        };
+
+        // Album tracks response
+        var albumTracksResponse = new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = "trackId1",
+                    name = "Dreams",
+                    uri = "spotify:track:trackId1",
+                    artists = new[] { new { name = "Fleetwood Mac" } },
+                    album = new { name = "Rumours" }
+                },
+                new
+                {
+                    id = "trackId2",
+                    name = "The Chain",
+                    uri = "spotify:track:trackId2",
+                    artists = new[] { new { name = "Fleetwood Mac" } },
+                    album = new { name = "Rumours" }
+                }
+            }
+        };
+
+        _mockHandler.SetResponses(
+            JsonSerializer.Serialize(albumSearchResponse),
+            JsonSerializer.Serialize(albumTracksResponse)
+        );
+
+        // Act
+        var result = await _service.MatchAlbumsAsync(albums, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Albums);
+        Assert.True(result.Albums[0].IsMatched);
+        Assert.NotNull(result.Albums[0].Match);
+        Assert.Equal("albumId123", result.Albums[0].Match!.SpotifyId);
+        Assert.Equal(100, result.Albums[0].Match!.Confidence);
+        Assert.Equal(MatchMethod.Exact, result.Albums[0].Match!.Method);
+    }
+
+    [Fact]
+    public async Task MatchArtistsAsync_WithExactArtistMatch_ReturnsHighConfidence()
+    {
+        // Arrange
+        var artists = new List<NormalizedArtist>
+        {
+            new()
+            {
+                Name = "The Beatles",
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        // Artist search response
+        var artistSearchResponse = new
+        {
+            artists = new
+            {
+                items = new[]
+                {
+                    new
+                    {
+                        id = "artistId123",
+                        name = "The Beatles",
+                        uri = "spotify:artist:artistId123",
+                        genres = new[] { "rock", "pop" }
+                    }
+                }
+            }
+        };
+
+        // Top tracks response
+        var topTracksResponse = new
+        {
+            tracks = new[]
+            {
+                new
+                {
+                    id = "trackId1",
+                    name = "Hey Jude",
+                    uri = "spotify:track:trackId1",
+                    artists = new[] { new { name = "The Beatles" } },
+                    album = new { name = "Hey Jude" }
+                },
+                new
+                {
+                    id = "trackId2",
+                    name = "Let It Be",
+                    uri = "spotify:track:trackId2",
+                    artists = new[] { new { name = "The Beatles" } },
+                    album = new { name = "Let It Be" }
+                }
+            }
+        };
+
+        _mockHandler.SetResponses(
+            JsonSerializer.Serialize(artistSearchResponse),
+            JsonSerializer.Serialize(topTracksResponse)
+        );
+
+        // Act
+        var result = await _service.MatchArtistsAsync(artists, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Artists);
+        Assert.True(result.Artists[0].IsMatched);
+        Assert.NotNull(result.Artists[0].Match);
+        Assert.Equal("artistId123", result.Artists[0].Match!.SpotifyId);
+        Assert.Equal(100, result.Artists[0].Match!.Confidence);
+        Assert.Equal(MatchMethod.Exact, result.Artists[0].Match!.Method);
+    }
+
+    [Fact]
+    public async Task MatchAlbumsAsync_WithNoMatches_ReturnsUnmatched()
+    {
+        // Arrange
+        var albums = new List<NormalizedAlbum>
+        {
+            new()
+            {
+                Name = "Unknown Album",
+                Artist = "Unknown Artist",
+                Tracks = new List<NormalizedTrack>(),
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        var spotifyResponse = new
+        {
+            albums = new
+            {
+                items = Array.Empty<object>()
+            }
+        };
+
+        _mockHandler.SetResponse(JsonSerializer.Serialize(spotifyResponse));
+
+        // Act
+        var result = await _service.MatchAlbumsAsync(albums, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Albums);
+        Assert.False(result.Albums[0].IsMatched);
+        Assert.Null(result.Albums[0].Match);
+        Assert.Equal(0, result.MatchedCount);
+        Assert.Equal(1, result.UnmatchedCount);
+    }
+
+    [Fact]
+    public async Task MatchArtistsAsync_WithNormalizedMatch_ReturnsGoodConfidence()
+    {
+        // Arrange
+        var artists = new List<NormalizedArtist>
+        {
+            new()
+            {
+                Name = "the beatles",
+                Source = "lastfm",
+                SourceMetadata = new Dictionary<string, object?>()
+            }
+        };
+
+        // Artist search response
+        var artistSearchResponse = new
+        {
+            artists = new
+            {
+                items = new[]
+                {
+                    new
+                    {
+                        id = "artistId123",
+                        name = "The Beatles",
+                        uri = "spotify:artist:artistId123",
+                        genres = new[] { "rock", "pop" }
+                    }
+                }
+            }
+        };
+
+        // Top tracks response
+        var topTracksResponse = new
+        {
+            tracks = new[]
+            {
+                new
+                {
+                    id = "trackId1",
+                    name = "Hey Jude",
+                    uri = "spotify:track:trackId1",
+                    artists = new[] { new { name = "The Beatles" } },
+                    album = new { name = "Hey Jude" }
+                }
+            }
+        };
+
+        _mockHandler.SetResponses(
+            JsonSerializer.Serialize(artistSearchResponse),
+            JsonSerializer.Serialize(topTracksResponse)
+        );
+
+        // Act
+        var result = await _service.MatchArtistsAsync(artists, "test_access_token");
+
+        // Assert
+        Assert.Single(result.Artists);
+        Assert.True(result.Artists[0].IsMatched);
+        Assert.Equal(90, result.Artists[0].Match!.Confidence);
+        Assert.Equal(MatchMethod.Normalized, result.Artists[0].Match!.Method);
+    }
+
     public void Dispose()
     {
         _httpClient?.Dispose();
@@ -304,20 +554,33 @@ public class SpotifyMatchingServiceTests : IDisposable
     private sealed class MockHttpMessageHandler : HttpMessageHandler
     {
         private string _response = string.Empty;
+        private readonly Queue<string> _responses = new();
 
         public void SetResponse(string response)
         {
             _response = response;
+            _responses.Clear();
+        }
+
+        public void SetResponses(params string[] responses)
+        {
+            _responses.Clear();
+            foreach (var response in responses)
+            {
+                _responses.Enqueue(response);
+            }
         }
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            var responseContent = _responses.Count > 0 ? _responses.Dequeue() : _response;
+            
             return Task.FromResult(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,
-                Content = new StringContent(_response)
+                Content = new StringContent(responseContent)
             });
         }
     }

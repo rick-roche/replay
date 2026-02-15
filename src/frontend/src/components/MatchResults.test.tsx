@@ -42,6 +42,8 @@ vi.mock('@/contexts/MatchContext', () => {
   return {
     useMatch: () => ({
       matchedData,
+      matchedAlbums: null,
+      matchedArtists: null,
       isLoading: false,
       error: null,
       matchTracks: vi.fn(),
@@ -75,7 +77,7 @@ describe('MatchResults', () => {
     )
 
     // Header
-    expect(screen.getByText('Matching Complete')).toBeInTheDocument()
+    expect(screen.getByText('Tracks Matched')).toBeInTheDocument()
 
     // Matched line
     expect(screen.getByText(/Matched: Track A by Artist X/)).toBeInTheDocument()

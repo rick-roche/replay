@@ -9,15 +9,25 @@ import type { components } from '@/api/generated-client';
 import { matchApi } from '@/api/match';
 
 type NormalizedTrack = components['schemas']['NormalizedTrack']
+type NormalizedAlbum = components['schemas']['NormalizedAlbum']
+type NormalizedArtist = components['schemas']['NormalizedArtist']
 type MatchedDataResponse = components['schemas']['MatchedDataResponse']
+type MatchedAlbumsResponse = components['schemas']['MatchedAlbumsResponse']
+type MatchedArtistsResponse = components['schemas']['MatchedArtistsResponse']
 type SpotifyTrack = components['schemas']['SpotifyTrack']
+type SpotifyAlbumInfo = components['schemas']['SpotifyAlbumInfo']
+type SpotifyArtistInfo = components['schemas']['SpotifyArtistInfo']
 
 interface MatchContextType {
   matchedData: MatchedDataResponse | null;
+  matchedAlbums: MatchedAlbumsResponse | null;
+  matchedArtists: MatchedArtistsResponse | null;
   isLoading: boolean;
   error: string | null;
   matchTracks: (tracks: NormalizedTrack[]) => Promise<void>;
   appendMatches: (tracks: NormalizedTrack[]) => Promise<void>;
+  matchAlbums: (albums: NormalizedAlbum[]) => Promise<void>;
+  matchArtists: (artists: NormalizedArtist[]) => Promise<void>;
   clearMatches: () => void;
   clearError: () => void;
   // Methods for handling unmatched tracks
@@ -26,6 +36,8 @@ interface MatchContextType {
   moveTrack: (fromIndex: number, toIndex: number) => void;
   applyManualMatch: (trackIndex: number, spotifyTrack: SpotifyTrack) => void;
   searchTracks: (query: string) => Promise<SpotifyTrack[]>;
+  searchAlbums: (query: string) => Promise<SpotifyAlbumInfo[]>;
+  searchArtists: (query: string) => Promise<SpotifyArtistInfo[]>;
 }
 
 const MatchContext = createContext<MatchContextType | undefined>(undefined);
@@ -51,6 +63,12 @@ export function MatchProvider({ children }: { children: ReactNode }) {
   const [matchedData, setMatchedData] = useState<MatchedDataResponse | null>(
     null
   );
+  const [matchedAlbums, setMatchedAlbums] = useState<MatchedAlbumsResponse | null>(
+    null
+  );
+  const [matchedArtists, setMatchedArtists] = useState<MatchedArtistsResponse | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +83,44 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to match tracks';
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const matchAlbums = useCallback(
+    async (albums: NormalizedAlbum[]) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await matchApi.matchAlbumsToSpotify({ albums });
+        setMatchedAlbums(result);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to match albums';
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const matchArtists = useCallback(
+    async (artists: NormalizedArtist[]) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await matchApi.matchArtistsToSpotify({ artists });
+        setMatchedArtists(result);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to match artists';
         setError(errorMessage);
       } finally {
         setIsLoading(false);
@@ -211,8 +267,36 @@ export function MatchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const searchAlbums = useCallback(async (query: string) => {
+    if (!query.trim()) return [];
+
+    try {
+      return await matchApi.searchAlbumsForManualMatch(query);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Search failed';
+      setError(errorMessage);
+      return [];
+    }
+  }, []);
+
+  const searchArtists = useCallback(async (query: string) => {
+    if (!query.trim()) return [];
+
+    try {
+      return await matchApi.searchArtistsForManualMatch(query);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Search failed';
+      setError(errorMessage);
+      return [];
+    }
+  }, []);
+
   const clearMatches = useCallback(() => {
     setMatchedData(null);
+    setMatchedAlbums(null);
+    setMatchedArtists(null);
     setError(null);
   }, []);
 
@@ -224,10 +308,14 @@ export function MatchProvider({ children }: { children: ReactNode }) {
     <MatchContext.Provider
       value={{
         matchedData,
+        matchedAlbums,
+        matchedArtists,
         isLoading,
         error,
         matchTracks,
         appendMatches,
+        matchAlbums,
+        matchArtists,
         clearMatches,
         clearError,
         retryMatch,
@@ -235,6 +323,8 @@ export function MatchProvider({ children }: { children: ReactNode }) {
         moveTrack,
         applyManualMatch,
         searchTracks,
+        searchAlbums,
+        searchArtists,
       }}
     >
       {children}

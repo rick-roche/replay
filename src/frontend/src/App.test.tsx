@@ -35,7 +35,9 @@ vi.mock('./contexts/ConfigContext', () => ({
 
 vi.mock('./contexts/MatchContext', () => ({
   useMatch: vi.fn(() => ({
-    matchedData: null
+    matchedData: null,
+    matchedAlbums: null,
+    matchedArtists: null
   }))
 }))
 
@@ -67,6 +69,14 @@ vi.mock('./components/DataFetchForm', () => ({
 
 vi.mock('./components/MatchTracksButton', () => ({
   MatchTracksButton: () => <div>MatchTracksButton</div>
+}))
+
+vi.mock('./components/MatchAlbumsButton', () => ({
+  MatchAlbumsButton: () => <div>MatchAlbumsButton</div>
+}))
+
+vi.mock('./components/MatchArtistsButton', () => ({
+  MatchArtistsButton: () => <div>MatchArtistsButton</div>
 }))
 
 vi.mock('./components/MatchResults', () => ({

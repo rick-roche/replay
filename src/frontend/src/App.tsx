@@ -18,6 +18,8 @@ import { DiscogsFilterForm } from './components/DiscogsFilterForm'
 import { SetlistFmFilterForm } from './components/SetlistFmFilterForm'
 import { FetchDataButton, DataResults } from './components/DataFetchForm'
 import { MatchTracksButton } from './components/MatchTracksButton'
+import { MatchAlbumsButton } from './components/MatchAlbumsButton'
+import { MatchArtistsButton } from './components/MatchArtistsButton'
 import { MatchResults } from './components/MatchResults'
 import { PlaylistConfigForm } from './components/PlaylistConfigForm'
 import { CreatePlaylistButton } from './components/CreatePlaylistButton'
@@ -28,7 +30,7 @@ import { AdvancedOptions } from './components/AdvancedOptions'
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
   const { selectedSource } = useDataSource()
-  const { matchedData } = useMatch()
+  const { matchedData, matchedAlbums, matchedArtists } = useMatch()
   const { autoFetch } = useConfig()
   const { markStepComplete, nextStep, completedSteps } = useWorkflow()
 
@@ -188,7 +190,11 @@ function App() {
                     step={WorkflowStep.FETCH_AND_MATCH}
                     title="Fetch & Match"
                     onComplete={handleFetchedAndMatched}
-                    canComplete={matchedData !== null && (matchedData.tracks?.length ?? 0) > 0}
+                    canComplete={
+                      (matchedData !== null && (matchedData.tracks?.length ?? 0) > 0) ||
+                      (matchedAlbums !== null && (matchedAlbums.albums?.length ?? 0) > 0) ||
+                      (matchedArtists !== null && (matchedArtists.artists?.length ?? 0) > 0)
+                    }
                   >
                     <Flex direction="column" gap="4">
                       {selectedSource === DataSource.LASTFM && (
@@ -204,6 +210,8 @@ function App() {
                               <FetchDataButton />
                               <DataResults />
                               <MatchTracksButton />
+                              <MatchAlbumsButton />
+                              <MatchArtistsButton />
                               <MatchResults />
                             </>
                           )}
@@ -222,6 +230,8 @@ function App() {
                               <FetchDataButton />
                               <DataResults />
                               <MatchTracksButton />
+                              <MatchAlbumsButton />
+                              <MatchArtistsButton />
                               <MatchResults />
                             </>
                           )}
@@ -240,6 +250,8 @@ function App() {
                               <FetchDataButton />
                               <DataResults />
                               <MatchTracksButton />
+                              <MatchAlbumsButton />
+                              <MatchArtistsButton />
                               <MatchResults />
                             </>
                           )}
@@ -250,7 +262,7 @@ function App() {
                 )}
 
                 {/* Step 4: Curate */}
-                {matchedData && (
+                {(matchedData || matchedAlbums || matchedArtists) && (
                   <WorkflowStepContainer
                     step={WorkflowStep.CURATE}
                     title="Curate Playlist"
@@ -264,7 +276,7 @@ function App() {
                 )}
 
                 {/* Step 5: Create */}
-                {matchedData && (
+                {(matchedData || matchedAlbums || matchedArtists) && (
                   <WorkflowStepContainer
                     step={WorkflowStep.CREATE}
                     title="Create Playlist"

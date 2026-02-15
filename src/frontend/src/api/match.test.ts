@@ -184,4 +184,219 @@ describe('matchApi', () => {
       expect(result.length).toBe(0)
     })
   })
+
+  describe('matchAlbumsToSpotify', () => {
+    it('should send match albums request to API', async () => {
+      const mockRequest = {
+        albums: [
+          { name: 'Album 1', artist: 'Artist 1', tracks: [], sourceMetadata: {}, source: 'lastfm' }
+        ]
+      }
+
+      const mockResponse = {
+        albums: [
+          {
+            sourceAlbum: mockRequest.albums[0],
+            match: {
+              spotifyId: 'albumId1',
+              name: 'Album 1',
+              artist: 'Artist 1',
+              uri: 'spotify:album:albumId1',
+              tracks: [],
+              confidence: 100,
+              method: 'Exact' as const
+            },
+            isMatched: true
+          }
+        ]
+      }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: mockResponse,
+        error: null
+      })
+
+      const result = await matchApi.matchAlbumsToSpotify(mockRequest)
+
+      expect(result).toEqual(mockResponse)
+      expect(client.POST).toHaveBeenCalledWith(
+        '/api/api/match/spotify/albums',
+        expect.objectContaining({
+          body: mockRequest
+        })
+      )
+    })
+
+    it('should handle album API errors', async () => {
+      const mockError = { message: 'API Error' }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: undefined,
+        error: mockError
+      })
+
+      const { handleApiError } = await import('@/api/errors')
+
+      const mockRequest = { albums: [] }
+
+      try {
+        await matchApi.matchAlbumsToSpotify(mockRequest)
+      } catch {
+        // Expected to throw
+      }
+
+      expect(handleApiError).toHaveBeenCalled()
+    })
+  })
+
+  describe('searchAlbumsForManualMatch', () => {
+    it('should search for albums on Spotify', async () => {
+      const mockResults = [
+        {
+          id: 'albumId1',
+          name: 'Test Album',
+          artist: 'Test Artist',
+          releaseDate: '2024-01-01',
+          uri: 'spotify:album:albumId1',
+          totalTracks: 10
+        }
+      ]
+
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: mockResults,
+        error: null
+      })
+
+      const result = await matchApi.searchAlbumsForManualMatch('test album')
+
+      expect(result).toEqual(mockResults)
+      expect(client.GET).toHaveBeenCalledWith(
+        '/api/api/match/spotify/albums/search',
+        expect.objectContaining({
+          params: {
+            query: {
+              query: 'test album'
+            }
+          }
+        })
+      )
+    })
+
+    it('should handle no album results', async () => {
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: null,
+        error: null
+      })
+
+      const result = await matchApi.searchAlbumsForManualMatch('nonexistent')
+
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('matchArtistsToSpotify', () => {
+    it('should send match artists request to API', async () => {
+      const mockRequest = {
+        artists: [
+          { name: 'Artist 1', sourceMetadata: {}, source: 'lastfm' }
+        ]
+      }
+
+      const mockResponse = {
+        artists: [
+          {
+            sourceArtist: mockRequest.artists[0],
+            match: {
+              spotifyId: 'artistId1',
+              name: 'Artist 1',
+              uri: 'spotify:artist:artistId1',
+              topTracks: [],
+              confidence: 100,
+              method: 'Exact' as const
+            },
+            isMatched: true
+          }
+        ]
+      }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: mockResponse,
+        error: null
+      })
+
+      const result = await matchApi.matchArtistsToSpotify(mockRequest)
+
+      expect(result).toEqual(mockResponse)
+      expect(client.POST).toHaveBeenCalledWith(
+        '/api/api/match/spotify/artists',
+        expect.objectContaining({
+          body: mockRequest
+        })
+      )
+    })
+
+    it('should handle artist API errors', async () => {
+      const mockError = { message: 'API Error' }
+
+      vi.mocked(client.POST).mockResolvedValueOnce({
+        data: undefined,
+        error: mockError
+      })
+
+      const { handleApiError } = await import('@/api/errors')
+
+      const mockRequest = { artists: [] }
+
+      try {
+        await matchApi.matchArtistsToSpotify(mockRequest)
+      } catch {
+        // Expected to throw
+      }
+
+      expect(handleApiError).toHaveBeenCalled()
+    })
+  })
+
+  describe('searchArtistsForManualMatch', () => {
+    it('should search for artists on Spotify', async () => {
+      const mockResults = [
+        {
+          id: 'artistId1',
+          name: 'Test Artist',
+          uri: 'spotify:artist:artistId1',
+          genres: ['rock', 'pop']
+        }
+      ]
+
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: mockResults,
+        error: null
+      })
+
+      const result = await matchApi.searchArtistsForManualMatch('test artist')
+
+      expect(result).toEqual(mockResults)
+      expect(client.GET).toHaveBeenCalledWith(
+        '/api/api/match/spotify/artists/search',
+        expect.objectContaining({
+          params: {
+            query: {
+              query: 'test artist'
+            }
+          }
+        })
+      )
+    })
+
+    it('should handle no artist results', async () => {
+      vi.mocked(client.GET).mockResolvedValueOnce({
+        data: null,
+        error: null
+      })
+
+      const result = await matchApi.searchArtistsForManualMatch('nonexistent')
+
+      expect(result).toEqual([])
+    })
+  })
 })
