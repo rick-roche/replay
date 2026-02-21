@@ -166,3 +166,4 @@ resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
 output CONTAINER_APPS_ENVIRONMENT_NAME string = containerAppsEnvironment.name
 output CONTAINER_APPS_ENVIRONMENT_ID string = containerAppsEnvironment.id
 output CONTAINER_APP_NAME string = containerApp.name
+output CONTAINER_APP_FQDN string = containerApp.properties.configuration.ingress.fqdn

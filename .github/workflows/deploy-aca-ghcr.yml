@@ -188,15 +188,18 @@ jobs:
           echo "resource_group=$resource_group" >> "$GITHUB_OUTPUT"
           echo "environment_name=$provisioned_env_name" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure ACA extension is installed
-        run: az extension add --name containerapp --upgrade --allow-preview true
-
       - name: Output app URL
-        env:
-          APP_NAME: ${{ steps.settings.outputs.app_name }}
-          RESOURCE_GROUP: ${{ steps.azd.outputs.resource_group }}
         run: |
-          fqdn=$(az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
+          fqdn="$(azd env get-value CONTAINER_APP_FQDN)"
+          custom_domain="$(azd env get-value ACA_CUSTOM_DOMAIN || true)"
+
           echo "App URL: https://${fqdn}"
+          if [[ -n "${custom_domain}" ]]; then
+            echo "Custom domain URL: https://${custom_domain}"
+          fi
           echo ""
-          echo "Remember to set SPOTIFY_REDIRECT_URI to: https://${fqdn}/api/auth/callback"
+          if [[ -n "${custom_domain}" ]]; then
+            echo "Remember to set SPOTIFY_REDIRECT_URI to: https://${custom_domain}/api/auth/callback"
+          else
+            echo "Remember to set SPOTIFY_REDIRECT_URI to: https://${fqdn}/api/auth/callback"
+          fi
