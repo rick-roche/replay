@@ -64,13 +64,13 @@ var optionalEnvVars = concat(
   empty(setlistfmApiKey) ? [] : [{ name: 'SetlistFm__ApiKey', secretRef: 'setlistfm-api-key' }]
 )
 
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-07-01' = {
   name: containerAppsEnvironmentName
   location: location
   properties: {}
 }
 
-resource managedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (useCustomDomain) {
+resource managedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2025-07-01' = if (useCustomDomain) {
   parent: containerAppsEnvironment
   name: 'managed-cert-${replace(customDomain, '.', '-')}'
   location: location
@@ -80,7 +80,7 @@ resource managedCertificate 'Microsoft.App/managedEnvironments/managedCertificat
   }
 }
 
-resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
+resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
   name: containerAppName
   location: location
   properties: {
