@@ -1,6 +1,7 @@
 using RePlay.Server.Configuration;
 using RePlay.Server.Endpoints;
 using RePlay.Server.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
 
@@ -14,6 +15,18 @@ builder.Services.AddProblemDetails();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto |
+        ForwardedHeaders.XForwardedHost;
+
+    // ACA terminates TLS and forwards headers through infrastructure proxies.
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Configure Spotify options with validation
 builder.Services.AddOptions<SpotifyOptions>()
@@ -30,7 +43,8 @@ builder.Services.AddOptions<SpotifyOptions>()
         if (options.RedirectUri.Contains("localhost", StringComparison.OrdinalIgnoreCase))
             return false;
         return true;
-    }, "Spotify configuration is invalid. Ensure ClientId, ClientSecret, and RedirectUri are set. RedirectUri must not contain 'localhost'.");
+    }, "Spotify configuration is invalid. Ensure ClientId, ClientSecret, and RedirectUri are set. RedirectUri must not contain 'localhost'.")
+    .ValidateOnStart();
 
 // Configure external source options
 builder.Services.Configure<LastfmOptions>(builder.Configuration.GetSection(LastfmOptions.SectionName));
@@ -66,6 +80,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

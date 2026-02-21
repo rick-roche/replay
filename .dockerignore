@@ -1,0 +1,15 @@
+.git
+.github
+.azure
+.aspire
+_tmp
+
+**/bin
+**/obj
+
+src/frontend/node_modules
+src/frontend/dist
+src/frontend/coverage
+
+TestResults
+coveragereport

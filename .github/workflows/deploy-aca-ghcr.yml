@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       container_image:
-        description: "Container image to deploy (override if your Aspire push uses a different image path)"
+        description: "Container image to deploy (override if not pushing in this run)"
         required: false
         type: string
       run_push:
-        description: "Run `aspire do push` before deploy"
+        description: "Build and push image to GHCR before deploy"
         required: true
         default: true
         type: boolean
@@ -37,40 +37,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Setup Aspire CLI
-        uses: mfeeley/setup-aspire@v2
-
       - name: Setup AZD
         uses: Azure/setup-azd@v2
 
-      - name: Login to GHCR for push
-        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Push image(s) to GHCR with Aspire
-        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
-        env:
-          PARAMETERS__REGISTRY_ENDPOINT: ghcr.io
-          PARAMETERS__REGISTRY_REPOSITORY: ${{ vars.GHCR_REPOSITORY != '' && vars.GHCR_REPOSITORY || github.repository }}
-        run: aspire do push --project src/RePlay.AppHost/RePlay.AppHost.csproj --non-interactive
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Resolve deployment settings
         id: settings
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_PUSH: ${{ github.event.inputs.run_push }}
+          GIT_SHA: ${{ github.sha }}
           INPUT_IMAGE: ${{ github.event.inputs.container_image }}
           GHCR_REPOSITORY: ${{ vars.GHCR_REPOSITORY }}
           ACA_APP_NAME: ${{ vars.ACA_APP_NAME }}
@@ -88,8 +73,14 @@ jobs:
           azd_environment_name="${AZD_ENV_NAME:-prod}"
 
           ghcr_repo="${GHCR_REPOSITORY:-${GITHUB_REPOSITORY}}"
-          image_default="ghcr.io/${ghcr_repo}/server:latest"
+          short_sha="${GIT_SHA::7}"
+          image_default="ghcr.io/${ghcr_repo}/server:sha-${short_sha}"
           image="${INPUT_IMAGE:-$image_default}"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "${RUN_PUSH:-true}" != "true" && -z "${INPUT_IMAGE}" ]]; then
+            echo "When run_push is false, container_image must be provided."
+            exit 1
+          fi
 
           echo "app_name=$app_name" >> "$GITHUB_OUTPUT"
           echo "environment_name=$environment_name" >> "$GITHUB_OUTPUT"
@@ -98,12 +89,22 @@ jobs:
           echo "azd_environment_name=$azd_environment_name" >> "$GITHUB_OUTPUT"
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
-      - name: Azure login
-        uses: azure/login@v2
+      - name: Login to GHCR for push
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
+        uses: docker/login-action@v3
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image to GHCR
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.settings.outputs.image }}
 
       - name: AZD login (federated)
         env:
@@ -146,7 +147,7 @@ jobs:
       - name: Ensure ACA extension is installed
         run: az extension add --name containerapp --upgrade --allow-preview true
 
-      - name: Create or update ACA app (GHCR override)
+      - name: Create or update ACA app (GHCR image)
         env:
           APP_NAME: ${{ steps.settings.outputs.app_name }}
           ENV_NAME: ${{ steps.azd.outputs.environment_name }}
@@ -156,7 +157,7 @@ jobs:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+          SPOTIFY_REDIRECT_URI: ${{ vars.SPOTIFY_REDIRECT_URI }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           DISCOGS_CONSUMER_KEY: ${{ secrets.DISCOGS_CONSUMER_KEY }}
           DISCOGS_CONSUMER_SECRET: ${{ secrets.DISCOGS_CONSUMER_SECRET }}
@@ -171,6 +172,16 @@ jobs:
 
           if [[ -z "${SPOTIFY_CLIENT_ID}" || -z "${SPOTIFY_CLIENT_SECRET}" || -z "${SPOTIFY_REDIRECT_URI}" ]]; then
             echo "Spotify secrets are required: SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI"
+            exit 1
+          fi
+
+          if [[ "${SPOTIFY_REDIRECT_URI}" != https://* ]]; then
+            echo "SPOTIFY_REDIRECT_URI must start with https://"
+            exit 1
+          fi
+
+          if [[ "${SPOTIFY_REDIRECT_URI}" == *localhost* ]]; then
+            echo "SPOTIFY_REDIRECT_URI must not contain localhost."
             exit 1
           fi
 
