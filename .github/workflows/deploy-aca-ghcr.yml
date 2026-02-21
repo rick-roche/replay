@@ -47,9 +47,6 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Setup Aspire CLI
-        uses: mfeeley/setup-aspire@v2
-
       - name: Setup AZD
         uses: Azure/setup-azd@v2
 
