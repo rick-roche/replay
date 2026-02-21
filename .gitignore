@@ -455,3 +455,4 @@ obj\\Debug/
 aspire-output/
 appsettings.Development.json
 coverage/
+.azure/

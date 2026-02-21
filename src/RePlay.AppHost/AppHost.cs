@@ -11,6 +11,7 @@ var repository = builder.AddParameter("registry-repository");
 var registry = builder.AddContainerRegistry("container-registry", endpoint, repository);
 
 var server = builder.AddProject<Projects.RePlay_Server>("server")
+    .WithContainerRegistry(registry)
     .WithHttpHealthCheck("/health")
     .WithExternalHttpEndpoints();
 
