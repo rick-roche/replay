@@ -30,7 +30,8 @@ builder.Services.AddOptions<SpotifyOptions>()
         if (options.RedirectUri.Contains("localhost", StringComparison.OrdinalIgnoreCase))
             return false;
         return true;
-    }, "Spotify configuration is invalid. Ensure ClientId, ClientSecret, and RedirectUri are set. RedirectUri must not contain 'localhost'.");
+    }, "Spotify configuration is invalid. Ensure ClientId, ClientSecret, and RedirectUri are set. RedirectUri must not contain 'localhost'.")
+    .ValidateOnStart();
 
 // Configure external source options
 builder.Services.Configure<LastfmOptions>(builder.Configuration.GetSection(LastfmOptions.SectionName));

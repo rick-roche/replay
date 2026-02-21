@@ -155,7 +155,7 @@ jobs:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+          SPOTIFY_REDIRECT_URI: ${{ vars.SPOTIFY_REDIRECT_URI }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           DISCOGS_CONSUMER_KEY: ${{ secrets.DISCOGS_CONSUMER_KEY }}
           DISCOGS_CONSUMER_SECRET: ${{ secrets.DISCOGS_CONSUMER_SECRET }}
@@ -170,6 +170,16 @@ jobs:
 
           if [[ -z "${SPOTIFY_CLIENT_ID}" || -z "${SPOTIFY_CLIENT_SECRET}" || -z "${SPOTIFY_REDIRECT_URI}" ]]; then
             echo "Spotify secrets are required: SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI"
+            exit 1
+          fi
+
+          if [[ "${SPOTIFY_REDIRECT_URI}" != https://* ]]; then
+            echo "SPOTIFY_REDIRECT_URI must start with https://"
+            exit 1
+          fi
+
+          if [[ "${SPOTIFY_REDIRECT_URI}" == *localhost* ]]; then
+            echo "SPOTIFY_REDIRECT_URI must not contain localhost."
             exit 1
           fi
 
