@@ -55,6 +55,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           RUN_PUSH: ${{ github.event.inputs.run_push }}
+          GIT_SHA: ${{ github.sha }}
           INPUT_IMAGE: ${{ github.event.inputs.container_image }}
           GHCR_REPOSITORY: ${{ vars.GHCR_REPOSITORY }}
           ACA_APP_NAME: ${{ vars.ACA_APP_NAME }}
@@ -72,7 +73,8 @@ jobs:
           azd_environment_name="${AZD_ENV_NAME:-prod}"
 
           ghcr_repo="${GHCR_REPOSITORY:-${GITHUB_REPOSITORY}}"
-          image_default="ghcr.io/${ghcr_repo}/server:latest"
+          short_sha="${GIT_SHA::7}"
+          image_default="ghcr.io/${ghcr_repo}/server:sha-${short_sha}"
           image="${INPUT_IMAGE:-$image_default}"
 
           if [[ "$EVENT_NAME" == "workflow_dispatch" && "${RUN_PUSH:-true}" != "true" && -z "${INPUT_IMAGE}" ]]; then

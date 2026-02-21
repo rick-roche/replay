@@ -1,6 +1,6 @@
 # RePlay
 
-[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml)
+[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy ACA from GHCR](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml)
 
 RePlay is a music-first social app that lets users explore, queue, and share listening sessions using provider authentication (e.g., Spotify). The project contains a .NET backend, an Aspire orchestrator, and a React + TypeScript frontend.
 
@@ -55,6 +55,13 @@ Frontend (from repo root):
 ## CI and coverage
 
 CI is defined in [.github/workflows/ci.yml](./.github/workflows/ci.yml) and runs backend and frontend builds, tests, and uploads coverage artifacts for inspection.
+
+## Deployment
+
+Deploy to Azure Container Apps using images stored in GitHub Container Registry:
+
+- Guide: [docs/deploy-aca-ghcr.md](./docs/deploy-aca-ghcr.md)
+- Workflow: [.github/workflows/deploy-aca-ghcr.yml](./.github/workflows/deploy-aca-ghcr.yml)
 
 ## Contributing
 
