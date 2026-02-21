@@ -45,6 +45,11 @@ param discogsConsumerSecret string = ''
 @description('Optional Setlist.fm API key.')
 param setlistfmApiKey string = ''
 
+@description('Optional custom domain for ingress (for example: replay.rickroche.com).')
+param customDomain string = ''
+
+var useCustomDomain = !empty(customDomain)
+
 var optionalSecrets = concat(
   empty(lastfmApiKey) ? [] : [{ name: 'lastfm-api-key', value: lastfmApiKey }],
   empty(discogsConsumerKey) ? [] : [{ name: 'discogs-consumer-key', value: discogsConsumerKey }],
@@ -65,6 +70,16 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
   properties: {}
 }
 
+resource managedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (useCustomDomain) {
+  parent: containerAppsEnvironment
+  name: 'managed-cert-${replace(customDomain, '.', '-')}'
+  location: location
+  properties: {
+    subjectName: customDomain
+    domainControlValidation: 'CNAME'
+  }
+}
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
@@ -75,6 +90,13 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         external: true
         targetPort: 8080
         allowInsecure: false
+        customDomains: useCustomDomain ? [
+          {
+            name: customDomain
+            bindingType: 'Auto'
+            certificateId: managedCertificate.id
+          }
+        ] : []
       }
       registries: [
         {

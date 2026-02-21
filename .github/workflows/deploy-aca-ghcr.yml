@@ -133,6 +133,7 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REDIRECT_URI: ${{ vars.SPOTIFY_REDIRECT_URI }}
+          ACA_CUSTOM_DOMAIN: ${{ vars.ACA_CUSTOM_DOMAIN }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           DISCOGS_CONSUMER_KEY: ${{ secrets.DISCOGS_CONSUMER_KEY }}
           DISCOGS_CONSUMER_SECRET: ${{ secrets.DISCOGS_CONSUMER_SECRET }}
@@ -173,6 +174,7 @@ jobs:
           azd env set SPOTIFY_CLIENT_ID "$SPOTIFY_CLIENT_ID"
           azd env set SPOTIFY_CLIENT_SECRET "$SPOTIFY_CLIENT_SECRET"
           azd env set SPOTIFY_REDIRECT_URI "$SPOTIFY_REDIRECT_URI"
+          azd env set ACA_CUSTOM_DOMAIN "${ACA_CUSTOM_DOMAIN:-}"
           azd env set LASTFM_API_KEY "${LASTFM_API_KEY:-}"
           azd env set DISCOGS_CONSUMER_KEY "${DISCOGS_CONSUMER_KEY:-}"
           azd env set DISCOGS_CONSUMER_SECRET "${DISCOGS_CONSUMER_SECRET:-}"

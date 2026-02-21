@@ -40,6 +40,9 @@
     },
     "setlistfmApiKey": {
       "value": "${SETLISTFM_API_KEY}"
+    },
+    "customDomain": {
+      "value": "${ACA_CUSTOM_DOMAIN}"
     }
   }
 }

@@ -62,6 +62,7 @@ Add repository variables (`Settings -> Secrets and variables -> Actions -> Varia
 - `ACA_ENV_NAME` (default: `replay-env`)
 - `ACA_APP_NAME` (default: `replay`)
 - `GHCR_REPOSITORY` (default: `${owner}/${repo}`)
+- `ACA_CUSTOM_DOMAIN` (optional, example: `replay.rickroche.com`)
 
 ## 5. Run deployment workflow
 
@@ -88,6 +89,17 @@ Set Spotify redirect URI to:
 - `https://<your-aca-fqdn>/api/auth/callback`
 
 Ensure `SPOTIFY_REDIRECT_URI` variable matches this exact URI.
+
+If using `ACA_CUSTOM_DOMAIN`, set the redirect URI to:
+- `https://<your-custom-domain>/api/auth/callback`
+
+## 7. Optional custom domain (Bicep-managed)
+
+When `ACA_CUSTOM_DOMAIN` is set, Bicep configures ingress custom domain with `bindingType: 'Auto'` and a managed certificate.
+
+Notes:
+- DNS ownership/validation records must exist and be propagated before deployment succeeds.
+- If deploy fails on custom-domain validation, create/verify DNS records and re-run the workflow.
 
 ## Notes
 
