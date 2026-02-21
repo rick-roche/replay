@@ -94,5 +94,5 @@ Ensure `SPOTIFY_REDIRECT_URI` secret matches this exact URI.
 - CI does not call `aspire do push`, which avoids Aspire's ACR provisioning path.
 - The API validates Spotify configuration at startup (`ValidateOnStart`), so invalid auth config fails fast during startup/deploy.
 - ACA is configured with `min-replicas=0` and `max-replicas=1` for low-cost hobby usage.
-- Infrastructure config sets ACA environment logs destination to `none` to minimize recurring logging cost.
+- Infrastructure config omits ACA environment log routing to minimize recurring logging cost.
 - If you need to deploy a non-default image/tag, pass it in `container_image` when dispatching the workflow.
