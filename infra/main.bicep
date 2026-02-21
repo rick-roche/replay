@@ -70,6 +70,19 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-07-01'
   properties: {}
 }
 
+resource managedEnvironmentManagedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2025-07-01' = if (useCustomDomain) {
+  parent: containerAppsEnvironment
+  name: '${containerAppsEnvironment.name}-cert'
+  location: location
+  properties: {
+    subjectName: customDomain
+    domainControlValidation: 'CNAME'
+  }
+  dependsOn: [
+    containerApp
+  ]
+}
+
 resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
   name: containerAppName
   location: location
