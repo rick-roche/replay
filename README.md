@@ -1,8 +1,10 @@
-# RePlay
+# Re:Play
 
 [![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy ACA from GHCR](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml)
 
-RePlay is a music-first social app that lets users explore, queue, and share listening sessions using provider authentication (e.g., Spotify). The project contains a .NET backend, an Aspire orchestrator, and a React + TypeScript frontend.
+![Re:Play logo](src/frontend/public/replay-logo.svg)
+
+Re:Play is a music-first social app that lets users explore, queue, and share listening sessions using provider authentication (e.g., Spotify). The project contains a .NET backend, an Aspire orchestrator, and a React + TypeScript frontend.
 
 ## Technology stack
 

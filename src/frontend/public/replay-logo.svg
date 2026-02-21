@@ -1,0 +1,20 @@
+<svg width="640" height="180" viewBox="0 0 640 180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Re:Play logo</title>
+  <desc id="desc">Rounded square with replay ring and play icon followed by the word Re:Play.</desc>
+  <defs>
+    <linearGradient id="badgeGlow" x1="24" y1="24" x2="156" y2="156" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22C55E"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <linearGradient id="wordmarkFill" x1="198" y1="48" x2="600" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86EFAC"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="140" height="140" rx="34" fill="#0B1511"/>
+  <rect x="20" y="20" width="140" height="140" rx="34" stroke="url(#badgeGlow)" stroke-width="4"/>
+  <circle cx="90" cy="90" r="37" stroke="#22C55E" stroke-width="10" stroke-linecap="round"/>
+  <path d="M84 49C101 50 116 58 125 71" stroke="#22C55E" stroke-width="10" stroke-linecap="round"/>
+  <path d="M79 72L112 90L79 108V72Z" fill="#BBF7D0"/>
+  <text x="196" y="118" fill="url(#wordmarkFill)" font-size="78" font-weight="700" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" letter-spacing="-1.2">Re:Play</text>
+</svg>
