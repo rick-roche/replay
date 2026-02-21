@@ -1,89 +1,80 @@
 # Agent Instructions
 
-Instructions for agents on how they must work with this repository.
+This file defines repository-wide instructions for AI coding agents working in Re:Play.
 
-When acting on this repository:
+Re:Play is a music-focused app with an Aspire app host, a .NET 10/C# 14 backend API (`src/RePlay.Server`), and a React + TypeScript + Vite frontend (`src/frontend`).
+
+## Priorities
 
 - Follow this file strictly.
-- Ask before making architectural changes.
-- Keep PRs and changes small and focused.
-- Explain non-obvious decisions in comments.
+- Keep changes small, focused, and easy to review.
 - Default to the simplest working solution.
-
-## Core Principles
-
-- Prefer boring, explicit code over clever abstractions.
-- Minimize dependencies and framework magic.
-- Small, typed, composable functions over large classes.
+- Prefer explicit, typed, composable code over abstractions.
 - Data correctness beats UI polish.
 
-## Repository Overview
+## Always
 
-### Technology Stack
+- Ask before making architectural changes.
+- Keep suggestions high confidence and grounded in existing code patterns.
+- Explain non-obvious decisions with concise comments in code.
+- Use C# 14 features where appropriate.
+- Preserve strict TypeScript typing and avoid `any`.
+- Keep frontend dark mode by default and responsive (web-first, mobile-friendly).
+- Validate inputs defensively and never trust client-provided data.
+- Return JSON API responses with explicit HTTP status codes.
+- Include machine-readable error codes for API error responses.
+- Regenerate frontend API client when API contract changes:
+  - `cd src/frontend && npm run generate-client`
+  - Updates `src/frontend/src/api/generated-client.ts`
 
-- [Aspire](https://aspire.dev/).
-- Backend: .NET 10.0 + C# 14 with xUnit SDK v3 with Microsoft.Testing.Platform for testing.
-- Frontend: React + Typescript + Vite with [vitest](https://vitest.dev/) for testing.
-- Storage: Browser storage only.
-- Infra: Azure Container Apps with GitHub Container Registry.
-- Auth: Use the selected music provider for authentication (e.g. Spotify).
+## Ask First
 
-### Directory Structure
+- Any architecture or major pattern change.
+- Adding new dependencies when existing libraries can solve the problem.
+- Changing CI, deployment, or coverage policy.
+- Changing public API shapes in ways that may break consumers.
 
-- `src/`: All application source code.
-    - `frontend/`: All the frontend code.
-    - `RePlay.AppHost`: Aspire orchestrator.
-    - `RePlay.Api`: The exposed Re:Play API
-    - `RePlay.Application`: The core application of Re:Play
-- `docs/`: All docs other than the README.md.
-- `infra/`: All infrastructure needed to deploy the application.
+## Never
 
-### Commands
+- Never change `global.json` unless explicitly asked.
+- Never reduce thresholds in `src/frontend/vitest.config.ts`.
+- Never merge code that leaves failing tests, lint, or build checks.
 
-- `aspire run`: Runs the application (including installing all dependencies).
-- `dotnet build`: Builds the dotnet solution. This should never have errors or warnings.
-- `dotnet test`: Runs the backend tests.
-- `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
-- `cd src/frontend && npm run test`: Runs the frontend tests.
+## Repository Map
 
----
+- `src/RePlay.AppHost`: Aspire orchestrator.
+- `src/RePlay.Server`: Backend API.
+- `src/RePlay.Server.Tests`: Backend tests.
+- `src/frontend`: Frontend app (React/TypeScript/Vite + Vitest).
+- `docs/`: Supporting documentation.
+- `infra/`: Deployment infrastructure.
 
-## General Rules
+## Standard Commands
 
-- Make only high confidence suggestions when reviewing code changes.
-- Always use the latest version C#, currently C# 14 features.
-- Never change global.json unless explicitly asked to.
+- Run full app: `aspire run`
+- Build backend: `dotnet build RePlay.sln -c Release`
+- Test backend: `dotnet test`
+- Validate frontend: `cd src/frontend && npm run validate`
+- Test frontend: `cd src/frontend && npm run test`
 
-## Frontend Rules
+## Testing Expectations
 
-- Dark mode by default.
-- Web-first layout, responsive for mobile.
+- Prefer non-integrated tests.
+- Add or update backend unit tests for backend logic changes.
+- Add or update frontend component tests for UI logic changes.
+- Add or update API contract-style tests for API behavior changes.
+- Keep backend coverage gates passing (`scripts/validate-coverage.sh` in CI).
 
-## TypeScript Rules
+Before completing work, run and pass:
 
-- Strict typing enabled.
-- Avoid `any`.
-- Generate frontend types and client from the API using `cd src/frontend && npm run generate-client`. This updates `src/frontend/src/api/generated-client.ts`.
+- `dotnet test`
+- `cd src/frontend && npm run validate`
+- `cd src/frontend && npm run test`
 
-## API Rules
+## Progressive Disclosure
 
-- Use Microsoft.AspNetCore.OpenApi to generate OpenAPI spec and [Scalar](https://github.com/scalar/scalar) to view it.
-- All API responses are JSON with explicit HTTP status codes.
-- Error responses must include a machine-readable error code.
-- Validate inputs defensively.
-- Never trust client-provided data blindly.
+Keep this file lean. Put domain-specific detail in focused docs, then reference them:
 
-## Testing Rules
-
-- Prefer non-integrated tests always.
-- All backend functionality should have unit tests.
-- All frontend components performing logic should have component unit tests.
-- All API's should have non-integrated contract tests.
-
-Ensure that all changes have tests added and that all validations pass:
-
-- `dotnet test`: Runs the backend tests.
-- `cd src/frontend && npm run validate`: Validates the frontend code (build, lint, knip).
-- `cd src/frontend && npm run test`: Runs the frontend tests.
-
-Never reduce the thresholds in `src/frontend/vitest.config.ts`. Ever.
+- `README.md` for repo setup and workflows.
+- `docs/configuration.md` for runtime configuration.
+- `docs/deploy-aca-ghcr.md` for deployment flow.
