@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       container_image:
-        description: "Container image to deploy (override if your Aspire push uses a different image path)"
+        description: "Container image to deploy (override if not pushing in this run)"
         required: false
         type: string
       run_push:
-        description: "Run `aspire do push` before deploy"
+        description: "Build and push image to GHCR before deploy"
         required: true
         default: true
         type: boolean
@@ -37,23 +37,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install Aspire CLI
-        run: |
-          echo "Installing Aspire CLI from install script..."
-          curl -sSL https://aspire.dev/install.sh | bash -s -- -q dev
-
       - name: Setup AZD
         uses: Azure/setup-azd@v2
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Azure login
         uses: azure/login@v2
@@ -62,27 +50,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Login to GHCR for push
-        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push image(s) to GHCR with Aspire
-        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
-        env:
-          PARAMETERS__REGISTRY_ENDPOINT: ghcr.io
-          PARAMETERS__REGISTRY_REPOSITORY: ${{ vars.GHCR_REPOSITORY != '' && vars.GHCR_REPOSITORY || github.repository }}
-          Azure__SubscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          Azure__ResourceGroup: ${{ vars.AZURE_RESOURCE_GROUP != '' && vars.AZURE_RESOURCE_GROUP || 'rg-replay' }}
-          Azure__Location: ${{ vars.AZURE_LOCATION != '' && vars.AZURE_LOCATION || 'uksouth' }}
-        run: aspire do push --project src/RePlay.AppHost/RePlay.AppHost.csproj --non-interactive
-
       - name: Resolve deployment settings
         id: settings
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_PUSH: ${{ github.event.inputs.run_push }}
           INPUT_IMAGE: ${{ github.event.inputs.container_image }}
           GHCR_REPOSITORY: ${{ vars.GHCR_REPOSITORY }}
           ACA_APP_NAME: ${{ vars.ACA_APP_NAME }}
@@ -103,12 +75,34 @@ jobs:
           image_default="ghcr.io/${ghcr_repo}/server:latest"
           image="${INPUT_IMAGE:-$image_default}"
 
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "${RUN_PUSH:-true}" != "true" && -z "${INPUT_IMAGE}" ]]; then
+            echo "When run_push is false, container_image must be provided."
+            exit 1
+          fi
+
           echo "app_name=$app_name" >> "$GITHUB_OUTPUT"
           echo "environment_name=$environment_name" >> "$GITHUB_OUTPUT"
           echo "resource_group=$resource_group" >> "$GITHUB_OUTPUT"
           echo "location=$location" >> "$GITHUB_OUTPUT"
           echo "azd_environment_name=$azd_environment_name" >> "$GITHUB_OUTPUT"
           echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR for push
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image to GHCR
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.settings.outputs.image }}
 
       - name: AZD login (federated)
         env:
@@ -151,7 +145,7 @@ jobs:
       - name: Ensure ACA extension is installed
         run: az extension add --name containerapp --upgrade --allow-preview true
 
-      - name: Create or update ACA app (GHCR override)
+      - name: Create or update ACA app (GHCR image)
         env:
           APP_NAME: ${{ steps.settings.outputs.app_name }}
           ENV_NAME: ${{ steps.azd.outputs.environment_name }}
