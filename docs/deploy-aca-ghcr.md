@@ -5,8 +5,7 @@ This guide deploys RePlay to Azure Container Apps (ACA) while storing images in 
 ## What this repo now does
 
 - Uses Docker Buildx to push image(s) to GHCR.
-- Uses `azd` first for Azure environment + infrastructure provisioning.
-- Uses a small `az containerapp` override to deploy/update the app from GHCR.
+- Uses `azd` for Azure environment + infrastructure provisioning, including the Container App resource.
 - Avoids Azure Container Registry (ACR) for runtime images.
 
 Implementation references:
@@ -40,6 +39,8 @@ ACA needs long-lived credentials to pull from GHCR.
 Required secrets:
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
+
+Required variable:
 - `SPOTIFY_REDIRECT_URI`
 
 The deploy workflow validates `SPOTIFY_REDIRECT_URI` and fails early unless it:
@@ -77,8 +78,7 @@ Manual inputs:
 
 High-level workflow sequence:
 1. Build and push image(s) with Docker Buildx to GHCR, tagged as `sha-<commit>`.
-2. `azd auth login` + `azd provision` provisions infra from `infra/main.bicep`.
-3. `az containerapp create/update` applies GHCR image + app secrets/env vars.
+2. `azd auth login` + `azd provision` provisions/updates infra from `infra/main.bicep` (ACA environment + app).
 
 ## 6. Set Spotify redirect URI
 
@@ -87,7 +87,7 @@ After deploy, workflow output shows the ACA URL.
 Set Spotify redirect URI to:
 - `https://<your-aca-fqdn>/api/auth/callback`
 
-Ensure `SPOTIFY_REDIRECT_URI` secret matches this exact URI.
+Ensure `SPOTIFY_REDIRECT_URI` variable matches this exact URI.
 
 ## Notes
 
