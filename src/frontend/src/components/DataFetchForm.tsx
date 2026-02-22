@@ -125,21 +125,13 @@ export function DataResults() {
   const { normalizedData, isLoading } = useData()
   const { matchedData, matchedAlbums, matchedArtists, isLoading: isMatching } = useMatch()
   const { selectedSource } = useDataSource()
+  const [expandedByUser, setExpandedByUser] = useState(false)
+
   const hasMatches = !!(matchedData || matchedAlbums || matchedArtists)
-  const [isCollapsed, setIsCollapsed] = useState(hasMatches && !isMatching)
-  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(hasMatches && !isMatching)
-
-  // Reset collapsed state when matches clear or matching is in progress
-  if (((!matchedData && !matchedAlbums && !matchedArtists) || isMatching) && isCollapsed) {
-    setIsCollapsed(false)
-    setHasAutoCollapsed(false)
-  }
-
-  // Auto-collapse when matches appear for the first time
-  if (hasMatches && !isMatching && !hasAutoCollapsed) {
-    setIsCollapsed(true)
-    setHasAutoCollapsed(true)
-  }
+  // Derive collapsed state from props and user preference
+  // If user has toggled, respect their choice. Otherwise, auto-collapse when matches appear
+  const shouldAutoCollapse = hasMatches && !isMatching
+  const isCollapsed = !expandedByUser && shouldAutoCollapse
 
   if (isLoading) {
     const sourceName =
@@ -206,7 +198,7 @@ export function DataResults() {
           <Button
             variant="ghost"
             size="1"
-            onClick={() => setIsCollapsed((prev) => !prev)}
+            onClick={() => setExpandedByUser(!expandedByUser)}
           >
             {isCollapsed ? 'Show' : 'Hide'}
           </Button>
