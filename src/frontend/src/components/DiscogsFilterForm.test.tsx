@@ -25,7 +25,6 @@ describe('DiscogsFilterForm', () => {
       </TestWrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
     const yearInputs = screen.getAllByRole('spinbutton')
 
     fireEvent.change(yearInputs[0], { target: { value: '2' } })
@@ -40,7 +39,6 @@ describe('DiscogsFilterForm', () => {
       </TestWrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
     const yearInputs = screen.getAllByRole('spinbutton')
 
     fireEvent.change(yearInputs[0], { target: { value: '1999' } })

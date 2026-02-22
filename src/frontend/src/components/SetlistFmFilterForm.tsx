@@ -5,7 +5,9 @@ import { useConfig } from '../contexts/ConfigContext'
 
 export function SetlistFmFilterForm() {
   const { setlistFmFilter, updateSetlistFmFilter } = useConfig()
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
+  const [maxConcertsInput, setMaxConcertsInput] = useState(setlistFmFilter.maxConcerts?.toString() ?? '10')
+  const [maxTracksInput, setMaxTracksInput] = useState(setlistFmFilter.maxTracks?.toString() ?? '100')
 
   const handleStartDateChange = (value: string) => {
     updateSetlistFmFilter({ startDate: value || undefined })
@@ -16,16 +18,32 @@ export function SetlistFmFilterForm() {
   }
 
   const handleMaxConcertsChange = (value: string) => {
-    const num = parseInt(value, 10)
-    if (!isNaN(num) && num > 0 && num <= 100) {
+    setMaxConcertsInput(value)
+  }
+
+  const handleMaxConcertsBlur = () => {
+    const num = parseInt(maxConcertsInput, 10)
+    if (!isNaN(num) && num >= 1 && num <= 100) {
       updateSetlistFmFilter({ maxConcerts: num })
+    } else {
+      // Reset to current or default value if invalid
+      setMaxConcertsInput(setlistFmFilter.maxConcerts?.toString() ?? '10')
+      updateSetlistFmFilter({ maxConcerts: setlistFmFilter.maxConcerts ?? 10 })
     }
   }
 
   const handleMaxTracksChange = (value: string) => {
-    const num = parseInt(value, 10)
-    if (!isNaN(num) && num > 0 && num <= 500) {
+    setMaxTracksInput(value)
+  }
+
+  const handleMaxTracksBlur = () => {
+    const num = parseInt(maxTracksInput, 10)
+    if (!isNaN(num) && num >= 1 && num <= 500) {
       updateSetlistFmFilter({ maxTracks: num })
+    } else {
+      // Reset to current or default value if invalid
+      setMaxTracksInput(setlistFmFilter.maxTracks?.toString() ?? '100')
+      updateSetlistFmFilter({ maxTracks: setlistFmFilter.maxTracks ?? 100 })
     }
   }
 
@@ -102,8 +120,9 @@ export function SetlistFmFilterForm() {
                 type="number"
                 min="1"
                 max="100"
-                value={setlistFmFilter.maxConcerts?.toString() ?? '10'}
+                value={maxConcertsInput}
                 onChange={(e) => handleMaxConcertsChange(e.target.value)}
+                onBlur={handleMaxConcertsBlur}
                 placeholder="10"
               />
               <Text size="1" color="gray" className="mt-2 block">
@@ -120,8 +139,9 @@ export function SetlistFmFilterForm() {
                 type="number"
                 min="1"
                 max="500"
-                value={setlistFmFilter.maxTracks?.toString() ?? '100'}
+                value={maxTracksInput}
                 onChange={(e) => handleMaxTracksChange(e.target.value)}
+                onBlur={handleMaxTracksBlur}
                 placeholder="100"
               />
               <Text size="1" color="gray" className="mt-2 block">

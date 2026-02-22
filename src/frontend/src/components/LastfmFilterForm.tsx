@@ -10,7 +10,8 @@ import { useConfig } from '../contexts/ConfigContext'
 
 export function LastfmFilterForm() {
   const { lastfmFilter, updateFilter } = useConfig()
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
+  const [maxResultsInput, setMaxResultsInput] = useState(lastfmFilter.maxResults?.toString() ?? '50')
 
   const handleDataTypeChange = (value: string) => {
     updateFilter({ dataType: value as LastfmDataType })
@@ -29,9 +30,17 @@ export function LastfmFilterForm() {
   }
 
   const handleMaxResultsChange = (value: string) => {
-    const num = parseInt(value, 10)
-    if (!isNaN(num) && num > 0 && num <= 500) {
+    setMaxResultsInput(value)
+  }
+
+  const handleMaxResultsBlur = () => {
+    const num = parseInt(maxResultsInput, 10)
+    if (!isNaN(num) && num >= 1 && num <= 500) {
       updateFilter({ maxResults: num })
+    } else {
+      // Reset to current or default value if invalid
+      setMaxResultsInput(lastfmFilter.maxResults?.toString() ?? '50')
+      updateFilter({ maxResults: lastfmFilter.maxResults ?? 50 })
     }
   }
 
@@ -141,8 +150,9 @@ export function LastfmFilterForm() {
                 type="number"
                 min="1"
                 max="500"
-                value={lastfmFilter.maxResults?.toString() ?? '50'}
+                value={maxResultsInput}
                 onChange={(e) => handleMaxResultsChange(e.target.value)}
+                onBlur={handleMaxResultsBlur}
                 placeholder="50"
               />
               <Text size="1" color="gray" className="mt-2 block">

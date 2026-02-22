@@ -29,18 +29,18 @@ describe('LastfmFilterForm', () => {
     expect(screen.getByText('Filter Last.fm Data')).toBeInTheDocument()
   })
 
-  it('should be collapsible by default with Show button', () => {
+  it('should be expanded by default with Hide button', () => {
     render(
       <TestWrapper>
         <LastfmFilterForm />
       </TestWrapper>
     )
 
-    const showButton = screen.getByText('Show')
-    expect(showButton).toBeInTheDocument()
+    const hideButton = screen.getByText('Hide')
+    expect(hideButton).toBeInTheDocument()
 
-    // Content should not be visible initially
-    expect(screen.queryByText('What to fetch')).not.toBeInTheDocument()
+    // Content should be visible initially
+    expect(screen.getByText('What to fetch')).toBeInTheDocument()
   })
 
   it('should have filter icon in header', () => {
@@ -113,8 +113,8 @@ describe('LastfmFilterForm', () => {
     expect(heading).toBeInTheDocument()
 
     // The button should be focusable/accessible
-    const showButton = screen.getByText('Show')
-    expect(showButton.tagName).toBe('BUTTON')
+    const hideButton = screen.getByText('Hide')
+    expect(hideButton.tagName).toBe('BUTTON')
   })
 
   it('should be dark-mode compatible', () => {
@@ -147,8 +147,8 @@ describe('LastfmFilterForm', () => {
       </TestWrapper>
     )
 
-    const showButton = screen.getByText('Show')
+    const hideButton = screen.getByText('Hide')
     // Button should be accessible
-    expect(showButton.tagName).toBe('BUTTON')
+    expect(hideButton.tagName).toBe('BUTTON')
   })
 })

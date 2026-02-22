@@ -1,83 +1,12 @@
-import { useEffect, useRef } from 'react'
-import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucide-react'
-import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
+import { Music2, LogOut, User as UserIcon } from 'lucide-react'
+import { Button, Container, Flex, Heading, Text, Box, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
+import { Routes, Route, Link } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-import { useDataSource } from './contexts/DataSourceContext'
-import { useMatch } from './contexts/MatchContext'
-import { useConfig } from './contexts/ConfigContext'
-import { useWorkflow, WorkflowStep } from './contexts/WorkflowContext'
-import { DataSource } from './types/datasource'
-import { WorkflowStepper } from './components/WorkflowStepper'
-import { WorkflowStepContainer } from './components/WorkflowStepContainer'
-import { DataSourceSelector } from './components/DataSourceSelector'
-import { LastfmConfigForm } from './components/LastfmConfigForm'
-import { DiscogsConfigForm } from './components/DiscogsConfigForm'
-import { SetlistConfigForm } from './components/SetlistConfigForm'
-import { LastfmFilterForm } from './components/LastfmFilterForm'
-import { DiscogsFilterForm } from './components/DiscogsFilterForm'
-import { SetlistFmFilterForm } from './components/SetlistFmFilterForm'
-import { FetchDataButton, DataResults } from './components/DataFetchForm'
-import { MatchTracksButton } from './components/MatchTracksButton'
-import { MatchAlbumsButton } from './components/MatchAlbumsButton'
-import { MatchArtistsButton } from './components/MatchArtistsButton'
-import { MatchResults } from './components/MatchResults'
-import { PlaylistConfigForm } from './components/PlaylistConfigForm'
-import { CreatePlaylistButton } from './components/CreatePlaylistButton'
-import { PlaylistConfirmation } from './components/PlaylistConfirmation'
-import { AutoFetcher } from './components/AutoFetcher'
-import { AdvancedOptions } from './components/AdvancedOptions'
+import { Home } from './pages/Home'
+import { About } from './pages/About'
 
 function App() {
   const { user, isLoading, isAuthenticated, login, logout } = useAuth()
-  const { selectedSource } = useDataSource()
-  const { matchedData, matchedAlbums, matchedArtists } = useMatch()
-  const { autoFetch } = useConfig()
-  const { markStepComplete, nextStep, currentStep } = useWorkflow()
-  const hasAutoAdvancedRef = useRef(false)
-
-  // Auto-advance to curate when fetch+match completes with results for the first time
-  useEffect(() => {
-    const hasResults =
-      (matchedData && matchedData.tracks && matchedData.tracks.length > 0) ||
-      (matchedAlbums && matchedAlbums.albums && matchedAlbums.albums.length > 0) ||
-      (matchedArtists && matchedArtists.artists && matchedArtists.artists.length > 0)
-
-    if (hasResults && currentStep === WorkflowStep.FETCH_AND_MATCH && !hasAutoAdvancedRef.current) {
-      hasAutoAdvancedRef.current = true
-      markStepComplete(WorkflowStep.FETCH_AND_MATCH)
-      nextStep()
-    }
-
-    // Reset the ref if we go back to fetch+match step with no results
-    if (!hasResults && currentStep === WorkflowStep.FETCH_AND_MATCH) {
-      hasAutoAdvancedRef.current = false
-    }
-  }, [matchedData, matchedAlbums, matchedArtists, currentStep, markStepComplete, nextStep])
-
-  // Handle workflow progression
-  const handleSourceSelected = () => {
-    if (selectedSource) {
-      markStepComplete(WorkflowStep.SELECT_SOURCE)
-      nextStep()
-    }
-  }
-
-  const handleConfigured = () => {
-    markStepComplete(WorkflowStep.CONFIGURE)
-    nextStep()
-  }
-
-  const handleFetchedAndMatched = () => {
-    if (matchedData && matchedData.tracks && matchedData.tracks.length > 0) {
-      markStepComplete(WorkflowStep.FETCH_AND_MATCH)
-      nextStep()
-    }
-  }
-
-  const handleCurated = () => {
-    markStepComplete(WorkflowStep.CURATE)
-    nextStep()
-  }
 
   return (
     <Box className="min-h-screen">
@@ -85,11 +14,13 @@ function App() {
       <Box className="border-b border-zinc-800">
         <Container size="4">
           <Flex justify="between" align="center" py="4">
-            <Flex align="center" gap="2">
-              <Music2 className="h-8 w-8 text-green-500" />
-              <Heading size="6" className="bg-linear-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
-                Re:Play
-              </Heading>
+            <Flex align="center" gap="2" asChild>
+              <Link to="/">
+                <Music2 className="h-8 w-8 text-green-500" />
+                <Heading size="6" className="bg-linear-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
+                  Re:Play
+                </Heading>
+              </Link>
             </Flex>
             <Flex align="center" gap="4">
               {isLoading ? (
@@ -118,259 +49,21 @@ function App() {
                   </DropdownMenu.Content>
                 </DropdownMenu.Root>
               ) : (
-                <>
-                  <Button variant="ghost" size="2">
-                    About
-                  </Button>
-                  <Button size="2" onClick={login}>
-                    <UserIcon className="h-4 w-4" />
-                    Connect Spotify
-                  </Button>
-                </>
+                <Button size="2" onClick={login}>
+                  <UserIcon className="h-4 w-4" />
+                  Connect Spotify
+                </Button>
               )}
             </Flex>
           </Flex>
         </Container>
       </Box>
 
-      {/* Hero Section */}
-      <Container size="4">
-        <Section size="3">
-          <Flex direction="column" align="center" gap="6" className="text-center max-w-4xl mx-auto">
-            {isAuthenticated && user ? (
-              <Flex direction="column" gap="6" width="100%">
-                <Box>
-                  <Heading size="8" weight="bold" mb="2">
-                    Welcome back, {user.displayName}!
-                  </Heading>
-                  <Text size="4" color="gray">
-                    Ready to create some playlists from your music history?
-                  </Text>
-                </Box>
-
-                {/* Workflow Stepper */}
-                <WorkflowStepper />
-
-                {/* Step 1: Select Source */}
-                <WorkflowStepContainer
-                  step={WorkflowStep.SELECT_SOURCE}
-                  title="Select Data Source"
-                  onComplete={handleSourceSelected}
-                  canComplete={selectedSource !== null}
-                >
-                  <DataSourceSelector />
-                </WorkflowStepContainer>
-
-                {/* Step 2: Configure */}
-                {selectedSource && (
-                  <WorkflowStepContainer
-                    step={WorkflowStep.CONFIGURE}
-                    title="Configure"
-                    onComplete={handleConfigured}
-                    canComplete={true}
-                  >
-                    <Flex direction="column" gap="4">
-                      {selectedSource === DataSource.LASTFM && (
-                        <>
-                          <LastfmConfigForm />
-                          <LastfmFilterForm />
-                        </>
-                      )}
-                      {selectedSource === DataSource.DISCOGS && (
-                        <>
-                          <DiscogsConfigForm />
-                          <DiscogsFilterForm />
-                        </>
-                      )}
-                      {selectedSource === DataSource.SETLISTFM && (
-                        <>
-                          <SetlistConfigForm />
-                          <SetlistFmFilterForm />
-                        </>
-                      )}
-                      <AdvancedOptions />
-                    </Flex>
-                  </WorkflowStepContainer>
-                )}
-
-                {/* Step 3: Fetch & Match */}
-                {selectedSource && (
-                  <WorkflowStepContainer
-                    step={WorkflowStep.FETCH_AND_MATCH}
-                    title="Fetch & Match"
-                    onComplete={handleFetchedAndMatched}
-                    canComplete={
-                      (matchedData !== null && (matchedData.tracks?.length ?? 0) > 0) ||
-                      (matchedAlbums !== null && (matchedAlbums.albums?.length ?? 0) > 0) ||
-                      (matchedArtists !== null && (matchedArtists.artists?.length ?? 0) > 0)
-                    }
-                  >
-                    <Flex direction="column" gap="4">
-                      {selectedSource === DataSource.LASTFM && (
-                        <>
-                          {autoFetch ? (
-                            <>
-                              <AutoFetcher />
-                              <DataResults />
-                              <MatchResults />
-                            </>
-                          ) : (
-                            <>
-                              <FetchDataButton />
-                              <DataResults />
-                              <MatchTracksButton />
-                              <MatchAlbumsButton />
-                              <MatchArtistsButton />
-                              <MatchResults />
-                            </>
-                          )}
-                        </>
-                      )}
-                      {selectedSource === DataSource.SETLISTFM && (
-                        <>
-                          {autoFetch ? (
-                            <>
-                              <AutoFetcher />
-                              <DataResults />
-                              <MatchResults />
-                            </>
-                          ) : (
-                            <>
-                              <FetchDataButton />
-                              <DataResults />
-                              <MatchTracksButton />
-                              <MatchAlbumsButton />
-                              <MatchArtistsButton />
-                              <MatchResults />
-                            </>
-                          )}
-                        </>
-                      )}
-                      {selectedSource === DataSource.DISCOGS && (
-                        <>
-                          {autoFetch ? (
-                            <>
-                              <AutoFetcher />
-                              <DataResults />
-                              <MatchResults />
-                            </>
-                          ) : (
-                            <>
-                              <FetchDataButton />
-                              <DataResults />
-                              <MatchTracksButton />
-                              <MatchAlbumsButton />
-                              <MatchArtistsButton />
-                              <MatchResults />
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Flex>
-                  </WorkflowStepContainer>
-                )}
-
-                {/* Step 4: Curate */}
-                {(matchedData || matchedAlbums || matchedArtists) && (
-                  <WorkflowStepContainer
-                    step={WorkflowStep.CURATE}
-                    title="Curate Playlist"
-                    onComplete={handleCurated}
-                    canComplete={true}
-                  >
-                    <Flex direction="column" gap="4">
-                      <MatchResults />
-                    </Flex>
-                  </WorkflowStepContainer>
-                )}
-
-                {/* Step 5: Create */}
-                {(matchedData || matchedAlbums || matchedArtists) && (
-                  <WorkflowStepContainer
-                    step={WorkflowStep.CREATE}
-                    title="Create Playlist"
-                  >
-                    <Flex direction="column" gap="4">
-                      <PlaylistConfigForm />
-                      <CreatePlaylistButton />
-                      <PlaylistConfirmation />
-                    </Flex>
-                  </WorkflowStepContainer>
-                )}
-              </Flex>
-            ) : (
-              <>
-                <Flex direction="column" gap="4">
-                  <Heading size="9" weight="bold">
-                    Replay Your Music History
-                  </Heading>
-                  <Text size="5" color="gray" className="max-w-2xl">
-                    Transform your listening data, collection, and concert memories into curated Spotify playlists
-                  </Text>
-                </Flex>
-
-                <Flex gap="4">
-                  <Button size="3" onClick={login}>
-                    <Music2 className="h-5 w-5" />
-                    Get Started
-                  </Button>
-                  <Button size="3" variant="outline">
-                    Learn More
-                  </Button>
-                </Flex>
-              </>
-            )}
-
-            {/* Features Grid */}
-            <Grid columns={{ initial: '1', md: '3' }} gap="4" width="100%" pt="8">
-              <FeatureCard
-                icon={<Radio className="h-8 w-8" />}
-                title="Last.fm"
-                description="Turn your listening history into playlists based on any time period"
-              />
-              <FeatureCard
-                icon={<Disc3 className="h-8 w-8" />}
-                title="Discogs"
-                description="Convert your physical and digital collection into playable playlists"
-              />
-              <FeatureCard
-                icon={<ListMusic className="h-8 w-8" />}
-                title="Setlist.fm"
-                description="Relive concerts by creating playlists from shows you've attended"
-              />
-            </Grid>
-
-            {/* How It Works */}
-            <Flex direction="column" gap="6" width="100%" pt="8">
-              <Heading size="7" weight="bold">
-                How It Works
-              </Heading>
-              <Grid columns={{ initial: '1', md: '4' }} gap="4" className="text-left">
-                <StepCard
-                  number="1"
-                  title="Connect"
-                  description="Link your Spotify account and choose a data source"
-                />
-                <StepCard
-                  number="2"
-                  title="Select"
-                  description="Apply filters or use presets to find the music you want"
-                />
-                <StepCard
-                  number="3"
-                  title="Curate"
-                  description="Review and refine matched tracks to your liking"
-                />
-                <StepCard
-                  number="4"
-                  title="Create"
-                  description="Generate and save your playlist to Spotify"
-                />
-              </Grid>
-            </Flex>
-          </Flex>
-        </Section>
-      </Container>
+      {/* Main Content */}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
 
       {/* Footer */}
       <Box className="border-t border-zinc-800 mt-24">
@@ -390,17 +83,20 @@ function App() {
             </Flex>
             <Flex gap="6">
               <Text size="2" asChild>
-                <a href="#" className="hover:text-white transition-colors">
-                  Privacy
-                </a>
+                <Link 
+                  to="/about"
+                  className="hover:text-white transition-colors"
+                >
+                  About
+                </Link>
               </Text>
               <Text size="2" asChild>
-                <a href="#" className="hover:text-white transition-colors">
-                  Terms
-                </a>
-              </Text>
-              <Text size="2" asChild>
-                <a href="#" className="hover:text-white transition-colors">
+                <a 
+                  href="https://github.com/rick-roche/replay" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors"
+                >
                   GitHub
                 </a>
               </Text>
@@ -409,34 +105,6 @@ function App() {
         </Container>
       </Box>
     </Box>
-  )
-}
-
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <Card>
-      <Flex direction="column" gap="3">
-        <Box className="text-green-500">{icon}</Box>
-        <Heading size="4" weight="medium">{title}</Heading>
-        <Text size="2" color="gray">{description}</Text>
-      </Flex>
-    </Card>
-  )
-}
-
-function StepCard({ number, title, description }: { number: string; title: string; description: string }) {
-  return (
-    <Flex direction="column" gap="2">
-      <Flex 
-        align="center" 
-        justify="center" 
-        className="h-8 w-8 rounded-full bg-green-500/10 text-green-500 font-bold"
-      >
-        {number}
-      </Flex>
-      <Heading size="3" weight="medium">{title}</Heading>
-      <Text size="2" color="gray">{description}</Text>
-    </Flex>
   )
 }
 

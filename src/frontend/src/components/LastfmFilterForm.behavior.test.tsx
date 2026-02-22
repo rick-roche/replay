@@ -25,13 +25,18 @@ describe('LastfmFilterForm behavior', () => {
       </Wrapper>
     )
 
-    const toggle = screen.getByRole('button', { name: 'Show' })
-    fireEvent.click(toggle)
+    // Panel starts expanded, so content should be visible
     expect(screen.getByText('What to fetch')).toBeInTheDocument()
 
+    // Click Hide to collapse
     const hide = screen.getByRole('button', { name: 'Hide' })
     fireEvent.click(hide)
     expect(screen.queryByText('What to fetch')).not.toBeInTheDocument()
+
+    // Click Show to expand again
+    const show = screen.getByRole('button', { name: 'Show' })
+    fireEvent.click(show)
+    expect(screen.getByText('What to fetch')).toBeInTheDocument()
   })
 
   it('renders custom date inputs and validation when time period is Custom', () => {
@@ -50,9 +55,7 @@ describe('LastfmFilterForm behavior', () => {
       </Wrapper>
     )
 
-    // Expand to see controls
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
-
+    // Panel is expanded by default, controls should be visible
     expect(screen.getByDisplayValue('2025-12-31')).toBeInTheDocument()
     expect(screen.getByDisplayValue('2025-01-01')).toBeInTheDocument()
 
@@ -67,25 +70,34 @@ describe('LastfmFilterForm behavior', () => {
       </Wrapper>
     )
 
-    // Expand controls
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
-
+    // Panel is expanded by default, controls should be visible
     const input = screen.getByRole('spinbutton') as HTMLInputElement
+
+    // Initial default value
+    expect(input.value).toBe('50')
 
     // Valid: change to 200
     fireEvent.change(input, { target: { value: '200' } })
     expect(input.value).toBe('200')
+    fireEvent.blur(input) // Validate on blur
+    expect(input.value).toBe('200')
 
-    // Invalid: over 500
+    // Invalid: over 500 - allows typing but resets on blur
     fireEvent.change(input, { target: { value: '600' } })
+    expect(input.value).toBe('600') // Allows typing
+    fireEvent.blur(input) // Should reset to last valid value
     expect(input.value).toBe('200')
 
-    // Invalid: zero
+    // Invalid: zero - allows typing but resets on blur
     fireEvent.change(input, { target: { value: '0' } })
+    expect(input.value).toBe('0') // Allows typing
+    fireEvent.blur(input) // Should reset to last valid value
     expect(input.value).toBe('200')
 
-    // Invalid: non-number
-    fireEvent.change(input, { target: { value: 'abc' } })
+    // Invalid: empty string - allows typing but resets on blur
+    fireEvent.change(input, { target: { value: '' } })
+    expect(input.value).toBe('') // Allows clearing
+    fireEvent.blur(input) // Should reset to last valid value
     expect(input.value).toBe('200')
   })
 })
