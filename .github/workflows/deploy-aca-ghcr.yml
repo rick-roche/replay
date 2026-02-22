@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       container_image:
-        description: "Container image to deploy (override if your Aspire push uses a different image path)"
+        description: "Container image to deploy (override if not pushing in this run)"
         required: false
         type: string
       run_push:
-        description: "Run `aspire do push` before deploy"
+        description: "Build and push image to GHCR before deploy"
         required: true
         default: true
         type: boolean
@@ -37,40 +37,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Setup Aspire CLI
-        uses: mfeeley/setup-aspire@v2
-
       - name: Setup AZD
         uses: Azure/setup-azd@v2
 
-      - name: Login to GHCR for push
-        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Push image(s) to GHCR with Aspire
-        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
-        env:
-          PARAMETERS__REGISTRY_ENDPOINT: ghcr.io
-          PARAMETERS__REGISTRY_REPOSITORY: ${{ vars.GHCR_REPOSITORY != '' && vars.GHCR_REPOSITORY || github.repository }}
-        run: aspire do push --project src/RePlay.AppHost/RePlay.AppHost.csproj --non-interactive
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Resolve deployment settings
         id: settings
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_PUSH: ${{ github.event.inputs.run_push }}
+          GIT_SHA: ${{ github.sha }}
           INPUT_IMAGE: ${{ github.event.inputs.container_image }}
           GHCR_REPOSITORY: ${{ vars.GHCR_REPOSITORY }}
           ACA_APP_NAME: ${{ vars.ACA_APP_NAME }}
@@ -88,8 +73,14 @@ jobs:
           azd_environment_name="${AZD_ENV_NAME:-prod}"
 
           ghcr_repo="${GHCR_REPOSITORY:-${GITHUB_REPOSITORY}}"
-          image_default="ghcr.io/${ghcr_repo}/server:latest"
+          short_sha="${GIT_SHA::7}"
+          image_default="ghcr.io/${ghcr_repo}/server:sha-${short_sha}"
           image="${INPUT_IMAGE:-$image_default}"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "${RUN_PUSH:-true}" != "true" && -z "${INPUT_IMAGE}" ]]; then
+            echo "When run_push is false, container_image must be provided."
+            exit 1
+          fi
 
           echo "app_name=$app_name" >> "$GITHUB_OUTPUT"
           echo "environment_name=$environment_name" >> "$GITHUB_OUTPUT"
@@ -98,12 +89,22 @@ jobs:
           echo "azd_environment_name=$azd_environment_name" >> "$GITHUB_OUTPUT"
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
-      - name: Azure login
-        uses: azure/login@v2
+      - name: Login to GHCR for push
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
+        uses: docker/login-action@v3
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image to GHCR
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_push == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.settings.outputs.image }}
 
       - name: AZD login (federated)
         env:
@@ -120,43 +121,19 @@ jobs:
       - name: Ensure AZD environment + provision infra
         id: azd
         env:
+          APP_NAME: ${{ steps.settings.outputs.app_name }}
+          CONTAINER_IMAGE: ${{ steps.settings.outputs.image }}
           AZD_ENV_NAME: ${{ steps.settings.outputs.azd_environment_name }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           AZURE_RESOURCE_GROUP: ${{ steps.settings.outputs.resource_group }}
           AZURE_LOCATION: ${{ steps.settings.outputs.location }}
           CONTAINER_APPS_ENVIRONMENT_NAME: ${{ steps.settings.outputs.environment_name }}
-        run: |
-          set -euo pipefail
-
-          azd env select "$AZD_ENV_NAME" --no-prompt || azd env new "$AZD_ENV_NAME" --no-prompt
-
-          azd env set AZURE_SUBSCRIPTION_ID "$AZURE_SUBSCRIPTION_ID"
-          azd env set AZURE_RESOURCE_GROUP "$AZURE_RESOURCE_GROUP"
-          azd env set AZURE_LOCATION "$AZURE_LOCATION"
-          azd env set CONTAINER_APPS_ENVIRONMENT_NAME "$CONTAINER_APPS_ENVIRONMENT_NAME"
-
-          azd provision --no-prompt
-
-          resource_group="$(azd env get-value AZURE_RESOURCE_GROUP)"
-          provisioned_env_name="$(azd env get-value CONTAINER_APPS_ENVIRONMENT_NAME)"
-
-          echo "resource_group=$resource_group" >> "$GITHUB_OUTPUT"
-          echo "environment_name=$provisioned_env_name" >> "$GITHUB_OUTPUT"
-
-      - name: Ensure ACA extension is installed
-        run: az extension add --name containerapp --upgrade --allow-preview true
-
-      - name: Create or update ACA app (GHCR override)
-        env:
-          APP_NAME: ${{ steps.settings.outputs.app_name }}
-          ENV_NAME: ${{ steps.azd.outputs.environment_name }}
-          RESOURCE_GROUP: ${{ steps.azd.outputs.resource_group }}
-          CONTAINER_IMAGE: ${{ steps.settings.outputs.image }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+          SPOTIFY_REDIRECT_URI: ${{ vars.SPOTIFY_REDIRECT_URI }}
+          ACA_CUSTOM_DOMAIN: ${{ vars.ACA_CUSTOM_DOMAIN }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           DISCOGS_CONSUMER_KEY: ${{ secrets.DISCOGS_CONSUMER_KEY }}
           DISCOGS_CONSUMER_SECRET: ${{ secrets.DISCOGS_CONSUMER_SECRET }}
@@ -174,89 +151,55 @@ jobs:
             exit 1
           fi
 
-          if [[ -z "${RESOURCE_GROUP}" || -z "${ENV_NAME}" ]]; then
-            echo "AZD provision did not return required values (AZURE_RESOURCE_GROUP / CONTAINER_APPS_ENVIRONMENT_NAME)."
+          if [[ "${SPOTIFY_REDIRECT_URI}" != https://* ]]; then
+            echo "SPOTIFY_REDIRECT_URI must start with https://"
             exit 1
           fi
 
-          secrets=(
-            "spotify-client-id=${SPOTIFY_CLIENT_ID}"
-            "spotify-client-secret=${SPOTIFY_CLIENT_SECRET}"
-            "spotify-redirect-uri=${SPOTIFY_REDIRECT_URI}"
-          )
-
-          env_vars=(
-            "Spotify__ClientId=secretref:spotify-client-id"
-            "Spotify__ClientSecret=secretref:spotify-client-secret"
-            "Spotify__RedirectUri=secretref:spotify-redirect-uri"
-            "ASPNETCORE_ENVIRONMENT=Production"
-          )
-
-          if [[ -n "${LASTFM_API_KEY}" ]]; then
-            secrets+=("lastfm-api-key=${LASTFM_API_KEY}")
-            env_vars+=("Lastfm__ApiKey=secretref:lastfm-api-key")
+          if [[ "${SPOTIFY_REDIRECT_URI}" == *localhost* ]]; then
+            echo "SPOTIFY_REDIRECT_URI must not contain localhost."
+            exit 1
           fi
 
-          if [[ -n "${DISCOGS_CONSUMER_KEY}" ]]; then
-            secrets+=("discogs-consumer-key=${DISCOGS_CONSUMER_KEY}")
-            env_vars+=("Discogs__ConsumerKey=secretref:discogs-consumer-key")
-          fi
+          azd env select "$AZD_ENV_NAME" --no-prompt || azd env new "$AZD_ENV_NAME" --no-prompt
 
-          if [[ -n "${DISCOGS_CONSUMER_SECRET}" ]]; then
-            secrets+=("discogs-consumer-secret=${DISCOGS_CONSUMER_SECRET}")
-            env_vars+=("Discogs__ConsumerSecret=secretref:discogs-consumer-secret")
-          fi
+          azd env set AZURE_SUBSCRIPTION_ID "$AZURE_SUBSCRIPTION_ID"
+          azd env set AZURE_RESOURCE_GROUP "$AZURE_RESOURCE_GROUP"
+          azd env set AZURE_LOCATION "$AZURE_LOCATION"
+          azd env set CONTAINER_APPS_ENVIRONMENT_NAME "$CONTAINER_APPS_ENVIRONMENT_NAME"
+          azd env set ACA_APP_NAME "$APP_NAME"
+          azd env set CONTAINER_IMAGE "$CONTAINER_IMAGE"
+          azd env set GHCR_USERNAME "$GHCR_USERNAME"
+          azd env set GHCR_PAT "$GHCR_PAT"
+          azd env set SPOTIFY_CLIENT_ID "$SPOTIFY_CLIENT_ID"
+          azd env set SPOTIFY_CLIENT_SECRET "$SPOTIFY_CLIENT_SECRET"
+          azd env set SPOTIFY_REDIRECT_URI "$SPOTIFY_REDIRECT_URI"
+          azd env set ACA_CUSTOM_DOMAIN "${ACA_CUSTOM_DOMAIN:-}"
+          azd env set LASTFM_API_KEY "${LASTFM_API_KEY:-}"
+          azd env set DISCOGS_CONSUMER_KEY "${DISCOGS_CONSUMER_KEY:-}"
+          azd env set DISCOGS_CONSUMER_SECRET "${DISCOGS_CONSUMER_SECRET:-}"
+          azd env set SETLISTFM_API_KEY "${SETLISTFM_API_KEY:-}"
 
-          if [[ -n "${SETLISTFM_API_KEY}" ]]; then
-            secrets+=("setlistfm-api-key=${SETLISTFM_API_KEY}")
-            env_vars+=("SetlistFm__ApiKey=secretref:setlistfm-api-key")
-          fi
+          azd provision --no-prompt
 
-          if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
-            az containerapp secret set \
-              --name "$APP_NAME" \
-              --resource-group "$RESOURCE_GROUP" \
-              --secrets "${secrets[@]}"
+          resource_group="$(azd env get-value AZURE_RESOURCE_GROUP)"
+          provisioned_env_name="$(azd env get-value CONTAINER_APPS_ENVIRONMENT_NAME)"
 
-            az containerapp registry set \
-              --name "$APP_NAME" \
-              --resource-group "$RESOURCE_GROUP" \
-              --server ghcr.io \
-              --username "$GHCR_USERNAME" \
-              --password "$GHCR_PAT"
-
-            az containerapp update \
-              --name "$APP_NAME" \
-              --resource-group "$RESOURCE_GROUP" \
-              --image "$CONTAINER_IMAGE" \
-              --set-env-vars "${env_vars[@]}" \
-              --min-replicas 0 \
-              --max-replicas 1
-          else
-            az containerapp create \
-              --name "$APP_NAME" \
-              --resource-group "$RESOURCE_GROUP" \
-              --environment "$ENV_NAME" \
-              --image "$CONTAINER_IMAGE" \
-              --registry-server ghcr.io \
-              --registry-username "$GHCR_USERNAME" \
-              --registry-password "$GHCR_PAT" \
-              --secrets "${secrets[@]}" \
-              --env-vars "${env_vars[@]}" \
-              --ingress external \
-              --target-port 8080 \
-              --min-replicas 0 \
-              --max-replicas 1 \
-              --cpu 0.5 \
-              --memory 1Gi
-          fi
+          echo "resource_group=$resource_group" >> "$GITHUB_OUTPUT"
+          echo "environment_name=$provisioned_env_name" >> "$GITHUB_OUTPUT"
 
       - name: Output app URL
-        env:
-          APP_NAME: ${{ steps.settings.outputs.app_name }}
-          RESOURCE_GROUP: ${{ steps.azd.outputs.resource_group }}
         run: |
-          fqdn=$(az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
+          fqdn="$(azd env get-value CONTAINER_APP_FQDN)"
+          custom_domain="$(azd env get-value ACA_CUSTOM_DOMAIN || true)"
+
           echo "App URL: https://${fqdn}"
+          if [[ -n "${custom_domain}" ]]; then
+            echo "Custom domain URL: https://${custom_domain}"
+          fi
           echo ""
-          echo "Remember to set SPOTIFY_REDIRECT_URI to: https://${fqdn}/api/auth/callback"
+          if [[ -n "${custom_domain}" ]]; then
+            echo "Remember to set SPOTIFY_REDIRECT_URI to: https://${custom_domain}/api/auth/callback"
+          else
+            echo "Remember to set SPOTIFY_REDIRECT_URI to: https://${fqdn}/api/auth/callback"
+          fi

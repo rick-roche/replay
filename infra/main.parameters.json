@@ -7,6 +7,42 @@
     },
     "containerAppsEnvironmentName": {
       "value": "${CONTAINER_APPS_ENVIRONMENT_NAME}"
+    },
+    "containerAppName": {
+      "value": "${ACA_APP_NAME}"
+    },
+    "containerImage": {
+      "value": "${CONTAINER_IMAGE}"
+    },
+    "ghcrUsername": {
+      "value": "${GHCR_USERNAME}"
+    },
+    "ghcrPat": {
+      "value": "${GHCR_PAT}"
+    },
+    "spotifyClientId": {
+      "value": "${SPOTIFY_CLIENT_ID}"
+    },
+    "spotifyClientSecret": {
+      "value": "${SPOTIFY_CLIENT_SECRET}"
+    },
+    "spotifyRedirectUri": {
+      "value": "${SPOTIFY_REDIRECT_URI}"
+    },
+    "lastfmApiKey": {
+      "value": "${LASTFM_API_KEY}"
+    },
+    "discogsConsumerKey": {
+      "value": "${DISCOGS_CONSUMER_KEY}"
+    },
+    "discogsConsumerSecret": {
+      "value": "${DISCOGS_CONSUMER_SECRET}"
+    },
+    "setlistfmApiKey": {
+      "value": "${SETLISTFM_API_KEY}"
+    },
+    "customDomain": {
+      "value": "${ACA_CUSTOM_DOMAIN}"
     }
   }
 }
