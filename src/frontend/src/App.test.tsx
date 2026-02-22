@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { BrowserRouter } from 'react-router-dom'
 import { Theme } from '@radix-ui/themes'
 import App from './App'
+
+// Test wrapper component
+function TestWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <BrowserRouter>
+      <Theme>{children}</Theme>
+    </BrowserRouter>
+  )
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -142,9 +152,9 @@ vi.mock('./components/AdvancedOptions', () => ({
 describe('App', () => {
   it('should render with authenticated user', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     const replayHeadings = screen.queryAllByText(/Re:Play/i)
@@ -153,9 +163,9 @@ describe('App', () => {
 
   it('shows Re:Play header', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('Re:Play')).toBeInTheDocument()
@@ -163,9 +173,9 @@ describe('App', () => {
 
   it('shows welcome message for authenticated user', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText(/Welcome back, Tester/i)).toBeInTheDocument()
@@ -173,9 +183,9 @@ describe('App', () => {
 
   it('shows workflow stepper when authenticated', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('WorkflowStepper')).toBeInTheDocument()
@@ -183,9 +193,9 @@ describe('App', () => {
 
   it('shows data source selector step', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('DataSourceSelector')).toBeInTheDocument()
@@ -193,9 +203,9 @@ describe('App', () => {
 
   it('shows configure step with Discogs when Discogs is selected', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('DiscogsConfigForm')).toBeInTheDocument()
@@ -203,9 +213,9 @@ describe('App', () => {
 
   it('shows fetch controls for Discogs when auto-fetch is off', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('FetchDataButton')).toBeInTheDocument()
@@ -214,9 +224,9 @@ describe('App', () => {
 
   it('should handle authenticated state correctly', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     // Should show authenticated content
@@ -226,9 +236,9 @@ describe('App', () => {
 
   it('should render all main sections', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     // Check for main content sections
@@ -237,9 +247,9 @@ describe('App', () => {
 
   it('should display feature cards', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('Last.fm')).toBeInTheDocument()
@@ -249,9 +259,9 @@ describe('App', () => {
 
   it('should display how it works section', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('How It Works')).toBeInTheDocument()
@@ -259,9 +269,9 @@ describe('App', () => {
 
   it('should have proper footer links', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     const links = screen.getAllByRole('link')
@@ -270,9 +280,9 @@ describe('App', () => {
 
   it('should show user avatar when authenticated', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     // Avatar or user info should be rendered for authenticated user
@@ -281,9 +291,9 @@ describe('App', () => {
 
   it('should have multiple workflow steps', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     // Should have at least the main steps rendered
@@ -292,9 +302,9 @@ describe('App', () => {
 
   it('should be responsive for dark mode', () => {
     const { container } = render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(container).toBeInTheDocument()
@@ -302,9 +312,9 @@ describe('App', () => {
 
   it('should show advanced options', () => {
     render(
-      <Theme>
+      <TestWrapper>
         <App />
-      </Theme>
+      </TestWrapper>
     )
 
     expect(screen.getByText('AdvancedOptions')).toBeInTheDocument()

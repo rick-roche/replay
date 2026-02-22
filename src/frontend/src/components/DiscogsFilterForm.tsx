@@ -5,11 +5,12 @@ import { useConfig } from '../contexts/ConfigContext'
 
 export function DiscogsFilterForm() {
   const { discogsFilter, updateDiscogsFilter } = useConfig()
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
   const [minReleaseYearInput, setMinReleaseYearInput] = useState(discogsFilter.minReleaseYear?.toString() ?? '')
   const [maxReleaseYearInput, setMaxReleaseYearInput] = useState(discogsFilter.maxReleaseYear?.toString() ?? '')
   const [minYearAddedInput, setMinYearAddedInput] = useState(discogsFilter.minYearAdded?.toString() ?? '')
   const [maxYearAddedInput, setMaxYearAddedInput] = useState(discogsFilter.maxYearAdded?.toString() ?? '')
+  const [maxTracksInput, setMaxTracksInput] = useState(discogsFilter.maxTracks?.toString() ?? '100')
 
   const currentYear = new Date().getFullYear()
 
@@ -59,9 +60,17 @@ export function DiscogsFilterForm() {
   }
 
   const handleMaxTracksChange = (value: string) => {
-    const num = parseInt(value, 10)
-    if (!isNaN(num) && num > 0 && num <= 500) {
+    setMaxTracksInput(value)
+  }
+
+  const handleMaxTracksBlur = () => {
+    const num = parseInt(maxTracksInput, 10)
+    if (!isNaN(num) && num >= 1 && num <= 500) {
       updateDiscogsFilter({ maxTracks: num })
+    } else {
+      // Reset to current or default value if invalid
+      setMaxTracksInput(discogsFilter.maxTracks?.toString() ?? '100')
+      updateDiscogsFilter({ maxTracks: discogsFilter.maxTracks ?? 100 })
     }
   }
 
@@ -204,8 +213,9 @@ export function DiscogsFilterForm() {
                 type="number"
                 min="1"
                 max="500"
-                value={discogsFilter.maxTracks?.toString() ?? '100'}
+                value={maxTracksInput}
                 onChange={(e) => handleMaxTracksChange(e.target.value)}
+                onBlur={handleMaxTracksBlur}
                 placeholder="100"
               />
               <Text size="1" color="gray" className="mt-2 block">
