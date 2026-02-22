@@ -4,12 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import { Theme } from '@radix-ui/themes'
 import { Home } from './Home'
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
-import { Theme } from '@radix-ui/themes'
-import { Home } from './Home'
-
 let mockAuthState = {
   user: null,
   isLoading: false,

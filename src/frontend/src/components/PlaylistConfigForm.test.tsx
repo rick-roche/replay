@@ -19,7 +19,7 @@ describe('PlaylistConfigForm', () => {
     localStorage.clear();
   });
 
-  it('should render the form with collapsed state by default', () => {
+  it('should render the form with expanded state by default', () => {
     render(
       <TestWrapper>
         <PlaylistConfigForm />
@@ -27,53 +27,39 @@ describe('PlaylistConfigForm', () => {
     );
 
     expect(screen.getByText('Configure Playlist Details')).toBeInTheDocument();
-    // Form should be collapsed by default, so description shouldn't be visible
-    expect(screen.queryByText('Give your playlist a memorable name')).not.toBeInTheDocument();
+    // Form should be expanded by default, so description should be visible
+    expect(screen.getByText('Give your playlist a memorable name')).toBeInTheDocument();
   });
 
-  it('should expand and show form fields when clicked', async () => {
-    const user = userEvent.setup();
+  it('should show form fields when expanded', () => {
     render(
       <TestWrapper>
         <PlaylistConfigForm />
       </TestWrapper>
     );
 
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    expect(button).toBeInTheDocument();
-
-    await user.click(button!);
-
-    // After expand, description should be visible
+    // Form is expanded by default
     expect(screen.getByText('Give your playlist a memorable name')).toBeInTheDocument();
     expect(screen.getByText('Describe what makes this playlist special (optional)')).toBeInTheDocument();
   });
 
-  it('should display default playlist name', async () => {
-    const user = userEvent.setup();
+  it('should display default playlist name', () => {
     render(
       <TestWrapper>
         <PlaylistConfigForm />
       </TestWrapper>
     );
-
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
 
     const nameInput = screen.getByPlaceholderText('My Re:Play Playlist') as HTMLInputElement;
     expect(nameInput.value).toBe('My Re:Play Playlist');
   });
 
-  it('should display default description', async () => {
-    const user = userEvent.setup();
+  it('should display default description', () => {
     render(
       <TestWrapper>
         <PlaylistConfigForm />
       </TestWrapper>
     );
-
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
 
     const descInput = screen.getByPlaceholderText('Created with Re:Play') as HTMLTextAreaElement;
     expect(descInput.value).toBe('Created with Re:Play');
@@ -86,9 +72,6 @@ describe('PlaylistConfigForm', () => {
         <PlaylistConfigForm />
       </TestWrapper>
     );
-
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
 
     const nameInput = screen.getByPlaceholderText('My Re:Play Playlist') as HTMLInputElement;
     await user.clear(nameInput);
@@ -105,9 +88,6 @@ describe('PlaylistConfigForm', () => {
       </TestWrapper>
     );
 
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
-
     const descInput = screen.getByPlaceholderText('Created with Re:Play') as HTMLTextAreaElement;
     await user.clear(descInput);
     await user.type(descInput, 'My favorite tracks from Last.fm');
@@ -115,16 +95,12 @@ describe('PlaylistConfigForm', () => {
     expect(descInput.value).toBe('My favorite tracks from Last.fm');
   });
 
-  it('should display public/private toggle with default private', async () => {
-    const user = userEvent.setup();
+  it('should display public/private toggle with default private', () => {
     render(
       <TestWrapper>
         <PlaylistConfigForm />
       </TestWrapper>
     );
-
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
 
     expect(screen.getByText('Private')).toBeInTheDocument();
     expect(screen.getByText(/Only you can see this playlist/)).toBeInTheDocument();
@@ -138,9 +114,6 @@ describe('PlaylistConfigForm', () => {
       </TestWrapper>
     );
 
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
-
     const toggle = screen.getByRole('switch');
     await user.click(toggle);
 
@@ -148,7 +121,7 @@ describe('PlaylistConfigForm', () => {
     expect(screen.getByText(/Anyone can see and follow this playlist/)).toBeInTheDocument();
   });
 
-  it('should collapse form when toggle button is clicked again', async () => {
+  it('should collapse form when toggle button is clicked', async () => {
     const user = userEvent.setup();
     render(
       <TestWrapper>
@@ -156,11 +129,10 @@ describe('PlaylistConfigForm', () => {
       </TestWrapper>
     );
 
-    const button = screen.getByText('Configure Playlist Details').closest('button');
-    await user.click(button!);
-
+    // Form is expanded by default
     expect(screen.getByText('Give your playlist a memorable name')).toBeInTheDocument();
 
+    const button = screen.getByText('Configure Playlist Details').closest('button');
     await user.click(button!);
 
     expect(screen.queryByText('Give your playlist a memorable name')).not.toBeInTheDocument();
