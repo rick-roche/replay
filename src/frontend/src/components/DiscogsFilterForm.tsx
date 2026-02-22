@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Select, TextField, Card, Heading, Flex, Box, Text } from '@radix-ui/themes'
 import { Sliders } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
@@ -6,24 +6,12 @@ import { useConfig } from '../contexts/ConfigContext'
 export function DiscogsFilterForm() {
   const { discogsFilter, updateDiscogsFilter } = useConfig()
   const [isExpanded, setIsExpanded] = useState(false)
-  const [minReleaseYearInput, setMinReleaseYearInput] = useState('')
-  const [maxReleaseYearInput, setMaxReleaseYearInput] = useState('')
-  const [minYearAddedInput, setMinYearAddedInput] = useState('')
-  const [maxYearAddedInput, setMaxYearAddedInput] = useState('')
+  const [minReleaseYearInput, setMinReleaseYearInput] = useState(discogsFilter.minReleaseYear?.toString() ?? '')
+  const [maxReleaseYearInput, setMaxReleaseYearInput] = useState(discogsFilter.maxReleaseYear?.toString() ?? '')
+  const [minYearAddedInput, setMinYearAddedInput] = useState(discogsFilter.minYearAdded?.toString() ?? '')
+  const [maxYearAddedInput, setMaxYearAddedInput] = useState(discogsFilter.maxYearAdded?.toString() ?? '')
 
   const currentYear = new Date().getFullYear()
-
-  useEffect(() => {
-    setMinReleaseYearInput(discogsFilter.minReleaseYear?.toString() ?? '')
-    setMaxReleaseYearInput(discogsFilter.maxReleaseYear?.toString() ?? '')
-    setMinYearAddedInput(discogsFilter.minYearAdded?.toString() ?? '')
-    setMaxYearAddedInput(discogsFilter.maxYearAdded?.toString() ?? '')
-  }, [
-    discogsFilter.minReleaseYear,
-    discogsFilter.maxReleaseYear,
-    discogsFilter.minYearAdded,
-    discogsFilter.maxYearAdded
-  ])
 
   const applyYearUpdate = (
     value: string,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Card, Heading, Flex, Box, Text, Spinner } from '@radix-ui/themes'
 import { AlertCircle, CheckCircle2, Download, PlusCircle } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
@@ -125,21 +125,21 @@ export function DataResults() {
   const { normalizedData, isLoading } = useData()
   const { matchedData, matchedAlbums, matchedArtists, isLoading: isMatching } = useMatch()
   const { selectedSource } = useDataSource()
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false)
+  const hasMatches = !!(matchedData || matchedAlbums || matchedArtists)
+  const [isCollapsed, setIsCollapsed] = useState(hasMatches && !isMatching)
+  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(hasMatches && !isMatching)
 
-  useEffect(() => {
-    if ((!matchedData && !matchedAlbums && !matchedArtists) || isMatching) {
-      setIsCollapsed(false)
-      setHasAutoCollapsed(false)
-      return
-    }
+  // Reset collapsed state when matches clear or matching is in progress
+  if (((!matchedData && !matchedAlbums && !matchedArtists) || isMatching) && isCollapsed) {
+    setIsCollapsed(false)
+    setHasAutoCollapsed(false)
+  }
 
-    if (!hasAutoCollapsed) {
-      setIsCollapsed(true)
-      setHasAutoCollapsed(true)
-    }
-  }, [matchedData, matchedAlbums, matchedArtists, isMatching, hasAutoCollapsed])
+  // Auto-collapse when matches appear for the first time
+  if (hasMatches && !isMatching && !hasAutoCollapsed) {
+    setIsCollapsed(true)
+    setHasAutoCollapsed(true)
+  }
 
   if (isLoading) {
     const sourceName =
