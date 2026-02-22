@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Card, Heading, Flex, Box, Text, Spinner } from '@radix-ui/themes'
 import { AlertCircle, CheckCircle2, Download, PlusCircle } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
@@ -125,21 +125,13 @@ export function DataResults() {
   const { normalizedData, isLoading } = useData()
   const { matchedData, matchedAlbums, matchedArtists, isLoading: isMatching } = useMatch()
   const { selectedSource } = useDataSource()
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false)
+  const [expandedByUser, setExpandedByUser] = useState(false)
 
-  useEffect(() => {
-    if ((!matchedData && !matchedAlbums && !matchedArtists) || isMatching) {
-      setIsCollapsed(false)
-      setHasAutoCollapsed(false)
-      return
-    }
-
-    if (!hasAutoCollapsed) {
-      setIsCollapsed(true)
-      setHasAutoCollapsed(true)
-    }
-  }, [matchedData, matchedAlbums, matchedArtists, isMatching, hasAutoCollapsed])
+  const hasMatches = !!(matchedData || matchedAlbums || matchedArtists)
+  // Derive collapsed state from props and user preference
+  // If user has toggled, respect their choice. Otherwise, auto-collapse when matches appear
+  const shouldAutoCollapse = hasMatches && !isMatching
+  const isCollapsed = !expandedByUser && shouldAutoCollapse
 
   if (isLoading) {
     const sourceName =
@@ -206,7 +198,7 @@ export function DataResults() {
           <Button
             variant="ghost"
             size="1"
-            onClick={() => setIsCollapsed((prev) => !prev)}
+            onClick={() => setExpandedByUser(!expandedByUser)}
           >
             {isCollapsed ? 'Show' : 'Hide'}
           </Button>

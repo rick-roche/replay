@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Music2, Disc3, ListMusic, Radio, LogOut, User as UserIcon } from 'lucide-react'
 import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section, Avatar, DropdownMenu, Spinner } from '@radix-ui/themes'
 import { useAuth } from './contexts/AuthContext'
@@ -32,18 +32,27 @@ function App() {
   const { selectedSource } = useDataSource()
   const { matchedData, matchedAlbums, matchedArtists } = useMatch()
   const { autoFetch } = useConfig()
-  const { markStepComplete, nextStep, completedSteps } = useWorkflow()
+  const { markStepComplete, nextStep, currentStep } = useWorkflow()
+  const hasAutoAdvancedRef = useRef(false)
 
-  // Handle workflow progression in response to completed steps
+  // Auto-advance to curate when fetch+match completes with results for the first time
   useEffect(() => {
-    if (completedSteps.has(WorkflowStep.FETCH_AND_MATCH)) {
-      // Auto-advance to curate step when fetch+match is complete
-      if (matchedData && matchedData.tracks && matchedData.tracks.length > 0) {
-        markStepComplete(WorkflowStep.FETCH_AND_MATCH)
-        nextStep()
-      }
+    const hasResults =
+      (matchedData && matchedData.tracks && matchedData.tracks.length > 0) ||
+      (matchedAlbums && matchedAlbums.albums && matchedAlbums.albums.length > 0) ||
+      (matchedArtists && matchedArtists.artists && matchedArtists.artists.length > 0)
+
+    if (hasResults && currentStep === WorkflowStep.FETCH_AND_MATCH && !hasAutoAdvancedRef.current) {
+      hasAutoAdvancedRef.current = true
+      markStepComplete(WorkflowStep.FETCH_AND_MATCH)
+      nextStep()
     }
-  }, [matchedData, completedSteps, nextStep, markStepComplete])
+
+    // Reset the ref if we go back to fetch+match step with no results
+    if (!hasResults && currentStep === WorkflowStep.FETCH_AND_MATCH) {
+      hasAutoAdvancedRef.current = false
+    }
+  }, [matchedData, matchedAlbums, matchedArtists, currentStep, markStepComplete, nextStep])
 
   // Handle workflow progression
   const handleSourceSelected = () => {

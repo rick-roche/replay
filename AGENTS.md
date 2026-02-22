@@ -26,6 +26,7 @@ Re:Play is a music-focused app with an Aspire app host, a .NET 10/C# 14 backend 
 - Regenerate frontend API client when API contract changes:
   - `cd src/frontend && npm run generate-client`
   - Updates `src/frontend/src/api/generated-client.ts`
+- **Frontend React patterns**: Use derived state instead of calling setState during render or in effect bodies. Compute state from props/other state (e.g., `const isCollapsed = !userToggled && shouldAutoCollapse`) rather than conditionally calling setState. Our eslint-plugin-react-hooks enforces this pattern—respect those linting rules.
 
 ## Ask First
 

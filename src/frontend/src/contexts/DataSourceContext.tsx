@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
 import { DataSource } from '../types/datasource'
 
 interface DataSourceContextValue {
@@ -11,16 +11,16 @@ const DataSourceContext = createContext<DataSourceContextValue | null>(null)
 
 const DATA_SOURCE_KEY = 'replay:selected_source'
 
-export function DataSourceProvider({ children }: { children: ReactNode }) {
-  const [selectedSource, setSelectedSource] = useState<DataSource | null>(null)
+function initializeSource(): DataSource | null {
+  const stored = localStorage.getItem(DATA_SOURCE_KEY)
+  if (stored && Object.values(DataSource).includes(stored as DataSource)) {
+    return stored as DataSource
+  }
+  return null
+}
 
-  // Load selected source from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(DATA_SOURCE_KEY)
-    if (stored && Object.values(DataSource).includes(stored as DataSource)) {
-      setSelectedSource(stored as DataSource)
-    }
-  }, [])
+export function DataSourceProvider({ children }: { children: ReactNode }) {
+  const [selectedSource, setSelectedSource] = useState<DataSource | null>(initializeSource)
 
   function selectSource(source: DataSource) {
     setSelectedSource(source)
