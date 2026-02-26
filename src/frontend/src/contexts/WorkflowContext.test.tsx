@@ -163,4 +163,58 @@ describe('WorkflowContext', () => {
 
     expect(result.current.currentStep).toBe(WorkflowStep.CREATE)
   })
+
+  it('should prevent navigation when locked', () => {
+    const { result } = renderHook(() => useWorkflow(), { wrapper })
+    
+    // Mark some steps as complete
+    act(() => {
+      result.current.markStepComplete(WorkflowStep.SELECT_SOURCE)
+      result.current.markStepComplete(WorkflowStep.CONFIGURE)
+      result.current.nextStep()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+    expect(result.current.canGoToStep(WorkflowStep.SELECT_SOURCE)).toBe(true)
+
+    // Lock the workflow
+    act(() => {
+      result.current.lockWorkflow()
+    })
+
+    // Should not be able to navigate to any step
+    expect(result.current.canGoToStep(WorkflowStep.SELECT_SOURCE)).toBe(false)
+    expect(result.current.canGoToStep(WorkflowStep.CONFIGURE)).toBe(false)
+    expect(result.current.canGoToStep(WorkflowStep.FETCH_AND_MATCH)).toBe(false)
+
+    // Try to navigate - should stay at current step
+    act(() => {
+      result.current.goToStep(WorkflowStep.SELECT_SOURCE)
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+  })
+
+  it('should unlock workflow when reset', () => {
+    const { result } = renderHook(() => useWorkflow(), { wrapper })
+    
+    // Navigate forward and lock
+    act(() => {
+      result.current.markStepComplete(WorkflowStep.SELECT_SOURCE)
+      result.current.nextStep()
+      result.current.lockWorkflow()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+    expect(result.current.canGoToStep(WorkflowStep.SELECT_SOURCE)).toBe(false)
+
+    // Reset workflow should unlock
+    act(() => {
+      result.current.resetWorkflow()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.SELECT_SOURCE)
+    expect(result.current.canGoToStep(WorkflowStep.CONFIGURE)).toBe(false) // Not completed
+    expect(result.current.completedSteps.size).toBe(0)
+  })
 })

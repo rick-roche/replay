@@ -56,7 +56,11 @@ export function PlaylistConfigForm() {
                   id="playlist-desc"
                   placeholder="Created with Re:Play"
                   value={config.description}
-                  onChange={(e) => updateDescription(e.target.value)}
+                  onChange={(e) => {
+                    // Strip line breaks to match Spotify's limitation
+                    const sanitized = e.target.value.replace(/[\r\n]+/g, ' ');
+                    updateDescription(sanitized);
+                  }}
                   className="w-full min-h-20"
                 />
                 <Text size="1" color="gray" mt="2">

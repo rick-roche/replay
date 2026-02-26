@@ -4,6 +4,7 @@ import { Button, Container, Flex, Heading, Text, Box, Card, Grid, Section } from
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDataSource } from '../contexts/DataSourceContext'
+import { useData } from '../contexts/DataContext'
 import { useMatch } from '../contexts/MatchContext'
 import { useConfig } from '../contexts/ConfigContext'
 import { useWorkflow, WorkflowStep } from '../contexts/WorkflowContext'
@@ -31,10 +32,20 @@ import { AdvancedOptions } from '../components/AdvancedOptions'
 export function Home() {
   const { user, isAuthenticated, login } = useAuth()
   const { selectedSource } = useDataSource()
-  const { matchedData, matchedAlbums, matchedArtists } = useMatch()
+  const { matchedData, matchedAlbums, matchedArtists, clearMatches } = useMatch()
+  const { clearData } = useData()
   const { autoFetch } = useConfig()
   const { markStepComplete, nextStep, currentStep } = useWorkflow()
   const hasAutoAdvancedRef = useRef(false)
+
+  // Clear matched and normalized data when navigating away from fetch+match
+  // so they don't persist when reconfiguring and fetching again
+  useEffect(() => {
+    if (currentStep !== WorkflowStep.FETCH_AND_MATCH && currentStep !== WorkflowStep.CURATE && currentStep !== WorkflowStep.CREATE) {
+      clearMatches()
+      clearData()
+    }
+  }, [currentStep, clearMatches, clearData])
 
   // Auto-advance to curate when fetch+match completes with results for the first time
   useEffect(() => {

@@ -1,9 +1,11 @@
 import React from 'react';
 import { Button, Box, Text, Flex } from '@radix-ui/themes';
 import { useCreatePlaylist } from '../contexts/CreatePlaylistContext';
+import { useWorkflow } from '../contexts/WorkflowContext';
 
 export const PlaylistConfirmation: React.FC = () => {
   const { playlistUrl, playlistId, clearPlaylist } = useCreatePlaylist();
+  const { resetWorkflow } = useWorkflow();
 
   if (!playlistUrl || !playlistId) {
     return null; // Only show if playlist was created
@@ -15,6 +17,7 @@ export const PlaylistConfirmation: React.FC = () => {
 
   const handleReset = () => {
     clearPlaylist();
+    resetWorkflow();
   };
 
   return (

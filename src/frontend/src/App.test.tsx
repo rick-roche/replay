@@ -47,7 +47,17 @@ vi.mock('./contexts/MatchContext', () => ({
   useMatch: vi.fn(() => ({
     matchedData: null,
     matchedAlbums: null,
-    matchedArtists: null
+    matchedArtists: null,
+    clearMatches: vi.fn()
+  }))
+}))
+
+vi.mock('./contexts/DataContext', () => ({
+  useData: vi.fn(() => ({
+    normalizedData: null,
+    isLoading: false,
+    error: null,
+    clearData: vi.fn()
   }))
 }))
 
@@ -67,7 +77,8 @@ vi.mock('./contexts/WorkflowContext', () => ({
     markStepComplete: vi.fn(),
     nextStep: vi.fn(),
     previousStep: vi.fn(),
-    resetWorkflow: vi.fn()
+    resetWorkflow: vi.fn(),
+    lockWorkflow: vi.fn()
   })),
   STEP_ORDER: ['select-source', 'configure', 'fetch-and-match', 'curate', 'create']
 }))

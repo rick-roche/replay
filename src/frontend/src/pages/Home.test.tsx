@@ -26,18 +26,27 @@ let mockWorkflowState = {
   markStepComplete: vi.fn(),
   nextStep: vi.fn(),
   previousStep: vi.fn(),
-  resetWorkflow: vi.fn()
+  resetWorkflow: vi.fn(),
+  lockWorkflow: vi.fn()
 }
 
 let mockMatchState = {
   matchedData: null,
   matchedAlbums: null,
-  matchedArtists: null
+  matchedArtists: null,
+  clearMatches: vi.fn()
 }
 
 let mockConfigState = {
   autoFetch: false,
   setAutoFetch: vi.fn()
+}
+
+let mockDataState = {
+  normalizedData: null,
+  isLoading: false,
+  error: null,
+  clearData: vi.fn()
 }
 
 beforeEach(() => {
@@ -67,18 +76,27 @@ beforeEach(() => {
     markStepComplete: vi.fn(),
     nextStep: vi.fn(),
     previousStep: vi.fn(),
-    resetWorkflow: vi.fn()
+    resetWorkflow: vi.fn(),
+    lockWorkflow: vi.fn()
   }
   
   mockMatchState = {
     matchedData: null,
     matchedAlbums: null,
-    matchedArtists: null
+    matchedArtists: null,
+    clearMatches: vi.fn()
   }
   
   mockConfigState = {
     autoFetch: false,
     setAutoFetch: vi.fn()
+  }
+  
+  mockDataState = {
+    normalizedData: null,
+    isLoading: false,
+    error: null,
+    clearData: vi.fn()
   }
 })
 
@@ -93,6 +111,10 @@ vi.mock('../contexts/DataSourceContext', () => ({
 
 vi.mock('../contexts/ConfigContext', () => ({
   useConfig: () => mockConfigState
+}))
+
+vi.mock('../contexts/DataContext', () => ({
+  useData: () => mockDataState
 }))
 
 vi.mock('../contexts/MatchContext', () => ({

@@ -5,13 +5,16 @@ import { CreatePlaylistButton } from '@/components/CreatePlaylistButton'
 import { PlaylistProvider } from '@/contexts/PlaylistContext'
 import { MatchProvider } from '@/contexts/MatchContext'
 import { CreatePlaylistProvider } from '@/contexts/CreatePlaylistContext'
+import { WorkflowProvider } from '@/contexts/WorkflowContext'
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
     <Theme>
       <PlaylistProvider>
         <MatchProvider>
-          <CreatePlaylistProvider>{children}</CreatePlaylistProvider>
+          <CreatePlaylistProvider>
+            <WorkflowProvider>{children}</WorkflowProvider>
+          </CreatePlaylistProvider>
         </MatchProvider>
       </PlaylistProvider>
     </Theme>
