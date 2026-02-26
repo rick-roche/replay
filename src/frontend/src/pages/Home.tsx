@@ -34,24 +34,18 @@ export function Home() {
   const { selectedSource } = useDataSource()
   const { matchedData, matchedAlbums, matchedArtists, clearMatches } = useMatch()
   const { clearData } = useData()
-  const clearDataRef = useRef(clearData)
   const { autoFetch } = useConfig()
   const { markStepComplete, nextStep, currentStep } = useWorkflow()
   const hasAutoAdvancedRef = useRef(false)
-
-  // Keep a stable reference to the latest clearData implementation
-  useEffect(() => {
-    clearDataRef.current = clearData
-  }, [clearData])
 
   // Clear matched and normalized data when navigating away from fetch+match
   // so they don't persist when reconfiguring and fetching again
   useEffect(() => {
     if (currentStep !== WorkflowStep.FETCH_AND_MATCH && currentStep !== WorkflowStep.CURATE && currentStep !== WorkflowStep.CREATE) {
       clearMatches()
-      clearDataRef.current()
+      clearData()
     }
-  }, [currentStep, clearMatches])
+  }, [currentStep, clearMatches, clearData])
 
   // Auto-advance to curate when fetch+match completes with results for the first time
   useEffect(() => {
