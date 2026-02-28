@@ -57,7 +57,8 @@ vi.mock('./contexts/DataContext', () => ({
     normalizedData: null,
     isLoading: false,
     error: null,
-    clearData: vi.fn()
+    clearData: vi.fn(),
+    clearError: vi.fn()
   }))
 }))
 
