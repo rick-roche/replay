@@ -38,10 +38,10 @@ export function Home() {
   const { markStepComplete, nextStep, currentStep } = useWorkflow()
   const hasAutoAdvancedRef = useRef(false)
 
-  // Clear matched and normalized data when navigating away from fetch+match
+  // Clear matched and normalized data when back in early workflow steps
   // so they don't persist when reconfiguring and fetching again
   useEffect(() => {
-    if (currentStep !== WorkflowStep.FETCH_AND_MATCH && currentStep !== WorkflowStep.CURATE && currentStep !== WorkflowStep.CREATE) {
+    if (currentStep === WorkflowStep.SELECT_SOURCE || currentStep === WorkflowStep.CONFIGURE) {
       clearMatches()
       clearData()
     }

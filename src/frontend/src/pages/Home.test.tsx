@@ -362,4 +362,51 @@ describe('Home', () => {
 
     expect(screen.getByText('Create Playlist')).toBeInTheDocument()
   })
+
+  it('should call clearMatches and clearData when navigating to SELECT_SOURCE step', () => {
+    mockAuthState.isAuthenticated = true
+    mockAuthState.user = { displayName: 'TestUser', imageUrl: null }
+    mockWorkflowState.currentStep = 'select-source'
+    
+    render(
+      <TestWrapper>
+        <Home />
+      </TestWrapper>
+    )
+
+    expect(mockMatchState.clearMatches).toHaveBeenCalled()
+    expect(mockDataState.clearData).toHaveBeenCalled()
+  })
+
+  it('should call clearMatches and clearData when navigating to CONFIGURE step', () => {
+    mockAuthState.isAuthenticated = true
+    mockAuthState.user = { displayName: 'TestUser', imageUrl: null }
+    mockWorkflowState.currentStep = 'configure'
+    mockDataSourceState.selectedSource = 'lastfm'
+    
+    render(
+      <TestWrapper>
+        <Home />
+      </TestWrapper>
+    )
+
+    expect(mockMatchState.clearMatches).toHaveBeenCalled()
+    expect(mockDataState.clearData).toHaveBeenCalled()
+  })
+
+  it('should not call clearMatches and clearData when in FETCH_AND_MATCH step', () => {
+    mockAuthState.isAuthenticated = true
+    mockAuthState.user = { displayName: 'TestUser', imageUrl: null }
+    mockWorkflowState.currentStep = 'fetch-and-match'
+    mockDataSourceState.selectedSource = 'lastfm'
+    
+    render(
+      <TestWrapper>
+        <Home />
+      </TestWrapper>
+    )
+
+    expect(mockMatchState.clearMatches).not.toHaveBeenCalled()
+    expect(mockDataState.clearData).not.toHaveBeenCalled()
+  })
 })
