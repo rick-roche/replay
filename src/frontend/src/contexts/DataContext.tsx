@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
 import { sourcesApi } from '../api/sources'
 import type { DiscogsFilter } from '../types/discogs'
@@ -161,13 +161,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function clearData() {
+  const clearData = useCallback(() => {
     setNormalizedData(null)
-  }
+  }, [])
 
-  function clearError() {
+  const clearError = useCallback(() => {
     setError(null)
-  }
+  }, [])
 
   const value: DataContextValue = {
     normalizedData,

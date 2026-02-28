@@ -26,18 +26,28 @@ let mockWorkflowState = {
   markStepComplete: vi.fn(),
   nextStep: vi.fn(),
   previousStep: vi.fn(),
-  resetWorkflow: vi.fn()
+  resetWorkflow: vi.fn(),
+  lockWorkflow: vi.fn()
 }
 
 let mockMatchState = {
   matchedData: null,
   matchedAlbums: null,
-  matchedArtists: null
+  matchedArtists: null,
+  clearMatches: vi.fn()
 }
 
 let mockConfigState = {
   autoFetch: false,
   setAutoFetch: vi.fn()
+}
+
+let mockDataState = {
+  normalizedData: null,
+  isLoading: false,
+  error: null,
+  clearData: vi.fn(),
+  clearError: vi.fn()
 }
 
 beforeEach(() => {
@@ -67,18 +77,28 @@ beforeEach(() => {
     markStepComplete: vi.fn(),
     nextStep: vi.fn(),
     previousStep: vi.fn(),
-    resetWorkflow: vi.fn()
+    resetWorkflow: vi.fn(),
+    lockWorkflow: vi.fn()
   }
   
   mockMatchState = {
     matchedData: null,
     matchedAlbums: null,
-    matchedArtists: null
+    matchedArtists: null,
+    clearMatches: vi.fn()
   }
   
   mockConfigState = {
     autoFetch: false,
     setAutoFetch: vi.fn()
+  }
+  
+  mockDataState = {
+    normalizedData: null,
+    isLoading: false,
+    error: null,
+    clearData: vi.fn(),
+    clearError: vi.fn()
   }
 })
 
@@ -93,6 +113,10 @@ vi.mock('../contexts/DataSourceContext', () => ({
 
 vi.mock('../contexts/ConfigContext', () => ({
   useConfig: () => mockConfigState
+}))
+
+vi.mock('../contexts/DataContext', () => ({
+  useData: () => mockDataState
 }))
 
 vi.mock('../contexts/MatchContext', () => ({
@@ -339,5 +363,55 @@ describe('Home', () => {
     )
 
     expect(screen.getByText('Create Playlist')).toBeInTheDocument()
+  })
+
+  it('should call clearMatches and clearData when navigating to SELECT_SOURCE step', () => {
+    mockAuthState.isAuthenticated = true
+    mockAuthState.user = { displayName: 'TestUser', imageUrl: null }
+    mockWorkflowState.currentStep = 'select-source'
+    
+    render(
+      <TestWrapper>
+        <Home />
+      </TestWrapper>
+    )
+
+    expect(mockMatchState.clearMatches).toHaveBeenCalled()
+    expect(mockDataState.clearData).toHaveBeenCalled()
+    expect(mockDataState.clearError).toHaveBeenCalled()
+  })
+
+  it('should call clearMatches and clearData when navigating to CONFIGURE step', () => {
+    mockAuthState.isAuthenticated = true
+    mockAuthState.user = { displayName: 'TestUser', imageUrl: null }
+    mockWorkflowState.currentStep = 'configure'
+    mockDataSourceState.selectedSource = 'lastfm'
+    
+    render(
+      <TestWrapper>
+        <Home />
+      </TestWrapper>
+    )
+
+    expect(mockMatchState.clearMatches).toHaveBeenCalled()
+    expect(mockDataState.clearData).toHaveBeenCalled()
+    expect(mockDataState.clearError).toHaveBeenCalled()
+  })
+
+  it('should not call clearMatches and clearData when in FETCH_AND_MATCH step', () => {
+    mockAuthState.isAuthenticated = true
+    mockAuthState.user = { displayName: 'TestUser', imageUrl: null }
+    mockWorkflowState.currentStep = 'fetch-and-match'
+    mockDataSourceState.selectedSource = 'lastfm'
+    
+    render(
+      <TestWrapper>
+        <Home />
+      </TestWrapper>
+    )
+
+    expect(mockMatchState.clearMatches).not.toHaveBeenCalled()
+    expect(mockDataState.clearData).not.toHaveBeenCalled()
+    expect(mockDataState.clearError).not.toHaveBeenCalled()
   })
 })

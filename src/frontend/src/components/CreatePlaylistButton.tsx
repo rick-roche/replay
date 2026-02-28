@@ -3,11 +3,13 @@ import { Button, Box, Flex, Text } from '@radix-ui/themes';
 import { useCreatePlaylist } from '../contexts/CreatePlaylistContext';
 import { usePlaylist } from '../contexts/PlaylistContext';
 import { useMatch } from '../contexts/MatchContext';
+import { useWorkflow } from '../contexts/WorkflowContext';
 
 export const CreatePlaylistButton: React.FC = () => {
   const { createPlaylist, isCreating, error } = useCreatePlaylist();
   const { config } = usePlaylist();
   const { matchedData } = useMatch();
+  const { lockWorkflow } = useWorkflow();
   const [localError, setLocalError] = useState<string | null>(null);
 
   if (!matchedData?.tracks || matchedData.tracks.length === 0) {
@@ -35,6 +37,8 @@ export const CreatePlaylistButton: React.FC = () => {
 
     try {
       await createPlaylist(trackUris, config.name, config.description, config.isPublic);
+      // Lock workflow navigation after successful playlist creation
+      lockWorkflow();
     } catch {
       // Error is already set in the context
     }

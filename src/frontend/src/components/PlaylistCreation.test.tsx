@@ -7,6 +7,7 @@ import { PlaylistConfirmation } from '@/components/PlaylistConfirmation';
 import { CreatePlaylistProvider, useCreatePlaylist } from '@/contexts/CreatePlaylistContext';
 import { PlaylistProvider } from '@/contexts/PlaylistContext';
 import { MatchProvider } from '@/contexts/MatchContext';
+import { WorkflowProvider } from '@/contexts/WorkflowContext';
 import { Theme } from '@radix-ui/themes';
 
 // Mock the match API
@@ -22,7 +23,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <CreatePlaylistProvider>
       <PlaylistProvider>
         <MatchProvider>
-          {children}
+          <WorkflowProvider>
+            {children}
+          </WorkflowProvider>
         </MatchProvider>
       </PlaylistProvider>
     </CreatePlaylistProvider>

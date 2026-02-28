@@ -19,6 +19,7 @@ interface WorkflowContextValue {
   canGoToStep: (step: WorkflowStep) => boolean
   completedSteps: Set<WorkflowStep>
   markStepComplete: (step: WorkflowStep) => void
+  lockWorkflow: () => void
 }
 
 const WorkflowContext = createContext<WorkflowContextValue | null>(null)
@@ -34,12 +35,18 @@ const STEP_ORDER: WorkflowStep[] = [
 export function WorkflowProvider({ children }: { children: ReactNode }) {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>(WorkflowStep.SELECT_SOURCE)
   const [completedSteps, setCompletedSteps] = useState<Set<WorkflowStep>>(new Set())
+  const [isLocked, setIsLocked] = useState(false)
 
   const getCurrentStepIndex = useCallback(() => {
     return STEP_ORDER.indexOf(currentStep)
   }, [currentStep])
 
   const canGoToStep = useCallback((step: WorkflowStep) => {
+    // Cannot navigate if workflow is locked
+    if (isLocked) {
+      return false
+    }
+    
     // Can always go to a completed step or the current step
     if (completedSteps.has(step) || step === currentStep) {
       return true
@@ -55,7 +62,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     
     // If all previous steps are completed, can go to this step
     return true
-  }, [completedSteps, currentStep])
+  }, [completedSteps, currentStep, isLocked])
 
   const goToStep = useCallback((step: WorkflowStep) => {
     if (canGoToStep(step)) {
@@ -64,28 +71,39 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   }, [canGoToStep])
 
   const nextStep = useCallback(() => {
+    if (isLocked) {
+      return
+    }
     const currentIndex = getCurrentStepIndex()
     if (currentIndex < STEP_ORDER.length - 1) {
       const nextStep = STEP_ORDER[currentIndex + 1]!
       setCurrentStep(nextStep)
     }
-  }, [getCurrentStepIndex])
+  }, [getCurrentStepIndex, isLocked])
 
   const previousStep = useCallback(() => {
+    if (isLocked) {
+      return
+    }
     const currentIndex = getCurrentStepIndex()
     if (currentIndex > 0) {
       const prevStep = STEP_ORDER[currentIndex - 1]!
       setCurrentStep(prevStep)
     }
-  }, [getCurrentStepIndex])
+  }, [getCurrentStepIndex, isLocked])
 
   const resetWorkflow = useCallback(() => {
     setCurrentStep(WorkflowStep.SELECT_SOURCE)
     setCompletedSteps(new Set())
+    setIsLocked(false)
   }, [])
 
   const markStepComplete = useCallback((step: WorkflowStep) => {
     setCompletedSteps(prev => new Set([...prev, step]))
+  }, [])
+
+  const lockWorkflow = useCallback(() => {
+    setIsLocked(true)
   }, [])
 
   const value: WorkflowContextValue = {
@@ -96,7 +114,8 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     resetWorkflow,
     canGoToStep,
     completedSteps,
-    markStepComplete
+    markStepComplete,
+    lockWorkflow
   }
 
   return <WorkflowContext.Provider value={value}>{children}</WorkflowContext.Provider>

@@ -51,7 +51,17 @@ public static class PlaylistEndpoints
                 "Playlist name is required and cannot be empty.");
         }
 
-        if (request.TrackUris == null || request.TrackUris.Count == 0)
+        // Sanitize description by removing line breaks (Spotify limitation)
+        var sanitizedDescription = request.Description is not null
+            ? System.Text.RegularExpressions.Regex.Replace(request.Description, @"[\r\n]+", " ")
+            : null;
+
+        // Create sanitized request if description was modified
+        var sanitizedRequest = sanitizedDescription != request.Description
+            ? request with { Description = sanitizedDescription }
+            : request;
+
+        if (sanitizedRequest.TrackUris == null || sanitizedRequest.TrackUris.Count == 0)
         {
             return ApiErrorExtensions.BadRequest(
                 "INVALID_TRACKS",
@@ -59,7 +69,7 @@ public static class PlaylistEndpoints
         }
 
         // Validate all track URIs have correct format
-        foreach (var uri in request.TrackUris)
+        foreach (var uri in sanitizedRequest.TrackUris)
         {
             if (!uri.StartsWith("spotify:track:", StringComparison.Ordinal))
             {
@@ -109,7 +119,7 @@ public static class PlaylistEndpoints
         try
         {
             var response = await matchingService.CreatePlaylistAsync(
-                request,
+                sanitizedRequest,
                 accessToken,
                 userId,
                 cancellationToken);
