@@ -71,20 +71,26 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   }, [canGoToStep])
 
   const nextStep = useCallback(() => {
+    if (isLocked) {
+      return
+    }
     const currentIndex = getCurrentStepIndex()
     if (currentIndex < STEP_ORDER.length - 1) {
       const nextStep = STEP_ORDER[currentIndex + 1]!
       setCurrentStep(nextStep)
     }
-  }, [getCurrentStepIndex])
+  }, [getCurrentStepIndex, isLocked])
 
   const previousStep = useCallback(() => {
+    if (isLocked) {
+      return
+    }
     const currentIndex = getCurrentStepIndex()
     if (currentIndex > 0) {
       const prevStep = STEP_ORDER[currentIndex - 1]!
       setCurrentStep(prevStep)
     }
-  }, [getCurrentStepIndex])
+  }, [getCurrentStepIndex, isLocked])
 
   const resetWorkflow = useCallback(() => {
     setCurrentStep(WorkflowStep.SELECT_SOURCE)

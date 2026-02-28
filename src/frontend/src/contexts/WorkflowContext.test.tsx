@@ -217,4 +217,53 @@ describe('WorkflowContext', () => {
     expect(result.current.canGoToStep(WorkflowStep.CONFIGURE)).toBe(false) // Not completed
     expect(result.current.completedSteps.size).toBe(0)
   })
+
+  it('should prevent nextStep when locked', () => {
+    const { result } = renderHook(() => useWorkflow(), { wrapper })
+    
+    // Navigate forward
+    act(() => {
+      result.current.markStepComplete(WorkflowStep.SELECT_SOURCE)
+      result.current.nextStep()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+
+    // Lock workflow
+    act(() => {
+      result.current.lockWorkflow()
+    })
+
+    // Try to advance - should be no-op
+    act(() => {
+      result.current.markStepComplete(WorkflowStep.CONFIGURE)
+      result.current.nextStep()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+  })
+
+  it('should prevent previousStep when locked', () => {
+    const { result } = renderHook(() => useWorkflow(), { wrapper })
+    
+    // Navigate forward
+    act(() => {
+      result.current.markStepComplete(WorkflowStep.SELECT_SOURCE)
+      result.current.nextStep()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+
+    // Lock workflow
+    act(() => {
+      result.current.lockWorkflow()
+    })
+
+    // Try to go back - should be no-op
+    act(() => {
+      result.current.previousStep()
+    })
+
+    expect(result.current.currentStep).toBe(WorkflowStep.CONFIGURE)
+  })
 })

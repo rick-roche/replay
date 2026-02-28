@@ -33,7 +33,7 @@ export function Home() {
   const { user, isAuthenticated, login } = useAuth()
   const { selectedSource } = useDataSource()
   const { matchedData, matchedAlbums, matchedArtists, clearMatches } = useMatch()
-  const { clearData } = useData()
+  const { clearData, clearError } = useData()
   const { autoFetch } = useConfig()
   const { markStepComplete, nextStep, currentStep } = useWorkflow()
   const hasAutoAdvancedRef = useRef(false)
@@ -44,8 +44,9 @@ export function Home() {
     if (currentStep === WorkflowStep.SELECT_SOURCE || currentStep === WorkflowStep.CONFIGURE) {
       clearMatches()
       clearData()
+      clearError()
     }
-  }, [currentStep, clearMatches, clearData])
+  }, [currentStep, clearMatches, clearData, clearError])
 
   // Auto-advance to curate when fetch+match completes with results for the first time
   useEffect(() => {

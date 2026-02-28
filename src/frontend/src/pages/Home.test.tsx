@@ -46,7 +46,8 @@ let mockDataState = {
   normalizedData: null,
   isLoading: false,
   error: null,
-  clearData: vi.fn()
+  clearData: vi.fn(),
+  clearError: vi.fn()
 }
 
 beforeEach(() => {
@@ -96,7 +97,8 @@ beforeEach(() => {
     normalizedData: null,
     isLoading: false,
     error: null,
-    clearData: vi.fn()
+    clearData: vi.fn(),
+    clearError: vi.fn()
   }
 })
 
@@ -376,6 +378,7 @@ describe('Home', () => {
 
     expect(mockMatchState.clearMatches).toHaveBeenCalled()
     expect(mockDataState.clearData).toHaveBeenCalled()
+    expect(mockDataState.clearError).toHaveBeenCalled()
   })
 
   it('should call clearMatches and clearData when navigating to CONFIGURE step', () => {
@@ -392,6 +395,7 @@ describe('Home', () => {
 
     expect(mockMatchState.clearMatches).toHaveBeenCalled()
     expect(mockDataState.clearData).toHaveBeenCalled()
+    expect(mockDataState.clearError).toHaveBeenCalled()
   })
 
   it('should not call clearMatches and clearData when in FETCH_AND_MATCH step', () => {
@@ -408,5 +412,6 @@ describe('Home', () => {
 
     expect(mockMatchState.clearMatches).not.toHaveBeenCalled()
     expect(mockDataState.clearData).not.toHaveBeenCalled()
+    expect(mockDataState.clearError).not.toHaveBeenCalled()
   })
 })
