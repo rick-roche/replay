@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "src/RePlay.AppHost/RePlay.AppHost.csproj"
+  }
+}

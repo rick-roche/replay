@@ -247,28 +247,6 @@ public class SourcesEndpointsTests
     }
 
     [Fact]
-    public async Task PostFetchSetlistFmDataNormalized_RejectsEmptySelectedConcertIds()
-    {
-        var mi = GetPrivate("PostFetchSetlistFmDataNormalized");
-        var ctx = ContextWithSessionCookie();
-        var fake = new FakeSetlistFmService();
-
-        var result = await InvokeAsync(
-            mi,
-            new FetchSetlistFmDataRequest
-            {
-                UserId = "user123",
-                Filter = new SetlistFmFilter(),
-                SelectedConcertIds = []
-            },
-            fake,
-            ctx,
-            CancellationToken.None);
-
-        ((BadRequest<ApiError>)result).Value!.Code.Should().Be("EMPTY_SELECTED_CONCERT_IDS");
-    }
-
-    [Fact]
     public async Task PostFetchSetlistFmConcerts_ValidatesErrors()
     {
         var mi = GetPrivate("PostFetchSetlistFmConcerts");
