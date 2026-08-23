@@ -164,6 +164,17 @@ public sealed class SetlistFmServiceTests
     }
 
     [Fact]
+    public async Task GetUserConcertsAsync_RejectsEmptySelectedConcertIds()
+    {
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { MaxConcerts = 2 },
+                []))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
     public async Task GetUserConcertsAsync_RejectsInvalidFilterBoundsAndDates()
     {
         await FluentActions.Invoking(() => _service.GetUserConcertsAsync(

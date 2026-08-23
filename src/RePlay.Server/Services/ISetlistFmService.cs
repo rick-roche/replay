@@ -134,6 +134,11 @@ public sealed class SetlistFmService : ISetlistFmService
 
         var maxConcerts = GetBoundedLimit(filter.MaxConcerts, 10, MaximumConcerts, nameof(filter.MaxConcerts));
         var maxTracks = GetBoundedLimit(filter.MaxTracks, 100, MaximumTracks, nameof(filter.MaxTracks));
+        if (selectedConcertIds is { Count: 0 })
+        {
+            throw new ArgumentException("Selected concert IDs must not be empty when provided", nameof(selectedConcertIds));
+        }
+
         var hasSelectedConcerts = selectedConcertIds is { Count: > 0 };
         var (startDate, endDate) = ParseDateRange(filter);
 

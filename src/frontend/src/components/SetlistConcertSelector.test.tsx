@@ -101,6 +101,26 @@ describe('SetlistConcertSelector', () => {
     expect(setSelectedSetlistConcertIdsMock).toHaveBeenCalledWith('user123', ['c1'])
   })
 
+  it('tracks concert selections case-insensitively', async () => {
+    const user = userEvent.setup()
+    selectedConcertIds = ['C1']
+    setlistConcertsPage = {
+      concerts: [{ id: 'c1', artist: 'Band A' }],
+      totalConcerts: 1,
+      pageNumber: 1,
+      pageSize: 20,
+      hasNextPage: false,
+      hasPreviousPage: false
+    }
+
+    renderComponent()
+
+    const checkbox = screen.getByRole('checkbox', { name: /Include concert Band A/i })
+    expect(checkbox).toBeChecked()
+    await user.click(checkbox)
+    expect(setSelectedSetlistConcertIdsMock).toHaveBeenCalledWith('user123', [])
+  })
+
   it('supports select page and clear all actions', async () => {
     const user = userEvent.setup()
     selectedConcertIds = ['c-existing']

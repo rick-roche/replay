@@ -57,9 +57,17 @@ export function SetlistConcertSelector({
 
   const selectPageConcerts = () => {
     const pageIds = concerts.map((concert) => concert.id).filter(Boolean)
-    const nextIds = new Set(selectedIds)
-    pageIds.slice(0, Math.max(0, maxConcerts - nextIds.size)).forEach((id) => nextIds.add(id))
-    setSelectedSetlistConcertIds(userId, Array.from(nextIds))
+    const nextIds = [...selectedIds]
+    const nextIdSet = new Set(selectedIds.map((id) => id.toLowerCase()))
+    for (const id of pageIds) {
+      const normalizedId = id.toLowerCase()
+      if (nextIds.length >= maxConcerts || nextIdSet.has(normalizedId)) continue
+
+      nextIds.push(id)
+      nextIdSet.add(normalizedId)
+    }
+
+    setSelectedSetlistConcertIds(userId, nextIds)
   }
 
   const handleRefresh = () => {

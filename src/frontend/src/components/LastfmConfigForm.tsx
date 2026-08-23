@@ -34,7 +34,7 @@ export function LastfmConfigForm() {
                 {lastfmConfig.username}
               </Text>
               <Text size="1" color="gray">
-                {lastfmConfig.playCount.toLocaleString('en-US')} total scrobbles
+                {lastfmConfig.playCount.toLocaleString()} total scrobbles
               </Text>
               {lastfmConfig.profileUrl && (
                 <Text size="1" color="gray">
