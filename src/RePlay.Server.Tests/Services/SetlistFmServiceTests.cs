@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using RePlay.Server.Configuration;
+using RePlay.Server.Models;
 using RePlay.Server.Services;
 using System.Net;
 
@@ -105,6 +106,97 @@ public sealed class SetlistFmServiceTests
         await FluentActions.Invoking(() => _service.GetUserAsync(""))
             .Should()
             .ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task GetUserConcertsAsync_FetchesSelectedConcertsDirectly_AndHonorsTrackLimit()
+    {
+        var setlistPayload = """
+            {
+              "id": "concert-1",
+              "eventDate": "20-01-2024",
+              "artist": { "name": "Example Artist" },
+              "sets": {
+                "set": [{
+                  "song": [{ "name": "First Song" }, { "name": "Second Song" }]
+                }]
+              }
+            }
+            """;
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(setlistPayload) });
+
+        var result = await _service.GetUserConcertsAsync(
+            "exampleUser",
+            new SetlistFmFilter { MaxConcerts = 2, MaxTracks = 1 },
+            ["concert-1"]);
+
+        result.Concerts.Should().ContainSingle(concert => concert.Id == "concert-1");
+        result.Tracks.Should().ContainSingle(track => track.Name == "First Song");
+    }
+
+    [Fact]
+    public async Task GetUserConcertsAsync_RejectsSelectionsBeyondConfiguredConcertLimit()
+    {
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { MaxConcerts = 1 },
+                ["concert-1", "concert-2"]))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task GetUserConcertsAsync_RejectsDuplicateOrBlankSelectedConcertIds()
+    {
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { MaxConcerts = 2 },
+                ["concert-1", "CONCERT-1"]))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { MaxConcerts = 2 },
+                ["concert-1", " "]))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task GetUserConcertsAsync_RejectsInvalidFilterBoundsAndDates()
+    {
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { MaxTracks = 501 }))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { StartDate = "20-01-2024" }))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { StartDate = "2024-02-01", EndDate = "2024-01-01" }))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task GetUserConcertsPageAsync_ThrowsWhenProviderRequestFails()
+    {
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsPageAsync(
+                "exampleUser",
+                new SetlistFmFilter(),
+                pageNumber: 1,
+                pageSize: 20))
+            .Should()
+            .ThrowAsync<HttpRequestException>();
     }
 
     private sealed class TestHttpMessageHandler : HttpMessageHandler

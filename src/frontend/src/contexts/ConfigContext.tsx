@@ -8,6 +8,7 @@ type ConfigureDiscogsResponse = components['schemas']['ConfigureDiscogsResponse'
 type ConfigureSetlistResponse = components['schemas']['ConfigureSetlistResponse']
 type LastfmFilter = components['schemas']['LastfmFilter']
 type SetlistFmFilter = components['schemas']['SetlistFmFilter']
+type SetlistFmFetchMode = 'quick' | 'selectConcerts'
 
 interface ConfigContextValue {
   lastfmConfig: ConfigureLastfmResponse | null
@@ -16,6 +17,7 @@ interface ConfigContextValue {
   lastfmFilter: LastfmFilter
   discogsFilter: DiscogsFilter
   setlistFmFilter: SetlistFmFilter
+  setlistFmFetchMode: SetlistFmFetchMode
   isLoading: boolean
   error: string | null
   autoFetch: boolean
@@ -25,6 +27,10 @@ interface ConfigContextValue {
   updateFilter: (updates: Partial<LastfmFilter>) => void
   updateDiscogsFilter: (updates: Partial<DiscogsFilter>) => void
   updateSetlistFmFilter: (updates: Partial<SetlistFmFilter>) => void
+  setSetlistFmFetchMode: (mode: SetlistFmFetchMode) => void
+  getSelectedSetlistConcertIds: (userId: string) => string[]
+  setSelectedSetlistConcertIds: (userId: string, concertIds: string[]) => void
+  clearSelectedSetlistConcertIds: (userId: string) => void
   setAutoFetch: (value: boolean) => void
   clearError: () => void
 }
@@ -37,6 +43,8 @@ const SETLIST_CONFIG_KEY = 'replay:setlist_config'
 const LASTFM_FILTER_KEY = 'replay:lastfm_filter'
 const DISCOGS_FILTER_KEY = 'replay:discogs_filter'
 const SETLISTFM_FILTER_KEY = 'replay:setlistfm_filter'
+const SETLISTFM_FETCH_MODE_KEY = 'replay:setlistfm_fetch_mode'
+const SETLISTFM_SELECTED_CONCERTS_KEY = 'replay:setlistfm_selected_concerts'
 
 const DEFAULT_FILTER: LastfmFilter = {
   dataType: 'Tracks',
@@ -60,6 +68,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(DEFAULT_FILTER)
   const [discogsFilter, setDiscogsFilter] = useState<DiscogsFilter>(DEFAULT_DISCOGS_FILTER)
   const [setlistFmFilter, setSetlistFmFilter] = useState<SetlistFmFilter>(DEFAULT_SETLISTFM_FILTER)
+  const [setlistFmFetchMode, setSetlistFmFetchModeState] = useState<SetlistFmFetchMode>('quick')
+  const [selectedSetlistConcertIdsByUser, setSelectedSetlistConcertIdsByUser] = useState<Record<string, string[]>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [autoFetch, setAutoFetchState] = useState(true)
@@ -117,6 +127,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setSetlistFmFilter(JSON.parse(storedSetlistFmFilter))
       } catch {
         localStorage.removeItem(SETLISTFM_FILTER_KEY)
+      }
+    }
+
+    const storedSetlistFmFetchMode = localStorage.getItem(SETLISTFM_FETCH_MODE_KEY)
+    if (storedSetlistFmFetchMode === 'quick' || storedSetlistFmFetchMode === 'selectConcerts') {
+      setSetlistFmFetchModeState(storedSetlistFmFetchMode)
+    }
+
+    const storedSelectedConcerts = localStorage.getItem(SETLISTFM_SELECTED_CONCERTS_KEY)
+    if (storedSelectedConcerts) {
+      try {
+        const parsed: unknown = JSON.parse(storedSelectedConcerts)
+        if (!isSelectedConcertsByUser(parsed)) {
+          throw new Error('Invalid selected concert storage')
+        }
+        setSelectedSetlistConcertIdsByUser(parsed)
+      } catch {
+        localStorage.removeItem(SETLISTFM_SELECTED_CONCERTS_KEY)
       }
     }
   }, [])
@@ -185,6 +213,37 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(SETLISTFM_FILTER_KEY, JSON.stringify(newFilter))
   }
 
+  function setSetlistFmFetchMode(mode: SetlistFmFetchMode) {
+    setSetlistFmFetchModeState(mode)
+    localStorage.setItem(SETLISTFM_FETCH_MODE_KEY, mode)
+  }
+
+  function getSelectedSetlistConcertIds(userId: string): string[] {
+    return selectedSetlistConcertIdsByUser[userId] ?? []
+  }
+
+  function setSelectedSetlistConcertIds(userId: string, concertIds: string[]) {
+    const deduped = Array.from(new Set(concertIds.filter((concertId) => concertId.trim().length > 0)))
+    const next = {
+      ...selectedSetlistConcertIdsByUser,
+      [userId]: deduped
+    }
+
+    setSelectedSetlistConcertIdsByUser(next)
+    localStorage.setItem(SETLISTFM_SELECTED_CONCERTS_KEY, JSON.stringify(next))
+  }
+
+  function clearSelectedSetlistConcertIds(userId: string) {
+    if (!(userId in selectedSetlistConcertIdsByUser)) {
+      return
+    }
+
+    const next = { ...selectedSetlistConcertIdsByUser }
+    delete next[userId]
+    setSelectedSetlistConcertIdsByUser(next)
+    localStorage.setItem(SETLISTFM_SELECTED_CONCERTS_KEY, JSON.stringify(next))
+  }
+
   function clearError() {
     setError(null)
   }
@@ -200,6 +259,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     lastfmFilter,
     discogsFilter,
     setlistFmFilter,
+    setlistFmFetchMode,
     isLoading,
     error,
     autoFetch,
@@ -209,11 +269,21 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     updateFilter,
     updateDiscogsFilter,
     updateSetlistFmFilter,
+    setSetlistFmFetchMode,
+    getSelectedSetlistConcertIds,
+    setSelectedSetlistConcertIds,
+    clearSelectedSetlistConcertIds,
     setAutoFetch,
     clearError
   }
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
+}
+
+function isSelectedConcertsByUser(value: unknown): value is Record<string, string[]> {
+  return typeof value === 'object' && value !== null && Object.values(value).every(
+    (concertIds) => Array.isArray(concertIds) && concertIds.every((concertId) => typeof concertId === 'string')
+  )
 }
 
 export function useConfig() {

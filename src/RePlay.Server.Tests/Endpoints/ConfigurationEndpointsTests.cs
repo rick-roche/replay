@@ -60,17 +60,45 @@ public class ConfigurationEndpointsTests
     private sealed class FakeSetlistFmService : ISetlistFmService
     {
         public Func<string, CancellationToken, Task<SetlistUser?>>? OnGetUserAsync { get; set; }
-        public Func<string, SetlistFmFilter, CancellationToken, Task<SetlistFmDataResponse>>? OnGetUserConcertsAsync { get; set; }
-        public Func<string, SetlistFmFilter, CancellationToken, Task<NormalizedDataResponse>>? OnGetUserConcertsNormalizedAsync { get; set; }
+        public Func<string, SetlistFmFilter, IReadOnlyCollection<string>?, CancellationToken, Task<SetlistFmDataResponse>>? OnGetUserConcertsAsync { get; set; }
+        public Func<string, SetlistFmFilter, int, int, CancellationToken, Task<SetlistConcertsResponse>>? OnGetUserConcertsPageAsync { get; set; }
+        public Func<string, SetlistFmFilter, IReadOnlyCollection<string>?, CancellationToken, Task<NormalizedDataResponse>>? OnGetUserConcertsNormalizedAsync { get; set; }
 
         public Task<SetlistUser?> GetUserAsync(string usernameOrId, CancellationToken cancellationToken = default)
             => OnGetUserAsync?.Invoke(usernameOrId, cancellationToken) ?? Task.FromResult<SetlistUser?>(null);
 
-        public Task<SetlistFmDataResponse> GetUserConcertsAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default)
-            => OnGetUserConcertsAsync?.Invoke(userId, filter, cancellationToken) ?? Task.FromResult(new SetlistFmDataResponse { Concerts = [], Tracks = [], TotalConcerts = 0, TotalTracks = 0 });
+        public Task<SetlistFmDataResponse> GetUserConcertsAsync(
+            string userId,
+            SetlistFmFilter filter,
+            IReadOnlyCollection<string>? selectedConcertIds = null,
+            CancellationToken cancellationToken = default)
+            => OnGetUserConcertsAsync?.Invoke(userId, filter, selectedConcertIds, cancellationToken)
+               ?? Task.FromResult(new SetlistFmDataResponse { Concerts = [], Tracks = [], TotalConcerts = 0, TotalTracks = 0 });
 
-        public Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default)
-            => OnGetUserConcertsNormalizedAsync?.Invoke(userId, filter, cancellationToken) ?? Task.FromResult(new NormalizedDataResponse { DataType = "Concerts", Tracks = [], Albums = [], Artists = [], TotalResults = 0, Source = "setlistfm" });
+        public Task<SetlistConcertsResponse> GetUserConcertsPageAsync(
+            string userId,
+            SetlistFmFilter filter,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+            => OnGetUserConcertsPageAsync?.Invoke(userId, filter, pageNumber, pageSize, cancellationToken)
+               ?? Task.FromResult(new SetlistConcertsResponse
+               {
+                   Concerts = [],
+                   TotalConcerts = 0,
+                   PageNumber = pageNumber,
+                   PageSize = pageSize,
+                   HasNextPage = false,
+                   HasPreviousPage = pageNumber > 1
+               });
+
+        public Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(
+            string userId,
+            SetlistFmFilter filter,
+            IReadOnlyCollection<string>? selectedConcertIds = null,
+            CancellationToken cancellationToken = default)
+            => OnGetUserConcertsNormalizedAsync?.Invoke(userId, filter, selectedConcertIds, cancellationToken)
+               ?? Task.FromResult(new NormalizedDataResponse { DataType = "Concerts", Tracks = [], Albums = [], Artists = [], TotalResults = 0, Source = "setlistfm" });
     }
 
     private static HttpContext ContextWithSessionCookie(string? sessionId = "sid")

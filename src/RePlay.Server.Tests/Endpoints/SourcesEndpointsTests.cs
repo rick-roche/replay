@@ -58,17 +58,44 @@ public class SourcesEndpointsTests
     private sealed class FakeSetlistFmService : ISetlistFmService
     {
         public Func<string, CancellationToken, Task<SetlistUser?>>? OnGetUserAsync { get; set; }
-        public Func<string, SetlistFmFilter, CancellationToken, Task<SetlistFmDataResponse>>? OnGetUserConcertsAsync { get; set; }
-        public Func<string, SetlistFmFilter, CancellationToken, Task<NormalizedDataResponse>>? OnGetUserConcertsNormalizedAsync { get; set; }
+        public Func<string, SetlistFmFilter, IReadOnlyCollection<string>?, CancellationToken, Task<SetlistFmDataResponse>>? OnGetUserConcertsAsync { get; set; }
+        public Func<string, SetlistFmFilter, int, int, CancellationToken, Task<SetlistConcertsResponse>>? OnGetUserConcertsPageAsync { get; set; }
+        public Func<string, SetlistFmFilter, IReadOnlyCollection<string>?, CancellationToken, Task<NormalizedDataResponse>>? OnGetUserConcertsNormalizedAsync { get; set; }
 
         public Task<SetlistUser?> GetUserAsync(string usernameOrId, CancellationToken cancellationToken = default)
             => OnGetUserAsync?.Invoke(usernameOrId, cancellationToken) ?? Task.FromResult<SetlistUser?>(null);
 
-        public Task<SetlistFmDataResponse> GetUserConcertsAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default)
+        public Task<SetlistFmDataResponse> GetUserConcertsAsync(
+            string userId,
+            SetlistFmFilter filter,
+            IReadOnlyCollection<string>? selectedConcertIds = null,
+            CancellationToken cancellationToken = default)
             => throw new NotSupportedException("Use GetUserConcertsNormalizedAsync instead");
 
-        public Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default)
-            => OnGetUserConcertsNormalizedAsync?.Invoke(userId, filter, cancellationToken) ?? Task.FromResult(new NormalizedDataResponse { DataType = "Tracks", Tracks = [], Albums = [], Artists = [], Source = "setlistfm" });
+        public Task<SetlistConcertsResponse> GetUserConcertsPageAsync(
+            string userId,
+            SetlistFmFilter filter,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+            => OnGetUserConcertsPageAsync?.Invoke(userId, filter, pageNumber, pageSize, cancellationToken)
+                ?? Task.FromResult(new SetlistConcertsResponse
+                {
+                    Concerts = [],
+                    TotalConcerts = 0,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    HasNextPage = false,
+                    HasPreviousPage = pageNumber > 1
+                });
+
+        public Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(
+            string userId,
+            SetlistFmFilter filter,
+            IReadOnlyCollection<string>? selectedConcertIds = null,
+            CancellationToken cancellationToken = default)
+            => OnGetUserConcertsNormalizedAsync?.Invoke(userId, filter, selectedConcertIds, cancellationToken)
+                ?? Task.FromResult(new NormalizedDataResponse { DataType = "Tracks", Tracks = [], Albums = [], Artists = [], Source = "setlistfm" });
     }
 
     private static HttpContext ContextWithSessionCookie(string? sessionId = "sid")
@@ -142,10 +169,68 @@ public class SourcesEndpointsTests
         var ctx = ContextWithSessionCookie();
 
         // Success -> Ok
-        var fake = new FakeSetlistFmService { OnGetUserConcertsNormalizedAsync = (u, f, ct) => Task.FromResult(new NormalizedDataResponse { DataType = "Tracks", Tracks = [], Albums = [], Artists = [], Source = "setlistfm" }) };
+        var fake = new FakeSetlistFmService { OnGetUserConcertsNormalizedAsync = (u, f, s, ct) => Task.FromResult(new NormalizedDataResponse { DataType = "Tracks", Tracks = [], Albums = [], Artists = [], Source = "setlistfm" }) };
         var filter = new SetlistFmFilter();
         var r = await InvokeAsync(mi, new FetchSetlistFmDataRequest { UserId = "user123", Filter = filter }, fake, ctx, CancellationToken.None);
         r.Should().BeOfType<Ok<NormalizedDataResponse>>();
+    }
+
+    [Fact]
+    public async Task PostFetchSetlistFmConcerts_ValidatesErrors()
+    {
+        var mi = GetPrivate("PostFetchSetlistFmConcerts");
+        var ctx = ContextWithSessionCookie();
+        var fake = new FakeSetlistFmService();
+
+        var r1 = await InvokeAsync(mi, new FetchSetlistFmConcertsRequest { UserId = "", Filter = new SetlistFmFilter() }, fake, ctx, CancellationToken.None);
+        ((BadRequest<ApiError>)r1).Value!.Code.Should().Be("MISSING_USER_ID");
+
+        var r2 = await InvokeAsync(mi, new FetchSetlistFmConcertsRequest { UserId = "user123", Filter = null! }, fake, ctx, CancellationToken.None);
+        ((BadRequest<ApiError>)r2).Value!.Code.Should().Be("MISSING_FILTER");
+
+        var r3 = await InvokeAsync(mi, new FetchSetlistFmConcertsRequest { UserId = "user123", Filter = new SetlistFmFilter(), PageNumber = 0 }, fake, ctx, CancellationToken.None);
+        ((BadRequest<ApiError>)r3).Value!.Code.Should().Be("INVALID_PAGE_NUMBER");
+
+    }
+
+    [Fact]
+    public async Task PostFetchSetlistFmConcerts_ServicePaths()
+    {
+        var mi = GetPrivate("PostFetchSetlistFmConcerts");
+        var ctx = ContextWithSessionCookie();
+        var fake = new FakeSetlistFmService
+        {
+            OnGetUserConcertsPageAsync = (u, f, page, size, ct) => Task.FromResult(new SetlistConcertsResponse
+            {
+                Concerts = [
+                    new SetlistConcert
+                    {
+                        Id = "abc",
+                        Artist = "Artist",
+                        Date = "20-01-2024",
+                        Venue = "Venue",
+                        City = "City",
+                        Country = "Country",
+                        Tracks = []
+                    }
+                ],
+                TotalConcerts = 1,
+                PageNumber = page,
+                PageSize = size,
+                HasNextPage = false,
+                HasPreviousPage = page > 1
+            })
+        };
+
+        var req = new FetchSetlistFmConcertsRequest
+        {
+            UserId = "user123",
+            Filter = new SetlistFmFilter(),
+            PageNumber = 1
+        };
+
+        var result = await InvokeAsync(mi, req, fake, ctx, CancellationToken.None);
+        result.Should().BeOfType<Ok<SetlistConcertsResponse>>();
     }
 
     [Fact]

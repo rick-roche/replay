@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using RePlay.Server.Models;
 using RePlay.Server.Services;
@@ -42,6 +43,15 @@ public static class SourcesEndpoints
             .WithDescription("Fetches Setlist.fm concert data and normalizes it to a canonical format for consistent matching across all data sources.")
             .Accepts<FetchSetlistFmDataRequest>("application/json")
             .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
+        setlistfm.MapPost("/concerts", PostFetchSetlistFmConcerts)
+            .WithName("FetchSetlistFmConcerts")
+            .WithSummary("Fetch a provider page of Setlist.fm concerts")
+            .WithDescription("Fetches one attended-concert provider page. Date filters apply to concerts returned on that page.")
+            .Accepts<FetchSetlistFmConcertsRequest>("application/json")
+            .Produces<SetlistConcertsResponse>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
@@ -252,11 +262,13 @@ public static class SourcesEndpoints
         }
 
         // Validate date range if specified
-        if (!string.IsNullOrWhiteSpace(request.Filter.StartDate) && 
+        if (!string.IsNullOrWhiteSpace(request.Filter.StartDate) &&
             !string.IsNullOrWhiteSpace(request.Filter.EndDate))
         {
-            if (!DateTime.TryParse(request.Filter.StartDate, out var startDate) ||
-                !DateTime.TryParse(request.Filter.EndDate, out var endDate))
+            if (!DateTime.TryParseExact(request.Filter.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var startDate) ||
+                !DateTime.TryParseExact(request.Filter.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var endDate))
             {
                 return ApiErrorExtensions.BadRequest(
                     "INVALID_DATE_FORMAT",
@@ -274,7 +286,11 @@ public static class SourcesEndpoints
         try
         {
             // Fetch and normalize data from Setlist.fm
-            var data = await setlistFmService.GetUserConcertsNormalizedAsync(request.UserId, request.Filter, cancellationToken);
+            var data = await setlistFmService.GetUserConcertsNormalizedAsync(
+                request.UserId,
+                request.Filter,
+                request.SelectedConcertIds,
+                cancellationToken);
             
             return Results.Ok(data);
         }
@@ -289,6 +305,62 @@ public static class SourcesEndpoints
             return ApiErrorExtensions.InternalServerError(
                 "SETLISTFM_FETCH_ERROR",
                 "Error fetching Setlist.fm data",
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Fetch a paginated list of Setlist.fm concerts for user selection.
+    /// </summary>
+    private static async Task<IResult> PostFetchSetlistFmConcerts(
+        [FromBody] FetchSetlistFmConcertsRequest request,
+        ISetlistFmService setlistFmService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USER_ID",
+                "User ID is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        if (request.PageNumber < 1)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_PAGE_NUMBER",
+                "Page number must be at least 1");
+        }
+
+        try
+        {
+            var data = await setlistFmService.GetUserConcertsPageAsync(
+                request.UserId,
+                request.Filter,
+                request.PageNumber,
+                20,
+                cancellationToken);
+
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "SETLISTFM_FETCH_ERROR",
+                "Error fetching Setlist.fm concerts",
                 ex.Message);
         }
     }
