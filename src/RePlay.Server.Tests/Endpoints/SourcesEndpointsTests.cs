@@ -162,6 +162,58 @@ public class SourcesEndpointsTests
         ((BadRequest<ApiError>)r2).Value!.Code.Should().Be("MISSING_FILTER");
     }
 
+    [Theory]
+    [InlineData("PostFetchSetlistFmDataNormalized")]
+    [InlineData("PostFetchSetlistFmConcerts")]
+    public async Task SetlistFmEndpoints_ReturnSpecificErrorsForInvalidDates(string endpointName)
+    {
+        var mi = GetPrivate(endpointName);
+        var ctx = ContextWithSessionCookie();
+        var fake = new FakeSetlistFmService();
+
+        object invalidFormatRequest = endpointName == "PostFetchSetlistFmDataNormalized"
+            ? new FetchSetlistFmDataRequest
+            {
+                UserId = "user123",
+                Filter = new SetlistFmFilter { StartDate = "20-01-2024" }
+            }
+            : new FetchSetlistFmConcertsRequest
+            {
+                UserId = "user123",
+                Filter = new SetlistFmFilter { StartDate = "20-01-2024" }
+            };
+
+        var invalidFormat = await InvokeAsync(
+            mi,
+            invalidFormatRequest,
+            fake,
+            ctx,
+            CancellationToken.None);
+
+        ((BadRequest<ApiError>)invalidFormat).Value!.Code.Should().Be("INVALID_DATE_FORMAT");
+
+        object invalidRangeRequest = endpointName == "PostFetchSetlistFmDataNormalized"
+            ? new FetchSetlistFmDataRequest
+            {
+                UserId = "user123",
+                Filter = new SetlistFmFilter { StartDate = "2024-02-01", EndDate = "2024-01-01" }
+            }
+            : new FetchSetlistFmConcertsRequest
+            {
+                UserId = "user123",
+                Filter = new SetlistFmFilter { StartDate = "2024-02-01", EndDate = "2024-01-01" }
+            };
+
+        var invalidRange = await InvokeAsync(
+            mi,
+            invalidRangeRequest,
+            fake,
+            ctx,
+            CancellationToken.None);
+
+        ((BadRequest<ApiError>)invalidRange).Value!.Code.Should().Be("INVALID_DATE_RANGE");
+    }
+
     [Fact]
     public async Task PostFetchSetlistFmDataNormalized_ServicePaths()
     {

@@ -221,6 +221,19 @@ public sealed class SetlistFmServiceTests
     }
 
     [Fact]
+    public async Task GetUserConcertsPageAsync_UsesRequestedPageSize()
+    {
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{ "setlist": [], "total": 0, "page": 2, "itemsPerPage": 25 }""")
+        });
+
+        await _service.GetUserConcertsPageAsync("exampleUser", new SetlistFmFilter(), 2, 25);
+
+        _handler.LastRequestUri.Should().Be("https://api.setlist.fm/rest/1.0/user/exampleUser/attended?p=2&perPage=25");
+    }
+
+    [Fact]
     public async Task GetUserConcertsAsync_RejectsSelectedSetlistWithoutId()
     {
         _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
@@ -240,10 +253,13 @@ public sealed class SetlistFmServiceTests
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
 
+        public string? LastRequestUri { get; private set; }
+
         public void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            LastRequestUri = request.RequestUri?.ToString();
             if (_responses.Count == 0)
             {
                 throw new InvalidOperationException("No responses queued.");

@@ -261,26 +261,9 @@ public static class SourcesEndpoints
                 "Filter is required");
         }
 
-        // Validate date range if specified
-        if (!string.IsNullOrWhiteSpace(request.Filter.StartDate) &&
-            !string.IsNullOrWhiteSpace(request.Filter.EndDate))
+        if (ValidateSetlistFmDateRange(request.Filter) is { } dateValidationError)
         {
-            if (!DateTime.TryParseExact(request.Filter.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var startDate) ||
-                !DateTime.TryParseExact(request.Filter.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var endDate))
-            {
-                return ApiErrorExtensions.BadRequest(
-                    "INVALID_DATE_FORMAT",
-                    "Dates must be in valid ISO 8601 format");
-            }
-
-            if (startDate > endDate)
-            {
-                return ApiErrorExtensions.BadRequest(
-                    "INVALID_DATE_RANGE",
-                    "Start date must be before end date");
-            }
+            return dateValidationError;
         }
 
         try
@@ -339,6 +322,11 @@ public static class SourcesEndpoints
                 "Page number must be at least 1");
         }
 
+        if (ValidateSetlistFmDateRange(request.Filter) is { } dateValidationError)
+        {
+            return dateValidationError;
+        }
+
         try
         {
             var data = await setlistFmService.GetUserConcertsPageAsync(
@@ -363,5 +351,46 @@ public static class SourcesEndpoints
                 "Error fetching Setlist.fm concerts",
                 ex.Message);
         }
+    }
+
+    private static IResult? ValidateSetlistFmDateRange(SetlistFmFilter filter)
+    {
+        DateTime? startDate = null;
+        DateTime? endDate = null;
+
+        if (!string.IsNullOrWhiteSpace(filter.StartDate))
+        {
+            if (!DateTime.TryParseExact(filter.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedStartDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            startDate = parsedStartDate;
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.EndDate))
+        {
+            if (!DateTime.TryParseExact(filter.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedEndDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            endDate = parsedEndDate;
+        }
+
+        if (startDate > endDate)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_DATE_RANGE",
+                "Start date must be before end date");
+        }
+
+        return null;
     }
 }

@@ -174,7 +174,7 @@ public sealed class SetlistFmService : ISetlistFmService
         var fetchedConcerts = 0;
         while (fetchedConcerts < maxConcerts)
         {
-            var payload = await GetAttendedPageAsync(userId, page, cancellationToken).ConfigureAwait(false);
+            var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
             if (payload.Setlist == null || payload.Setlist.Count == 0)
             {
                 break;
@@ -234,7 +234,7 @@ public sealed class SetlistFmService : ISetlistFmService
         }
 
         var (startDate, endDate) = ParseDateRange(filter);
-        var payload = await GetAttendedPageAsync(userId, pageNumber, cancellationToken).ConfigureAwait(false);
+        var payload = await GetAttendedPageAsync(userId, pageNumber, pageSize, cancellationToken).ConfigureAwait(false);
 
         if (payload?.Setlist == null || payload.Setlist.Count == 0)
         {
@@ -347,9 +347,13 @@ public sealed class SetlistFmService : ISetlistFmService
         return request;
     }
 
-    private async Task<SetlistAttendedResponse> GetAttendedPageAsync(string userId, int page, CancellationToken cancellationToken)
+    private async Task<SetlistAttendedResponse> GetAttendedPageAsync(
+        string userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
     {
-        using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?p={page}");
+        using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?p={page}&perPage={pageSize}");
         var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
@@ -449,7 +453,7 @@ public sealed class SetlistFmService : ISetlistFmService
                 concertTracks.Add(track);
 
                 var trackKey = $"{track.Artist}|{track.Name}".ToLowerInvariant();
-                if (seenTracks.Add(trackKey) && allTracks.Count < maxTracks)
+                if (allTracks.Count < maxTracks && seenTracks.Add(trackKey))
                 {
                     allTracks.Add(track);
                 }
