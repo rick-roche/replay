@@ -142,7 +142,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (!isSelectedConcertsByUser(parsed)) {
           throw new Error('Invalid selected concert storage')
         }
-        setSelectedSetlistConcertIdsByUser(parsed)
+        setSelectedSetlistConcertIdsByUser(dedupeSelectedConcertsByUser(parsed))
       } catch {
         localStorage.removeItem(SETLISTFM_SELECTED_CONCERTS_KEY)
       }
@@ -293,6 +293,22 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 function isSelectedConcertsByUser(value: unknown): value is Record<string, string[]> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.values(value).every(
     (concertIds) => Array.isArray(concertIds) && concertIds.every((concertId) => typeof concertId === 'string')
+  )
+}
+
+function dedupeSelectedConcertsByUser(data: Record<string, string[]>): Record<string, string[]> {
+  return Object.fromEntries(
+    Object.entries(data).map(([userId, ids]) => {
+      const seen = new Set<string>()
+      const deduped = ids.flatMap((id) => {
+        const trimmed = id.trim()
+        const normalized = trimmed.toLowerCase()
+        if (!trimmed || seen.has(normalized)) return []
+        seen.add(normalized)
+        return [trimmed]
+      })
+      return [userId, deduped]
+    })
   )
 }
 

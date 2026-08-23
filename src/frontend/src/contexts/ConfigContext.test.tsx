@@ -137,6 +137,19 @@ describe('ConfigContext', () => {
     })
   })
 
+  it('deduplicates case-variant concert ids loaded from localStorage', async () => {
+    localStorage.setItem(
+      'replay:setlistfm_selected_concerts',
+      JSON.stringify({ alice: ['concert-1', 'CONCERT-1', 'Concert-2', ' '] })
+    )
+
+    const { result } = renderHook(() => useConfig(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.getSelectedSetlistConcertIds('alice')).toEqual(['concert-1', 'Concert-2'])
+    })
+  })
+
   it('deduplicates and clears selections for each Setlist.fm user', () => {
     const { result } = renderHook(() => useConfig(), { wrapper })
 
