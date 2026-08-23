@@ -266,6 +266,13 @@ public static class SourcesEndpoints
             return dateValidationError;
         }
 
+        if (request.SelectedConcertIds != null && request.SelectedConcertIds.Count == 0)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "EMPTY_CONCERT_SELECTION",
+                "SelectedConcertIds must contain at least one id when provided");
+        }
+
         try
         {
             // Fetch and normalize data from Setlist.fm

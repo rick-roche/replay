@@ -28,7 +28,8 @@ export function SetlistConcertSelector({
   const [appliedFilter, setAppliedFilter] = useState(setlistFmFilter)
 
   const selectedIds = useMemo(() => getSelectedSetlistConcertIds(userId), [getSelectedSetlistConcertIds, userId])
-  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  // Normalize to lowercase for case-insensitive membership checks (IDs stored with original casing)
+  const selectedIdSet = useMemo(() => new Set(selectedIds.map((id) => id.toLowerCase())), [selectedIds])
 
   const appliedFilterKey = useMemo(() => JSON.stringify(appliedFilter), [appliedFilter])
   const currentFilterKey = useMemo(() => JSON.stringify(setlistFmFilter), [setlistFmFilter])
@@ -50,7 +51,7 @@ export function SetlistConcertSelector({
 
     setSelectedSetlistConcertIds(
       userId,
-      selectedIds.filter((id) => id !== concertId)
+      selectedIds.filter((id) => id.toLowerCase() !== concertId.toLowerCase())
     )
   }
 
@@ -149,7 +150,7 @@ export function SetlistConcertSelector({
         {concerts.length > 0 && (
           <Flex direction="column" gap="2">
             {concerts.map((concert) => {
-              const isSelected = selectedIdSet.has(concert.id)
+              const isSelected = selectedIdSet.has(concert.id.toLowerCase())
               const descriptor = [concert.date, concert.venue, concert.city, concert.country]
                 .filter(Boolean)
                 .join(' - ')

@@ -162,6 +162,25 @@ public class SourcesEndpointsTests
         ((BadRequest<ApiError>)r2).Value!.Code.Should().Be("MISSING_FILTER");
     }
 
+    [Fact]
+    public async Task PostFetchSetlistFmDataNormalized_RejectsEmptySelectedConcertIds()
+    {
+        var mi = GetPrivate("PostFetchSetlistFmDataNormalized");
+        var ctx = ContextWithSessionCookie();
+        var fake = new FakeSetlistFmService();
+
+        var result = await InvokeAsync(mi,
+            new FetchSetlistFmDataRequest
+            {
+                UserId = "user123",
+                Filter = new SetlistFmFilter(),
+                SelectedConcertIds = []
+            },
+            fake, ctx, CancellationToken.None);
+
+        ((BadRequest<ApiError>)result).Value!.Code.Should().Be("EMPTY_CONCERT_SELECTION");
+    }
+
     [Theory]
     [InlineData("PostFetchSetlistFmDataNormalized")]
     [InlineData("PostFetchSetlistFmConcerts")]
