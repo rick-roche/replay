@@ -153,6 +153,11 @@ public sealed class SetlistFmService : ISetlistFmService
             foreach (var concertId in concertIds)
             {
                 var setlistItem = await GetSetlistAsync(concertId, cancellationToken).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(setlistItem.Id))
+                {
+                    throw new InvalidOperationException("Setlist.fm returned a setlist without an ID.");
+                }
+
                 AddConcert(setlistItem, concerts, allTracks, seenTracks, maxTracks, startDate, endDate);
             }
 
@@ -245,10 +250,11 @@ public sealed class SetlistFmService : ISetlistFmService
         }
 
         var concerts = payload.Setlist
+            .Where(item => !string.IsNullOrWhiteSpace(item.Id))
             .Where(item => PassesDateRange(item.EventDate, startDate, endDate))
             .Select(item => new SetlistConcert
             {
-                Id = item.Id ?? string.Empty,
+                Id = item.Id!,
                 Artist = item.Artist?.Name ?? "Unknown Artist",
                 Date = item.EventDate,
                 Venue = item.Venue?.Name,
@@ -411,6 +417,11 @@ public sealed class SetlistFmService : ISetlistFmService
         DateTime? startDate,
         DateTime? endDate)
     {
+        if (string.IsNullOrWhiteSpace(setlistItem.Id))
+        {
+            return false;
+        }
+
         if (!PassesDateRange(setlistItem.EventDate, startDate, endDate))
         {
             return false;
@@ -447,7 +458,7 @@ public sealed class SetlistFmService : ISetlistFmService
 
         concerts.Add(new SetlistConcert
         {
-            Id = setlistItem.Id ?? string.Empty,
+            Id = setlistItem.Id,
             Artist = setlistItem.Artist?.Name ?? "Unknown Artist",
             Date = setlistItem.EventDate,
             Venue = setlistItem.Venue?.Name,

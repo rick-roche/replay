@@ -223,7 +223,17 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }
 
   function setSelectedSetlistConcertIds(userId: string, concertIds: string[]) {
-    const deduped = Array.from(new Set(concertIds.filter((concertId) => concertId.trim().length > 0)))
+    const seenConcertIds = new Set<string>()
+    const deduped = concertIds.flatMap((concertId) => {
+      const trimmedId = concertId.trim()
+      const normalizedId = trimmedId.toLowerCase()
+      if (!trimmedId || seenConcertIds.has(normalizedId)) {
+        return []
+      }
+
+      seenConcertIds.add(normalizedId)
+      return [trimmedId]
+    })
     const next = {
       ...selectedSetlistConcertIdsByUser,
       [userId]: deduped
@@ -281,7 +291,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 }
 
 function isSelectedConcertsByUser(value: unknown): value is Record<string, string[]> {
-  return typeof value === 'object' && value !== null && Object.values(value).every(
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.values(value).every(
     (concertIds) => Array.isArray(concertIds) && concertIds.every((concertId) => typeof concertId === 'string')
   )
 }

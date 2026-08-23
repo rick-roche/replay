@@ -127,11 +127,21 @@ describe('ConfigContext', () => {
     })
   })
 
+  it('removes an array stored instead of a selection map', async () => {
+    localStorage.setItem('replay:setlistfm_selected_concerts', JSON.stringify(['concert-1']))
+
+    renderHook(() => useConfig(), { wrapper })
+
+    await waitFor(() => {
+      expect(localStorage.getItem('replay:setlistfm_selected_concerts')).toBeNull()
+    })
+  })
+
   it('deduplicates and clears selections for each Setlist.fm user', () => {
     const { result } = renderHook(() => useConfig(), { wrapper })
 
     act(() => {
-      result.current.setSelectedSetlistConcertIds('alice', ['concert-1', 'concert-1', ''])
+      result.current.setSelectedSetlistConcertIds('alice', ['concert-1', 'CONCERT-1', ''])
     })
     expect(result.current.getSelectedSetlistConcertIds('alice')).toEqual(['concert-1'])
 

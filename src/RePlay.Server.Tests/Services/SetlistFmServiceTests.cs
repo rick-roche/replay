@@ -199,6 +199,43 @@ public sealed class SetlistFmServiceTests
             .ThrowAsync<HttpRequestException>();
     }
 
+    [Fact]
+    public async Task GetUserConcertsPageAsync_SkipsConcertsWithoutIds()
+    {
+        var attendedPayload = """
+            {
+              "setlist": [
+                { "artist": { "name": "Missing ID" } },
+                { "id": "concert-1", "artist": { "name": "Example Artist" } }
+              ],
+              "total": 2,
+              "page": 1,
+              "itemsPerPage": 20
+            }
+            """;
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(attendedPayload) });
+
+        var result = await _service.GetUserConcertsPageAsync("exampleUser", new SetlistFmFilter(), 1, 20);
+
+        result.Concerts.Should().ContainSingle(concert => concert.Id == "concert-1");
+    }
+
+    [Fact]
+    public async Task GetUserConcertsAsync_RejectsSelectedSetlistWithoutId()
+    {
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{ "artist": { "name": "Missing ID" } }""")
+        });
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter(),
+                ["concert-1"]))
+            .Should()
+            .ThrowAsync<InvalidOperationException>();
+    }
+
     private sealed class TestHttpMessageHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
