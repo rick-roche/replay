@@ -1,10 +1,13 @@
 FROM node:24-alpine AS frontend-build
 WORKDIR /src/frontend
 
+COPY package.json /package.json
 COPY src/frontend/package.json src/frontend/package-lock.json ./
 RUN npm ci
 
 COPY src/frontend/ ./
+ARG GIT_SHA
+ENV GIT_SHA=$GIT_SHA
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build

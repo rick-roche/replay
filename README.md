@@ -1,6 +1,6 @@
 # Re:Play
 
-[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy to Coolify](https://github.com/rick-roche/replay/actions/workflows/deploy.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy.yml)
+[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy to Coolify](https://github.com/rick-roche/replay/actions/workflows/deploy.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy.yml) [![Release](https://img.shields.io/github/v/release/rick-roche/replay)](https://github.com/rick-roche/replay/releases)
 
 ![Re:Play logo](src/frontend/public/replay-logo.svg)
 
@@ -57,6 +57,20 @@ Frontend (from repo root):
 ## CI and coverage
 
 CI is defined in [.github/workflows/ci.yml](./.github/workflows/ci.yml) and runs backend and frontend builds, tests, and uploads coverage artifacts for inspection.
+
+## Releases
+
+Releases are automated from Conventional Commit titles. After a successful
+`main` CI run, Release Please creates or updates a release pull request. Its
+pull-request CI must pass; then the release pull request is merged automatically
+using the configured release token. The merge publishes the versioned image and
+Coolify deployment, while Release Please creates the `vX.Y.Z` Git tag, GitHub
+Release, and changelog.
+
+The root `package.json` is the single application version source. The About
+page displays the release version with the short commit SHA, for example
+`1.0.0+a72d99a`; local builds display `0.0.0+development` until the first
+automated release.
 
 ## Deployment
 

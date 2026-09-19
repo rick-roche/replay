@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { Theme } from '@radix-ui/themes'
 import { About } from './About'
+import packageJson from '../../../../package.json'
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -41,6 +42,7 @@ describe('About', () => {
     )
 
     expect(screen.getByText('Version')).toBeInTheDocument()
+    expect(screen.getByText(`${packageJson.version}+development`)).toBeInTheDocument()
   })
 
   it('should have GitHub link', () => {

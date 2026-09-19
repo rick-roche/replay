@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: read
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
@@ -16,6 +17,16 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
 jobs:
+  semantic-pull-request:
+    name: Validate pull request title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Conventional Commit title
+        uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -118,6 +129,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          build-args: GIT_SHA=${{ github.sha }}
 
   publish-image:
     name: Publish production image
@@ -144,4 +156,5 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          build-args: GIT_SHA=${{ github.sha }}
           tags: ghcr.io/${{ github.repository }}:${{ github.sha }}

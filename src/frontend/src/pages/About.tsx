@@ -1,6 +1,5 @@
 import { Music2, Github } from 'lucide-react'
 import { Container, Flex, Heading, Text, Box, Card, Button, Section } from '@radix-ui/themes'
-import packageJson from '../../package.json'
 
 export function About() {
   return (
@@ -42,7 +41,7 @@ export function About() {
               <Flex direction="column" gap="1">
                 <Heading size="4" weight="medium">Version</Heading>
                 <Text size="3" color="gray">
-                  {packageJson.version}
+                  {__APP_VERSION__}
                 </Text>
               </Flex>
 

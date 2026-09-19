@@ -68,6 +68,30 @@ COOLIFY_APPLICATION_UUID
 COOLIFY_TOKEN
 ```
 
+## Automated releases
+
+Release Please runs after successful `main` CI and maintains a release pull
+request from Conventional Commit history. A successful CI run on that release
+branch automatically merges it using `RELEASE_PLEASE_TOKEN`. The resulting
+`main` commit runs the normal image publication and Coolify deployment, and
+Release Please creates the GitHub Release, `vX.Y.Z` tag, and `CHANGELOG.md`.
+
+Configure this additional fine-grained GitHub token secret:
+
+```text
+RELEASE_PLEASE_TOKEN
+```
+
+Scope it to this repository with Contents, Issues, and Pull requests read/write
+permissions. The token is required because GitHub suppresses downstream
+workflow events created by the default `GITHUB_TOKEN`.
+
+The first automated release is configured to start at `1.0.0`. Subsequent
+versions follow Conventional Commits: `fix:` produces a patch release, `feat:`
+produces a minor release, and `!` or `BREAKING CHANGE:` produces a major
+release. `docs:`, `chore:`, `refactor:`, and `test:` changes do not release by
+themselves.
+
 ## DNS and Spotify
 
 Point this DNS record at the Coolify server:
