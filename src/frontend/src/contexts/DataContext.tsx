@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
-import { sourcesApi } from '../api/sources'
+import { sourcesApi, type SetlistConcertsResponse } from '../api/sources'
 import type { DiscogsFilter } from '../types/discogs'
 
 type LastfmFilter = components['schemas']['LastfmFilter']
@@ -12,11 +12,14 @@ type NormalizedArtist = components['schemas']['NormalizedArtist']
 
 interface DataContextValue {
   normalizedData: NormalizedDataResponse | null
+  setlistConcertsPage: SetlistConcertsResponse | null
   isLoading: boolean
+  isLoadingConcerts: boolean
   error: string | null
   fetchData: (username: string, filter: LastfmFilter) => Promise<void>
   fetchMoreData: (username: string, filter: LastfmFilter) => Promise<NormalizedTrack[]>
-  fetchSetlistFmData: (userId: string, filter: SetlistFmFilter) => Promise<void>
+  fetchSetlistFmData: (userId: string, filter: SetlistFmFilter, selectedConcertIds?: string[]) => Promise<void>
+  fetchSetlistFmConcerts: (userId: string, filter: SetlistFmFilter, pageNumber: number) => Promise<void>
   fetchDiscogsData: (username: string, filter: DiscogsFilter) => Promise<void>
   clearData: () => void
   clearError: () => void
@@ -73,10 +76,13 @@ const mergeNormalizedArtists = (existing: NormalizedArtist[], incoming: Normaliz
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [normalizedData, setNormalizedData] = useState<NormalizedDataResponse | null>(null)
+  const [setlistConcertsPage, setSetlistConcertsPage] = useState<SetlistConcertsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingConcerts, setIsLoadingConcerts] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const concertRequestId = useRef(0)
 
-  async function fetchData(username: string, filter: LastfmFilter) {
+  const fetchData = useCallback(async (username: string, filter: LastfmFilter) => {
     setIsLoading(true)
     setError(null)
     setNormalizedData(null)
@@ -89,9 +95,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  async function fetchMoreData(username: string, filter: LastfmFilter) {
+  const fetchMoreData = useCallback(async (username: string, filter: LastfmFilter) => {
     setIsLoading(true)
     setError(null)
 
@@ -129,24 +135,46 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [normalizedData])
 
-  async function fetchSetlistFmData(userId: string, filter: SetlistFmFilter) {
+  const fetchSetlistFmData = useCallback(async (userId: string, filter: SetlistFmFilter, selectedConcertIds?: string[]) => {
     setIsLoading(true)
     setError(null)
     setNormalizedData(null)
 
     try {
-      const normalized = await sourcesApi.fetchSetlistFmData(userId, filter)
+      const normalized = await sourcesApi.fetchSetlistFmData(userId, filter, selectedConcertIds)
       setNormalizedData(normalized)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch Setlist.fm data')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  async function fetchDiscogsData(username: string, filter: DiscogsFilter) {
+  const fetchSetlistFmConcerts = useCallback(async (userId: string, filter: SetlistFmFilter, pageNumber: number) => {
+    const requestId = ++concertRequestId.current
+    setIsLoadingConcerts(true)
+    setError(null)
+    setSetlistConcertsPage(null)
+
+    try {
+      const concertsPage = await sourcesApi.fetchSetlistFmConcerts(userId, filter, pageNumber)
+      if (requestId === concertRequestId.current) {
+        setSetlistConcertsPage(concertsPage)
+      }
+    } catch (err) {
+      if (requestId === concertRequestId.current) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch Setlist.fm concerts')
+      }
+    } finally {
+      if (requestId === concertRequestId.current) {
+        setIsLoadingConcerts(false)
+      }
+    }
+  }, [])
+
+  const fetchDiscogsData = useCallback(async (username: string, filter: DiscogsFilter) => {
     setIsLoading(true)
     setError(null)
     setNormalizedData(null)
@@ -159,10 +187,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   const clearData = useCallback(() => {
     setNormalizedData(null)
+    setSetlistConcertsPage(null)
   }, [])
 
   const clearError = useCallback(() => {
@@ -171,11 +200,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value: DataContextValue = {
     normalizedData,
+    setlistConcertsPage,
     isLoading,
+    isLoadingConcerts,
     error,
     fetchData,
     fetchMoreData,
     fetchSetlistFmData,
+    fetchSetlistFmConcerts,
     fetchDiscogsData,
     clearData,
     clearError

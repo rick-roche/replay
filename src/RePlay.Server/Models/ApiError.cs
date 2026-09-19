@@ -46,6 +46,16 @@ public static class ApiErrorExtensions
         }, statusCode: 401);
     }
 
+    public static IResult Forbidden(string code, string message, string? details = null)
+    {
+        return Results.Json(new ApiError
+        {
+            Code = code,
+            Message = message,
+            Details = details
+        }, statusCode: 403);
+    }
+
     public static IResult InternalServerError(string code, string message, string? details = null)
     {
         return Results.Json(new ApiError

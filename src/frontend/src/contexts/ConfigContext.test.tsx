@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { Theme } from '@radix-ui/themes'
 import { ConfigProvider, useConfig } from './ConfigContext'
 import * as apiModule from '@/api/config'
@@ -103,5 +103,64 @@ describe('ConfigContext', () => {
     })
 
     expect(result.current.error).toBe('Discogs error')
+  })
+
+  it('loads valid Setlist.fm selection state from localStorage', async () => {
+    localStorage.setItem('replay:setlistfm_fetch_mode', 'selectConcerts')
+    localStorage.setItem('replay:setlistfm_selected_concerts', JSON.stringify({ alice: ['concert-1'] }))
+
+    const { result } = renderHook(() => useConfig(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.setlistFmFetchMode).toBe('selectConcerts')
+    })
+    expect(result.current.getSelectedSetlistConcertIds('alice')).toEqual(['concert-1'])
+  })
+
+  it('removes malformed Setlist.fm selections from localStorage', async () => {
+    localStorage.setItem('replay:setlistfm_selected_concerts', JSON.stringify({ alice: ['concert-1', 2] }))
+
+    renderHook(() => useConfig(), { wrapper })
+
+    await waitFor(() => {
+      expect(localStorage.getItem('replay:setlistfm_selected_concerts')).toBeNull()
+    })
+  })
+
+  it('removes an array stored instead of a selection map', async () => {
+    localStorage.setItem('replay:setlistfm_selected_concerts', JSON.stringify(['concert-1']))
+
+    renderHook(() => useConfig(), { wrapper })
+
+    await waitFor(() => {
+      expect(localStorage.getItem('replay:setlistfm_selected_concerts')).toBeNull()
+    })
+  })
+
+  it('deduplicates case-variant concert ids loaded from localStorage', async () => {
+    localStorage.setItem(
+      'replay:setlistfm_selected_concerts',
+      JSON.stringify({ alice: ['concert-1', 'CONCERT-1', 'Concert-2', ' '] })
+    )
+
+    const { result } = renderHook(() => useConfig(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.getSelectedSetlistConcertIds('alice')).toEqual(['concert-1', 'Concert-2'])
+    })
+  })
+
+  it('deduplicates and clears selections for each Setlist.fm user', () => {
+    const { result } = renderHook(() => useConfig(), { wrapper })
+
+    act(() => {
+      result.current.setSelectedSetlistConcertIds('alice', ['concert-1', 'CONCERT-1', ''])
+    })
+    expect(result.current.getSelectedSetlistConcertIds('alice')).toEqual(['concert-1'])
+
+    act(() => {
+      result.current.clearSelectedSetlistConcertIds('alice')
+    })
+    expect(result.current.getSelectedSetlistConcertIds('alice')).toEqual([])
   })
 })

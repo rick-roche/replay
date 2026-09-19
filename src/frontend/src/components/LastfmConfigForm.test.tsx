@@ -126,7 +126,7 @@ describe('LastfmConfigForm', () => {
     )
 
     expect(screen.getByText('testuser')).toBeInTheDocument()
-    expect(screen.getByText('10,000 total scrobbles')).toBeInTheDocument()
+    expect(screen.getByText(/10[\s,.]000 total scrobbles/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Change Username/i })).toBeInTheDocument()
   })
 
@@ -182,7 +182,7 @@ describe('LastfmConfigForm', () => {
     expect(form).toBeInTheDocument()
   })
 
-  it('should format large play counts with commas', () => {
+  it('should format large play counts using the default locale', () => {
     const config = {
       username: 'testuser',
       playCount: 1234567,
@@ -197,6 +197,6 @@ describe('LastfmConfigForm', () => {
       </TestWrapper>
     )
 
-    expect(screen.getByText('1,234,567 total scrobbles')).toBeInTheDocument()
+    expect(screen.getByText(/1[\s,.]234[\s,.]567 total scrobbles/)).toBeInTheDocument()
   })
 })

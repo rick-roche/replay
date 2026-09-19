@@ -4,7 +4,7 @@ import { AlertCircle, Sliders } from 'lucide-react'
 import { useConfig } from '../contexts/ConfigContext'
 
 export function SetlistFmFilterForm() {
-  const { setlistFmFilter, updateSetlistFmFilter } = useConfig()
+  const { setlistFmFilter, updateSetlistFmFilter, setlistFmFetchMode, setSetlistFmFetchMode } = useConfig()
   const [isExpanded, setIsExpanded] = useState(true)
   const [maxConcertsInput, setMaxConcertsInput] = useState(setlistFmFilter.maxConcerts?.toString() ?? '10')
   const [maxTracksInput, setMaxTracksInput] = useState(setlistFmFilter.maxTracks?.toString() ?? '100')
@@ -73,6 +73,33 @@ export function SetlistFmFilterForm() {
 
         {isExpanded && (
           <Flex direction="column" gap="4">
+            <Box>
+              <Text as="label" size="2" weight="medium" className="block mb-2">
+                Fetch Mode
+              </Text>
+              <Flex gap="2" wrap="wrap">
+                <Button
+                  type="button"
+                  variant={setlistFmFetchMode === 'quick' ? 'solid' : 'soft'}
+                  onClick={() => setSetlistFmFetchMode('quick')}
+                  aria-pressed={setlistFmFetchMode === 'quick'}
+                >
+                  Quick Fetch
+                </Button>
+                <Button
+                  type="button"
+                  variant={setlistFmFetchMode === 'selectConcerts' ? 'solid' : 'soft'}
+                  onClick={() => setSetlistFmFetchMode('selectConcerts')}
+                  aria-pressed={setlistFmFetchMode === 'selectConcerts'}
+                >
+                  Select Concerts First
+                </Button>
+              </Flex>
+              <Text size="1" color="gray" className="mt-2 block">
+                Select-concert mode lets you include or exclude concerts before fetching tracks.
+              </Text>
+            </Box>
+
             {/* Date Range */}
             <Flex direction="column" gap="3">
               <Box>
@@ -145,7 +172,9 @@ export function SetlistFmFilterForm() {
                 placeholder="100"
               />
               <Text size="1" color="gray" className="mt-2 block">
-                Up to 500 deduplicated tracks can be fetched
+                {setlistFmFetchMode === 'quick'
+                  ? 'Up to 500 deduplicated tracks can be fetched'
+                  : 'Applies to the selected concerts; duplicate tracks are removed'}
               </Text>
             </Box>
           </Flex>

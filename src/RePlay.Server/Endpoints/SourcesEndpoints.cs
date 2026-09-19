@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using RePlay.Server.Models;
 using RePlay.Server.Services;
@@ -35,6 +36,49 @@ public static class SourcesEndpoints
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         var setlistfm = sources.MapGroup("/setlistfm");
+        setlistfm.AddEndpointFilter(async (context, next) =>
+        {
+            var httpContext = context.HttpContext;
+            if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
+                string.IsNullOrWhiteSpace(sessionId))
+            {
+                return ApiErrorExtensions.Unauthorized("NO_SESSION", "No active session found");
+            }
+
+            var sessionStore = httpContext.RequestServices.GetRequiredService<ISessionStore>();
+            var session = sessionStore.GetSession(sessionId);
+            if (session is null)
+            {
+                return ApiErrorExtensions.Unauthorized("INVALID_SESSION", "Session not found or has been invalidated");
+            }
+
+            if (session.IsExpired())
+            {
+                sessionStore.RemoveSession(sessionId);
+                httpContext.Response.Cookies.Delete("replay_session_id");
+                return ApiErrorExtensions.Unauthorized("SESSION_EXPIRED", "Session has expired");
+            }
+
+            var requestedUserId = context.Arguments
+                .Select(argument => argument switch
+                {
+                    FetchSetlistFmDataRequest request => request.UserId,
+                    FetchSetlistFmConcertsRequest request => request.UserId,
+                    _ => null
+                })
+                .FirstOrDefault(userId => userId is not null);
+            if (string.IsNullOrWhiteSpace(requestedUserId))
+            {
+                return await next(context);
+            }
+
+            if (ValidateSetlistFmUser(sessionStore, sessionId, requestedUserId) is { } userValidationError)
+            {
+                return userValidationError;
+            }
+
+            return await next(context);
+        });
 
         setlistfm.MapPost("/data", PostFetchSetlistFmDataNormalized)
             .WithName("FetchSetlistFmData")
@@ -43,9 +87,48 @@ public static class SourcesEndpoints
             .Accepts<FetchSetlistFmDataRequest>("application/json")
             .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
+            .Produces<ApiError>(StatusCodes.Status403Forbidden, "application/json")
+            .Produces<ApiError>(StatusCodes.Status502BadGateway, "application/json")
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
+
+        setlistfm.MapPost("/concerts", PostFetchSetlistFmConcerts)
+            .WithName("FetchSetlistFmConcerts")
+            .WithSummary("Fetch a provider page of Setlist.fm concerts")
+            .WithDescription("Fetches one attended-concert provider page. Date filters apply to concerts returned on that page.")
+            .Accepts<FetchSetlistFmConcertsRequest>("application/json")
+            .Produces<SetlistConcertsResponse>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
+            .Produces<ApiError>(StatusCodes.Status403Forbidden, "application/json")
+            .Produces<ApiError>(StatusCodes.Status502BadGateway, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         return group;
+    }
+
+    private static IResult? ValidateSetlistFmUser(
+        ISessionStore sessionStore,
+        string sessionId,
+        string? requestedUserId)
+    {
+        var configuredSetlist = sessionStore.GetSourceConfig(sessionId, "setlistfm");
+        if (configuredSetlist is null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "SETLISTFM_NOT_CONFIGURED",
+                "Configure a Setlist.fm profile before fetching concerts");
+        }
+
+        if (requestedUserId is null ||
+            !string.Equals(configuredSetlist.ConfigValue, requestedUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiErrorExtensions.Forbidden(
+                "SETLISTFM_USER_MISMATCH",
+                "The requested Setlist.fm user does not match the configured profile");
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -251,30 +334,26 @@ public static class SourcesEndpoints
                 "Filter is required");
         }
 
-        // Validate date range if specified
-        if (!string.IsNullOrWhiteSpace(request.Filter.StartDate) && 
-            !string.IsNullOrWhiteSpace(request.Filter.EndDate))
+        if (ValidateSetlistFmDateRange(request.Filter) is { } dateValidationError)
         {
-            if (!DateTime.TryParse(request.Filter.StartDate, out var startDate) ||
-                !DateTime.TryParse(request.Filter.EndDate, out var endDate))
-            {
-                return ApiErrorExtensions.BadRequest(
-                    "INVALID_DATE_FORMAT",
-                    "Dates must be in valid ISO 8601 format");
-            }
+            return dateValidationError;
+        }
 
-            if (startDate > endDate)
-            {
-                return ApiErrorExtensions.BadRequest(
-                    "INVALID_DATE_RANGE",
-                    "Start date must be before end date");
-            }
+        if (request.SelectedConcertIds != null && request.SelectedConcertIds.Count == 0)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "EMPTY_CONCERT_SELECTION",
+                "SelectedConcertIds must contain at least one id when provided");
         }
 
         try
         {
             // Fetch and normalize data from Setlist.fm
-            var data = await setlistFmService.GetUserConcertsNormalizedAsync(request.UserId, request.Filter, cancellationToken);
+            var data = await setlistFmService.GetUserConcertsNormalizedAsync(
+                request.UserId,
+                request.Filter,
+                request.SelectedConcertIds,
+                cancellationToken);
             
             return Results.Ok(data);
         }
@@ -284,6 +363,13 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
+        catch (HttpRequestException ex)
+        {
+            return ApiErrorExtensions.ServiceUnavailable(
+                "SETLISTFM_API_ERROR",
+                "Failed to communicate with Setlist.fm",
+                ex.Message);
+        }
         catch (Exception ex)
         {
             return ApiErrorExtensions.InternalServerError(
@@ -291,5 +377,114 @@ public static class SourcesEndpoints
                 "Error fetching Setlist.fm data",
                 ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Fetch a paginated list of Setlist.fm concerts for user selection.
+    /// </summary>
+    private static async Task<IResult> PostFetchSetlistFmConcerts(
+        [FromBody] FetchSetlistFmConcertsRequest request,
+        ISetlistFmService setlistFmService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_USER_ID",
+                "User ID is required");
+        }
+
+        if (request.Filter == null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "MISSING_FILTER",
+                "Filter is required");
+        }
+
+        if (request.PageNumber < 1)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_PAGE_NUMBER",
+                "Page number must be at least 1");
+        }
+
+        if (ValidateSetlistFmDateRange(request.Filter) is { } dateValidationError)
+        {
+            return dateValidationError;
+        }
+
+        try
+        {
+            var data = await setlistFmService.GetUserConcertsPageAsync(
+                request.UserId,
+                request.Filter,
+                request.PageNumber,
+                20,
+                cancellationToken);
+
+            return Results.Ok(data);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (HttpRequestException ex)
+        {
+            return ApiErrorExtensions.ServiceUnavailable(
+                "SETLISTFM_API_ERROR",
+                "Failed to communicate with Setlist.fm",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ApiErrorExtensions.InternalServerError(
+                "SETLISTFM_FETCH_ERROR",
+                "Error fetching Setlist.fm concerts",
+                ex.Message);
+        }
+    }
+
+    private static IResult? ValidateSetlistFmDateRange(SetlistFmFilter filter)
+    {
+        DateTime? startDate = null;
+        DateTime? endDate = null;
+
+        if (!string.IsNullOrWhiteSpace(filter.StartDate))
+        {
+            if (!DateTime.TryParseExact(filter.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedStartDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            startDate = parsedStartDate;
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.EndDate))
+        {
+            if (!DateTime.TryParseExact(filter.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedEndDate))
+            {
+                return ApiErrorExtensions.BadRequest(
+                    "INVALID_DATE_FORMAT",
+                    "Dates must be in valid ISO 8601 format");
+            }
+
+            endDate = parsedEndDate;
+        }
+
+        if (startDate > endDate)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "INVALID_DATE_RANGE",
+                "Start date must be before end date");
+        }
+
+        return null;
     }
 }

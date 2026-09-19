@@ -6,10 +6,12 @@ import type { DiscogsFilter } from '../types/discogs'
 type LastfmFilter = components['schemas']['LastfmFilter']
 type NormalizedDataResponse = components['schemas']['NormalizedDataResponse']
 type SetlistFmFilter = components['schemas']['SetlistFmFilter']
+export type SetlistConcertsResponse = components['schemas']['SetlistConcertsResponse']
 
 const SOURCES_LASTFM_DATA_PATH = '/api/sources/lastfm/data' as const
 const SOURCES_DISCOGS_DATA_PATH = '/api/sources/discogs/data' as const
 const SOURCES_SETLISTFM_DATA_PATH = '/api/sources/setlistfm/data' as const
+const SOURCES_SETLISTFM_CONCERTS_PATH = '/api/sources/setlistfm/concerts' as const
 
 export const sourcesApi = {
   /**
@@ -47,11 +49,30 @@ export const sourcesApi = {
   /**
    * Fetch Setlist.fm concert data (normalized format for matching)
    */
-  async fetchSetlistFmData(userId: string, filter: SetlistFmFilter): Promise<NormalizedDataResponse> {
+  async fetchSetlistFmData(
+    userId: string,
+    filter: SetlistFmFilter,
+    selectedConcertIds?: string[]
+  ): Promise<NormalizedDataResponse> {
     const { data, error } = await client.POST(SOURCES_SETLISTFM_DATA_PATH, {
-      body: { userId, filter } as { userId: string; filter: SetlistFmFilter }
+      body: { userId, filter, selectedConcertIds }
     })
     if (error) handleApiError(error, 'Failed to fetch Setlist.fm data')
+    return data!
+  },
+
+  /**
+   * Fetch a page of Setlist.fm concerts for include/exclude selection.
+   */
+  async fetchSetlistFmConcerts(
+    userId: string,
+    filter: SetlistFmFilter,
+    pageNumber: number
+  ): Promise<SetlistConcertsResponse> {
+    const { data, error } = await client.POST(SOURCES_SETLISTFM_CONCERTS_PATH, {
+      body: { userId, filter, pageNumber }
+    })
+    if (error) handleApiError(error, 'Failed to fetch Setlist.fm concerts')
     return data!
   }
 }

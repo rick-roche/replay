@@ -7,13 +7,23 @@ import { useMatch } from '../contexts/MatchContext'
 import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
 import type { components } from '../api/generated-client'
+import { SetlistConcertSelector } from './SetlistConcertSelector'
 
 type NormalizedTrack = components['schemas']['NormalizedTrack']
 type NormalizedAlbum = components['schemas']['NormalizedAlbum']
 type NormalizedArtist = components['schemas']['NormalizedArtist']
 
 export function FetchDataButton() {
-  const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const {
+    lastfmConfig,
+    lastfmFilter,
+    discogsConfig,
+    discogsFilter,
+    setlistConfig,
+    setlistFmFilter,
+    setlistFmFetchMode,
+    getSelectedSetlistConcertIds
+  } = useConfig()
   const { isLoading, error, fetchData, fetchSetlistFmData, fetchDiscogsData, fetchMoreData, clearError, normalizedData } = useData()
   const { appendMatches } = useMatch()
   const { selectedSource } = useDataSource()
@@ -35,7 +45,12 @@ export function FetchDataButton() {
     } else if (selectedSource === DataSource.DISCOGS && isDiscogsConfigured) {
       await fetchDiscogsData(discogsConfig!.username, discogsFilter)
     } else if (selectedSource === DataSource.SETLISTFM && isSetlistConfigured) {
-      await fetchSetlistFmData(setlistConfig!.userId, setlistFmFilter)
+      const selectedConcertIds = getSelectedSetlistConcertIds(setlistConfig!.userId)
+      if (setlistFmFetchMode === 'selectConcerts') {
+        await fetchSetlistFmData(setlistConfig!.userId, setlistFmFilter, selectedConcertIds)
+      } else {
+        await fetchSetlistFmData(setlistConfig!.userId, setlistFmFilter)
+      }
     }
   }
 
@@ -58,6 +73,16 @@ export function FetchDataButton() {
   }
 
   const isDisabled = isLoading || (!isLastfmConfigured && !isDiscogsConfigured && !isSetlistConfigured)
+  const selectedConcertIdsCount =
+    selectedSource === DataSource.SETLISTFM && setlistConfig
+      ? getSelectedSetlistConcertIds(setlistConfig.userId).length
+      : 0
+  const maxSelectedConcerts = Number(setlistFmFilter.maxConcerts ?? 10)
+  const isSetlistSelectionMode = selectedSource === DataSource.SETLISTFM && setlistFmFetchMode === 'selectConcerts'
+  const showInlineSetlistFetch = isSetlistSelectionMode && selectedSource === DataSource.SETLISTFM && isSetlistConfigured
+  const isSetlistSelectionOverLimit = selectedConcertIdsCount > maxSelectedConcerts
+  const isSetlistSelectionDisabled =
+    isSetlistSelectionMode && (selectedConcertIdsCount === 0 || isSetlistSelectionOverLimit)
   const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(normalizedData) && !isLoading
 
   const sourceName = 
@@ -68,7 +93,9 @@ export function FetchDataButton() {
   const dataTypeText = 
     selectedSource === DataSource.LASTFM ? lastfmFilter.dataType.toLowerCase() :
     selectedSource === DataSource.DISCOGS ? 'releases' :
-    selectedSource === DataSource.SETLISTFM ? 'concerts' :
+    selectedSource === DataSource.SETLISTFM
+      ? (setlistFmFetchMode === 'selectConcerts' ? 'selected concerts' : 'concerts')
+      :
     'data'
 
   return (
@@ -96,19 +123,40 @@ export function FetchDataButton() {
           </Text>
         )}
 
-        <Button onClick={handleFetch} disabled={isDisabled}>
-          {isLoading ? (
-            <>
-              <Spinner />
-              Fetching...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Fetch Data
-            </>
-          )}
-        </Button>
+        {showInlineSetlistFetch && (
+          <SetlistConcertSelector
+            userId={setlistConfig!.userId}
+            onFetchTracks={handleFetch}
+            isFetching={isLoading}
+            isFetchDisabled={isSetlistSelectionDisabled}
+          />
+        )}
+
+        {!showInlineSetlistFetch && (
+          <Button onClick={handleFetch} disabled={isDisabled || isSetlistSelectionDisabled}>
+            {isLoading ? (
+              <>
+                <Spinner />
+                Fetching...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                {isSetlistSelectionMode ? 'Fetch Tracks From Selected Concerts' : 'Fetch Data'}
+              </>
+            )}
+          </Button>
+        )}
+
+        {isSetlistSelectionMode && !showInlineSetlistFetch && (
+          <Text size="1" color="gray">
+            {selectedConcertIdsCount > 0
+              ? isSetlistSelectionOverLimit
+                ? `${selectedConcertIdsCount} concerts selected; reduce the selection to ${maxSelectedConcerts} or fewer`
+                : `${selectedConcertIdsCount} concerts selected`
+              : 'Select at least one concert to fetch tracks'}
+          </Text>
+        )}
 
         {canFetchMore && (
           <Button onClick={handleFetchMore} disabled={isDisabled} variant="soft">

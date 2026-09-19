@@ -37,3 +37,16 @@ public sealed record SetlistFmDataResponse
     public int TotalConcerts { get; init; }
     public int TotalTracks { get; init; }
 }
+
+/// <summary>
+/// Response containing a paginated list of concerts for selection workflows.
+/// </summary>
+public sealed record SetlistConcertsResponse
+{
+    public required List<SetlistConcert> Concerts { get; init; } = [];
+    public int TotalConcerts { get; init; }
+    public int PageNumber { get; init; }
+    public int PageSize { get; init; }
+    public bool HasNextPage { get; init; }
+    public bool HasPreviousPage { get; init; }
+}

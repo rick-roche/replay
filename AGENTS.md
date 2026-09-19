@@ -79,3 +79,6 @@ Keep this file lean. Put domain-specific detail in focused docs, then reference 
 - `README.md` for repo setup and workflows.
 - `docs/configuration.md` for runtime configuration.
 - `docs/deploy-aca-ghcr.md` for deployment flow.
+- Before changing C#, read `docs/development/csharp.md`.
+- Before changing React UI, read `docs/development/react.md` and `docs/development/accessibility.md`.
+- Before changing TypeScript, read `docs/development/typescript.md`.

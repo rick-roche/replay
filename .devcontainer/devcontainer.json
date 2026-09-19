@@ -32,11 +32,7 @@
 	"postStartCommand": "dotnet dev-certs https --trust",
 	"customizations": {
 		"vscode": {
-			"extensions": [
-				"ms-dotnettools.csdevkit",
-				"GitHub.copilot-chat",
-				"GitHub.copilot"
-			]
+			"extensions": ["ms-dotnettools.csdevkit"]
 		}
 	}
 	// Configure tool-specific properties.

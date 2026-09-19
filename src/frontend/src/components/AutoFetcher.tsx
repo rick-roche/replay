@@ -8,7 +8,7 @@ import { useDataSource } from '../contexts/DataSourceContext'
 import { DataSource } from '../types/datasource'
 
 export function AutoFetcher() {
-  const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter } = useConfig()
+  const { lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter, setlistFmFetchMode } = useConfig()
   const { isLoading: isFetchLoading, error: fetchError, fetchData, fetchSetlistFmData, fetchDiscogsData, normalizedData } = useData()
   const { isLoading: isMatchLoading, error: matchError, matchTracks, matchAlbums, matchArtists } = useMatch()
   const { selectedSource } = useDataSource()
@@ -38,12 +38,13 @@ export function AutoFetcher() {
     if (
       !hasTriggeredFetch.current &&
       selectedSource === DataSource.SETLISTFM &&
-      setlistConfig?.isConfigured
+      setlistConfig?.isConfigured &&
+      setlistFmFetchMode === 'quick'
     ) {
       hasTriggeredFetch.current = true
       fetchSetlistFmData(setlistConfig.userId, setlistFmFilter)
     }
-  }, [lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter, selectedSource, fetchData, fetchDiscogsData, fetchSetlistFmData])
+  }, [lastfmConfig, lastfmFilter, discogsConfig, discogsFilter, setlistConfig, setlistFmFilter, setlistFmFetchMode, selectedSource, fetchData, fetchDiscogsData, fetchSetlistFmData])
 
   // Trigger match when data is fetched
   useEffect(() => {

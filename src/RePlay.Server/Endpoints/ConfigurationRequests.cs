@@ -27,6 +27,17 @@ public sealed record FetchSetlistFmDataRequest
 {
     public required string UserId { get; init; }
     public required SetlistFmFilter Filter { get; init; }
+    public List<string>? SelectedConcertIds { get; init; }
+}
+
+/// <summary>
+/// Request to fetch a page of Setlist.fm concerts for selection.
+/// </summary>
+public sealed record FetchSetlistFmConcertsRequest
+{
+    public required string UserId { get; init; }
+    public required SetlistFmFilter Filter { get; init; }
+    public int PageNumber { get; init; } = 1;
 }
 
 /// <summary>

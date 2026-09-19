@@ -34,7 +34,7 @@ export function Home() {
   const { selectedSource } = useDataSource()
   const { matchedData, matchedAlbums, matchedArtists, clearMatches } = useMatch()
   const { clearData, clearError } = useData()
-  const { autoFetch } = useConfig()
+  const { autoFetch, setlistFmFetchMode } = useConfig()
   const { markStepComplete, nextStep, currentStep } = useWorkflow()
   const hasAutoAdvancedRef = useRef(false)
 
@@ -187,7 +187,7 @@ export function Home() {
                     )}
                     {selectedSource === DataSource.SETLISTFM && (
                       <>
-                        {autoFetch ? (
+                        {autoFetch && setlistFmFetchMode === 'quick' ? (
                           <>
                             <AutoFetcher />
                             <DataResults />

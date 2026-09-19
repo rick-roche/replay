@@ -21,12 +21,30 @@ public interface ISetlistFmService
     /// <summary>
     /// Fetch attended concerts for a user with specified filters and return raw concert data.
     /// </summary>
-    Task<SetlistFmDataResponse> GetUserConcertsAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default);
+    Task<SetlistFmDataResponse> GetUserConcertsAsync(
+        string userId,
+        SetlistFmFilter filter,
+        IReadOnlyCollection<string>? selectedConcertIds = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetch a paginated list of attended concerts for user selection workflows.
+    /// </summary>
+    Task<SetlistConcertsResponse> GetUserConcertsPageAsync(
+        string userId,
+        SetlistFmFilter filter,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Fetch attended concerts for a user with specified filters and return normalized data.
     /// </summary>
-    Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default);
+    Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(
+        string userId,
+        SetlistFmFilter filter,
+        IReadOnlyCollection<string>? selectedConcertIds = null,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -34,6 +52,8 @@ public interface ISetlistFmService
 /// </summary>
 public sealed class SetlistFmService : ISetlistFmService
 {
+    private const int MaximumConcerts = 100;
+    private const int MaximumTracks = 500;
     private static readonly JsonSerializerOptions SerializerOptions = new();
 
     private readonly HttpClient _httpClient;
@@ -97,7 +117,11 @@ public sealed class SetlistFmService : ISetlistFmService
         };
     }
 
-    public async Task<SetlistFmDataResponse> GetUserConcertsAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default)
+    public async Task<SetlistFmDataResponse> GetUserConcertsAsync(
+        string userId,
+        SetlistFmFilter filter,
+        IReadOnlyCollection<string>? selectedConcertIds = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(userId))
         {
@@ -108,46 +132,57 @@ public sealed class SetlistFmService : ISetlistFmService
         var allTracks = new List<SetlistTrack>();
         var seenTracks = new HashSet<string>(); // For deduplication
 
+        var maxConcerts = GetBoundedLimit(filter.MaxConcerts, 10, MaximumConcerts, nameof(filter.MaxConcerts));
+        var maxTracks = GetBoundedLimit(filter.MaxTracks, 100, MaximumTracks, nameof(filter.MaxTracks));
+        if (selectedConcertIds is { Count: 0 })
+        {
+            throw new ArgumentException("Selected concert IDs must not be empty when provided", nameof(selectedConcertIds));
+        }
+
+        var hasSelectedConcerts = selectedConcertIds is { Count: > 0 };
+        var (startDate, endDate) = ParseDateRange(filter);
+
+        if (hasSelectedConcerts)
+        {
+            var requestedConcertIds = selectedConcertIds!;
+            var concertIds = requestedConcertIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (concertIds.Count != requestedConcertIds.Count || concertIds.Count > maxConcerts)
+            {
+                throw new ArgumentException($"Select between 1 and {maxConcerts} unique concerts", nameof(selectedConcertIds));
+            }
+
+            await ValidateSelectedConcertsAsync(userId, concertIds, cancellationToken).ConfigureAwait(false);
+
+            foreach (var concertId in concertIds)
+            {
+                var setlistItem = await GetSetlistAsync(concertId, cancellationToken).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(setlistItem.Id))
+                {
+                    throw new InvalidOperationException("Setlist.fm returned a setlist without an ID.");
+                }
+
+                AddConcert(setlistItem, concerts, allTracks, seenTracks, maxTracks, startDate, endDate);
+            }
+
+            return new SetlistFmDataResponse
+            {
+                Concerts = concerts,
+                Tracks = allTracks,
+                TotalConcerts = concerts.Count,
+                TotalTracks = allTracks.Count
+            };
+        }
+
         var page = 1;
         var fetchedConcerts = 0;
-        var maxConcerts = filter.MaxConcerts > 0 ? filter.MaxConcerts : 10;
-
-        DateTime? startDate = null;
-        DateTime? endDate = null;
-
-        if (!string.IsNullOrWhiteSpace(filter.StartDate))
-        {
-            if (!DateTime.TryParse(filter.StartDate, out var parsedStart))
-            {
-                throw new ArgumentException("Invalid start date format", nameof(filter.StartDate));
-            }
-            startDate = parsedStart;
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.EndDate))
-        {
-            if (!DateTime.TryParse(filter.EndDate, out var parsedEnd))
-            {
-                throw new ArgumentException("Invalid end date format", nameof(filter.EndDate));
-            }
-            endDate = parsedEnd;
-        }
-
         while (fetchedConcerts < maxConcerts)
         {
-            using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?p={page}");
-            var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                break;
-            }
-
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            var payload = await JsonSerializer.DeserializeAsync<SetlistAttendedResponse>(stream, SerializerOptions, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (payload?.Setlist == null || payload.Setlist.Count == 0)
+            var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
+            if (payload.Setlist == null || payload.Setlist.Count == 0)
             {
                 break;
             }
@@ -159,84 +194,15 @@ public sealed class SetlistFmService : ISetlistFmService
                     break;
                 }
 
-                // Parse concert date and apply date filters
-                DateTime? concertDate = null;
-                if (!string.IsNullOrWhiteSpace(setlistItem.EventDate))
+                if (AddConcert(setlistItem, concerts, allTracks, seenTracks, maxTracks, startDate, endDate))
                 {
-                    if (DateTime.TryParseExact(setlistItem.EventDate, "dd-MM-yyyy", 
-                        System.Globalization.CultureInfo.InvariantCulture, 
-                        System.Globalization.DateTimeStyles.None, out var parsed))
-                    {
-                        concertDate = parsed;
-                    }
+                    fetchedConcerts++;
                 }
-
-                // Apply date range filtering
-                if (startDate.HasValue && concertDate.HasValue && concertDate < startDate)
-                {
-                    continue;
-                }
-
-                if (endDate.HasValue && concertDate.HasValue && concertDate > endDate)
-                {
-                    continue;
-                }
-
-                var concertTracks = new List<SetlistTrack>();
-
-                if (setlistItem.Sets?.Set != null)
-                {
-                    foreach (var set in setlistItem.Sets.Set)
-                    {
-                        if (set.Song != null)
-                        {
-                            foreach (var song in set.Song)
-                            {
-                                if (string.IsNullOrWhiteSpace(song.Name))
-                                {
-                                    continue;
-                                }
-
-                                var track = new SetlistTrack
-                                {
-                                    Name = song.Name,
-                                    Artist = setlistItem.Artist?.Name ?? "Unknown Artist",
-                                    ConcertDate = setlistItem.EventDate,
-                                    Venue = setlistItem.Venue?.Name,
-                                    City = setlistItem.Venue?.City?.Name,
-                                    Country = setlistItem.Venue?.City?.Country?.Name
-                                };
-
-                                concertTracks.Add(track);
-
-                                // Deduplicate tracks: artist + track name (case-insensitive)
-                                var trackKey = $"{track.Artist}|{track.Name}".ToLowerInvariant();
-                                if (!seenTracks.Contains(trackKey) && allTracks.Count < filter.MaxTracks)
-                                {
-                                    seenTracks.Add(trackKey);
-                                    allTracks.Add(track);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                concerts.Add(new SetlistConcert
-                {
-                    Id = setlistItem.Id ?? Guid.NewGuid().ToString(),
-                    Artist = setlistItem.Artist?.Name ?? "Unknown Artist",
-                    Date = setlistItem.EventDate,
-                    Venue = setlistItem.Venue?.Name,
-                    City = setlistItem.Venue?.City?.Name,
-                    Country = setlistItem.Venue?.City?.Country?.Name,
-                    Tracks = concertTracks
-                });
-
-                fetchedConcerts++;
             }
 
             // Check if there are more pages
-            if (payload.Page >= (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage)
+            if (payload.ItemsPerPage <= 0 ||
+                payload.Page >= (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage)
             {
                 break;
             }
@@ -253,9 +219,81 @@ public sealed class SetlistFmService : ISetlistFmService
         };
     }
 
-    public async Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(string userId, SetlistFmFilter filter, CancellationToken cancellationToken = default)
+    public async Task<SetlistConcertsResponse> GetUserConcertsPageAsync(
+        string userId,
+        SetlistFmFilter filter,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
     {
-        var data = await GetUserConcertsAsync(userId, filter, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new ArgumentException("User ID cannot be empty", nameof(userId));
+        }
+
+        if (pageNumber < 1)
+        {
+            throw new ArgumentException("Page number must be at least 1", nameof(pageNumber));
+        }
+
+        if (pageSize < 1 || pageSize > 100)
+        {
+            throw new ArgumentException("Page size must be between 1 and 100", nameof(pageSize));
+        }
+
+        var (startDate, endDate) = ParseDateRange(filter);
+        var payload = await GetAttendedPageAsync(userId, pageNumber, pageSize, cancellationToken).ConfigureAwait(false);
+
+        if (payload?.Setlist == null || payload.Setlist.Count == 0)
+        {
+            return new SetlistConcertsResponse
+            {
+                Concerts = [],
+                TotalConcerts = payload?.Total ?? 0,
+                PageNumber = payload?.Page ?? pageNumber,
+                PageSize = payload?.ItemsPerPage ?? pageSize,
+                HasNextPage = false,
+                HasPreviousPage = (payload?.Page ?? pageNumber) > 1
+            };
+        }
+
+        var concerts = payload.Setlist
+            .Where(item => !string.IsNullOrWhiteSpace(item.Id))
+            .Where(item => PassesDateRange(item.EventDate, startDate, endDate))
+            .Select(item => new SetlistConcert
+            {
+                Id = item.Id!,
+                Artist = item.Artist?.Name ?? "Unknown Artist",
+                Date = item.EventDate,
+                Venue = item.Venue?.Name,
+                City = item.Venue?.City?.Name,
+                Country = item.Venue?.City?.Country?.Name,
+                Tracks = []
+            })
+            .ToList();
+
+        var totalPages = payload.ItemsPerPage > 0
+            ? (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage
+            : payload.Page;
+
+        return new SetlistConcertsResponse
+        {
+            Concerts = concerts,
+            TotalConcerts = payload.Total,
+            PageNumber = payload.Page,
+            PageSize = payload.ItemsPerPage,
+            HasNextPage = payload.Page < totalPages,
+            HasPreviousPage = payload.Page > 1
+        };
+    }
+
+    public async Task<NormalizedDataResponse> GetUserConcertsNormalizedAsync(
+        string userId,
+        SetlistFmFilter filter,
+        IReadOnlyCollection<string>? selectedConcertIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var data = await GetUserConcertsAsync(userId, filter, selectedConcertIds, cancellationToken).ConfigureAwait(false);
 
         var normalizedTracks = data.Tracks.Select(track => new NormalizedTrack
         {
@@ -315,6 +353,197 @@ public sealed class SetlistFmService : ISetlistFmService
         request.Headers.UserAgent.ParseAdd(_options.UserAgent);
         request.Headers.Add("x-api-key", _options.ApiKey);
         return request;
+    }
+
+    private async Task<SetlistAttendedResponse> GetAttendedPageAsync(
+        string userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?p={page}&perPage={pageSize}");
+        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        return await JsonSerializer.DeserializeAsync<SetlistAttendedResponse>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Setlist.fm returned an invalid attended concerts response.");
+    }
+
+    private async Task<SetlistAttendedResponse.SetlistItem> GetSetlistAsync(string concertId, CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest($"setlist/{Uri.EscapeDataString(concertId)}");
+        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        return await JsonSerializer.DeserializeAsync<SetlistAttendedResponse.SetlistItem>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Setlist.fm returned an invalid setlist response.");
+    }
+
+    private async Task ValidateSelectedConcertsAsync(
+        string userId,
+        IReadOnlyCollection<string> concertIds,
+        CancellationToken cancellationToken)
+    {
+        var remainingIds = concertIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var page = 1;
+
+        while (remainingIds.Count > 0)
+        {
+            var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
+            foreach (var item in payload.Setlist ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(item.Id))
+                {
+                    remainingIds.Remove(item.Id);
+                }
+            }
+
+            if (remainingIds.Count == 0 ||
+                payload.ItemsPerPage <= 0 ||
+                payload.Page >= (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        if (remainingIds.Count > 0)
+        {
+            throw new ArgumentException("Selected concerts must belong to the requested Setlist.fm user", nameof(concertIds));
+        }
+    }
+
+    private static (DateTime? StartDate, DateTime? EndDate) ParseDateRange(SetlistFmFilter filter)
+    {
+        DateTime? startDate = ParseIsoDate(filter.StartDate, nameof(filter.StartDate));
+        DateTime? endDate = ParseIsoDate(filter.EndDate, nameof(filter.EndDate));
+        if (startDate > endDate)
+        {
+            throw new ArgumentException("Start date must be before end date", nameof(filter));
+        }
+
+        return (startDate, endDate);
+    }
+
+    private static DateTime? ParseIsoDate(string? value, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!DateTime.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+        {
+            throw new ArgumentException("Dates must use ISO 8601 format (yyyy-MM-dd)", parameterName);
+        }
+
+        return parsed;
+    }
+
+    private static int GetBoundedLimit(int value, int defaultValue, int maximum, string parameterName)
+    {
+        var limit = value > 0 ? value : defaultValue;
+        if (limit > maximum)
+        {
+            throw new ArgumentException($"Value must be between 1 and {maximum}", parameterName);
+        }
+
+        return limit;
+    }
+
+    private static bool AddConcert(
+        SetlistAttendedResponse.SetlistItem setlistItem,
+        List<SetlistConcert> concerts,
+        List<SetlistTrack> allTracks,
+        HashSet<string> seenTracks,
+        int maxTracks,
+        DateTime? startDate,
+        DateTime? endDate)
+    {
+        if (string.IsNullOrWhiteSpace(setlistItem.Id))
+        {
+            return false;
+        }
+
+        if (!PassesDateRange(setlistItem.EventDate, startDate, endDate))
+        {
+            return false;
+        }
+
+        var concertTracks = new List<SetlistTrack>();
+        foreach (var set in setlistItem.Sets?.Set ?? [])
+        {
+            foreach (var song in set.Song ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(song.Name))
+                {
+                    continue;
+                }
+
+                var track = new SetlistTrack
+                {
+                    Name = song.Name,
+                    Artist = setlistItem.Artist?.Name ?? "Unknown Artist",
+                    ConcertDate = setlistItem.EventDate,
+                    Venue = setlistItem.Venue?.Name,
+                    City = setlistItem.Venue?.City?.Name,
+                    Country = setlistItem.Venue?.City?.Country?.Name
+                };
+                concertTracks.Add(track);
+
+                var trackKey = $"{track.Artist}|{track.Name}".ToLowerInvariant();
+                if (allTracks.Count < maxTracks && seenTracks.Add(trackKey))
+                {
+                    allTracks.Add(track);
+                }
+            }
+        }
+
+        concerts.Add(new SetlistConcert
+        {
+            Id = setlistItem.Id,
+            Artist = setlistItem.Artist?.Name ?? "Unknown Artist",
+            Date = setlistItem.EventDate,
+            Venue = setlistItem.Venue?.Name,
+            City = setlistItem.Venue?.City?.Name,
+            Country = setlistItem.Venue?.City?.Country?.Name,
+            Tracks = concertTracks
+        });
+        return true;
+    }
+
+    private static bool PassesDateRange(string? eventDate, DateTime? startDate, DateTime? endDate)
+    {
+        if (string.IsNullOrWhiteSpace(eventDate))
+        {
+            return true;
+        }
+
+        if (!DateTime.TryParseExact(
+                eventDate,
+                "dd-MM-yyyy",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var concertDate))
+        {
+            return true;
+        }
+
+        if (startDate.HasValue && concertDate < startDate.Value)
+        {
+            return false;
+        }
+
+        if (endDate.HasValue && concertDate > endDate.Value)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private sealed record SetlistUserResponse
