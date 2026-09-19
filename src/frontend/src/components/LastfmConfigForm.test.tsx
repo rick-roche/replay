@@ -126,7 +126,7 @@ describe('LastfmConfigForm', () => {
     )
 
     expect(screen.getByText('testuser')).toBeInTheDocument()
-    expect(screen.getByText(/total scrobbles/)).toBeInTheDocument()
+    expect(screen.getByText(/10[\s,.]000 total scrobbles/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Change Username/i })).toBeInTheDocument()
   })
 
@@ -197,6 +197,6 @@ describe('LastfmConfigForm', () => {
       </TestWrapper>
     )
 
-    expect(screen.getByText(/total scrobbles/)).toBeInTheDocument()
+    expect(screen.getByText(/1[\s,.]234[\s,.]567 total scrobbles/)).toBeInTheDocument()
   })
 })

@@ -36,7 +36,7 @@ export function SetlistConcertSelector({
   const isFilterStale = appliedFilterKey !== currentFilterKey
 
   useEffect(() => {
-    fetchSetlistFmConcerts(userId, appliedFilter, pageNumber)
+    void Promise.resolve(fetchSetlistFmConcerts(userId, appliedFilter, pageNumber)).catch(() => undefined)
   }, [pageNumber, userId, appliedFilter, fetchSetlistFmConcerts])
 
   const concerts = isLoadingConcerts ? [] : setlistConcertsPage?.concerts ?? []
@@ -96,7 +96,11 @@ export function SetlistConcertSelector({
           </Flex>
           {onFetchTracks && isFetchDisabled && (
             <Text size="1" color="gray">
-              Select at least one concert to fetch tracks.
+              {selectedIds.length === 0
+                ? 'Select at least one concert to fetch tracks.'
+                : selectedIds.length > maxConcerts
+                  ? `Reduce the selection to ${maxConcerts} concerts or fewer to fetch tracks.`
+                  : 'Fetching is currently unavailable.'}
             </Text>
           )}
 

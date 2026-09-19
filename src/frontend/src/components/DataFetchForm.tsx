@@ -77,9 +77,12 @@ export function FetchDataButton() {
     selectedSource === DataSource.SETLISTFM && setlistConfig
       ? getSelectedSetlistConcertIds(setlistConfig.userId).length
       : 0
+  const maxSelectedConcerts = Number(setlistFmFilter.maxConcerts ?? 10)
   const isSetlistSelectionMode = selectedSource === DataSource.SETLISTFM && setlistFmFetchMode === 'selectConcerts'
   const showInlineSetlistFetch = isSetlistSelectionMode && selectedSource === DataSource.SETLISTFM && isSetlistConfigured
-  const isSetlistSelectionDisabled = isSetlistSelectionMode && selectedConcertIdsCount === 0
+  const isSetlistSelectionOverLimit = selectedConcertIdsCount > maxSelectedConcerts
+  const isSetlistSelectionDisabled =
+    isSetlistSelectionMode && (selectedConcertIdsCount === 0 || isSetlistSelectionOverLimit)
   const canFetchMore = selectedSource === DataSource.LASTFM && Boolean(normalizedData) && !isLoading
 
   const sourceName = 
@@ -148,7 +151,9 @@ export function FetchDataButton() {
         {isSetlistSelectionMode && !showInlineSetlistFetch && (
           <Text size="1" color="gray">
             {selectedConcertIdsCount > 0
-              ? `${selectedConcertIdsCount} concerts selected`
+              ? isSetlistSelectionOverLimit
+                ? `${selectedConcertIdsCount} concerts selected; reduce the selection to ${maxSelectedConcerts} or fewer`
+                : `${selectedConcertIdsCount} concerts selected`
               : 'Select at least one concert to fetch tracks'}
           </Text>
         )}

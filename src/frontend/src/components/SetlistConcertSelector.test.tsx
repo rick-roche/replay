@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useReducer } from 'react'
 import { Theme } from '@radix-ui/themes'
 import { SetlistConcertSelector } from '@/components/SetlistConcertSelector'
 
@@ -19,6 +20,7 @@ let setlistConcertsPage: {
 } | null = null
 let isLoadingConcerts = false
 let errorMessage: string | null = null
+let rerenderDataContext: (() => void) | undefined
 
 vi.mock('@/contexts/ConfigContext', () => ({
   useConfig: () => ({
@@ -30,12 +32,17 @@ vi.mock('@/contexts/ConfigContext', () => ({
 }))
 
 vi.mock('@/contexts/DataContext', () => ({
-  useData: () => ({
-    setlistConcertsPage,
-    isLoadingConcerts,
-    error: errorMessage,
-    fetchSetlistFmConcerts: fetchSetlistFmConcertsMock
-  })
+  useData: () => {
+    const [, forceRender] = useReducer((value) => value + 1, 0)
+    rerenderDataContext = forceRender
+
+    return {
+      setlistConcertsPage,
+      isLoadingConcerts,
+      error: errorMessage,
+      fetchSetlistFmConcerts: fetchSetlistFmConcertsMock
+    }
+  }
 }))
 
 function renderComponent() {
@@ -53,6 +60,7 @@ describe('SetlistConcertSelector', () => {
     setlistConcertsPage = null
     isLoadingConcerts = false
     errorMessage = null
+    rerenderDataContext = undefined
   })
 
   it('fetches concerts on mount', () => {
@@ -181,6 +189,19 @@ describe('SetlistConcertSelector', () => {
 
   it('keeps a way back after a page request fails', async () => {
     const user = userEvent.setup()
+    fetchSetlistFmConcertsMock
+      .mockImplementationOnce(() => Promise.resolve())
+      .mockImplementationOnce(() => {
+        isLoadingConcerts = true
+        rerenderDataContext?.()
+        const failure = Promise.reject(new Error('Failed to fetch Setlist.fm concerts'))
+        void failure.catch(() => {
+          errorMessage = 'Failed to fetch Setlist.fm concerts'
+          isLoadingConcerts = false
+          rerenderDataContext?.()
+        })
+        return failure
+      })
     setlistConcertsPage = {
       concerts: [{ id: 'c1', artist: 'Band A' }],
       totalConcerts: 21,
@@ -194,6 +215,8 @@ describe('SetlistConcertSelector', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
+    await waitFor(() => expect(fetchSetlistFmConcertsMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByText('Failed to fetch Setlist.fm concerts')).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
   })
 })
