@@ -68,6 +68,23 @@ describe('SetlistConcertSelector', () => {
     expect(screen.getByText('Loading concerts...')).toBeInTheDocument()
   })
 
+  it('does not keep the previous page interactive while loading a new page', () => {
+    isLoadingConcerts = true
+    setlistConcertsPage = {
+      concerts: [{ id: 'c1', artist: 'Band A' }],
+      totalConcerts: 21,
+      pageNumber: 1,
+      pageSize: 20,
+      hasNextPage: true,
+      hasPreviousPage: false
+    }
+
+    renderComponent()
+
+    expect(screen.queryByText('Band A')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select Page' })).toBeDisabled()
+  })
+
   it('renders empty state when no concerts are returned', () => {
     setlistConcertsPage = {
       concerts: [],
@@ -160,5 +177,23 @@ describe('SetlistConcertSelector', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next' }))
     expect(fetchSetlistFmConcertsMock).toHaveBeenCalledWith('user123', { maxConcerts: 10, maxTracks: 100 }, 2)
+  })
+
+  it('keeps a way back after a page request fails', async () => {
+    const user = userEvent.setup()
+    setlistConcertsPage = {
+      concerts: [{ id: 'c1', artist: 'Band A' }],
+      totalConcerts: 21,
+      pageNumber: 1,
+      pageSize: 20,
+      hasNextPage: true,
+      hasPreviousPage: false
+    }
+
+    renderComponent()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
   })
 })

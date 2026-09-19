@@ -36,6 +36,31 @@ public static class SourcesEndpoints
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         var setlistfm = sources.MapGroup("/setlistfm");
+        setlistfm.AddEndpointFilter(async (context, next) =>
+        {
+            var httpContext = context.HttpContext;
+            if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
+                string.IsNullOrWhiteSpace(sessionId))
+            {
+                return ApiErrorExtensions.Unauthorized("NO_SESSION", "No active session found");
+            }
+
+            var sessionStore = httpContext.RequestServices.GetRequiredService<ISessionStore>();
+            var session = sessionStore.GetSession(sessionId);
+            if (session is null)
+            {
+                return ApiErrorExtensions.Unauthorized("INVALID_SESSION", "Session not found or has been invalidated");
+            }
+
+            if (session.IsExpired())
+            {
+                sessionStore.RemoveSession(sessionId);
+                httpContext.Response.Cookies.Delete("replay_session_id");
+                return ApiErrorExtensions.Unauthorized("SESSION_EXPIRED", "Session has expired");
+            }
+
+            return await next(context);
+        });
 
         setlistfm.MapPost("/data", PostFetchSetlistFmDataNormalized)
             .WithName("FetchSetlistFmData")
@@ -290,6 +315,13 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
+        catch (HttpRequestException ex)
+        {
+            return ApiErrorExtensions.ServiceUnavailable(
+                "SETLISTFM_API_ERROR",
+                "Failed to communicate with Setlist.fm",
+                ex.Message);
+        }
         catch (Exception ex)
         {
             return ApiErrorExtensions.InternalServerError(
@@ -349,6 +381,13 @@ public static class SourcesEndpoints
         {
             return ApiErrorExtensions.BadRequest(
                 "INVALID_FILTER",
+                ex.Message);
+        }
+        catch (HttpRequestException ex)
+        {
+            return ApiErrorExtensions.ServiceUnavailable(
+                "SETLISTFM_API_ERROR",
+                "Failed to communicate with Setlist.fm",
                 ex.Message);
         }
         catch (Exception ex)

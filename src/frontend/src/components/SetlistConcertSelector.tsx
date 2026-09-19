@@ -39,7 +39,7 @@ export function SetlistConcertSelector({
     fetchSetlistFmConcerts(userId, appliedFilter, pageNumber)
   }, [pageNumber, userId, appliedFilter, fetchSetlistFmConcerts])
 
-  const concerts = setlistConcertsPage?.concerts ?? []
+  const concerts = isLoadingConcerts ? [] : setlistConcertsPage?.concerts ?? []
   const maxConcerts = Number(setlistFmFilter.maxConcerts ?? 10)
   const canSelectMore = selectedIds.length < maxConcerts
 
@@ -101,7 +101,7 @@ export function SetlistConcertSelector({
           )}
 
           <Flex gap="2" wrap="wrap">
-            <Button type="button" variant="soft" onClick={selectPageConcerts} disabled={concerts.length === 0 || !canSelectMore}>
+            <Button type="button" variant="soft" onClick={selectPageConcerts} disabled={isLoadingConcerts || concerts.length === 0 || !canSelectMore}>
               Select Page
             </Button>
             <Button
@@ -169,7 +169,7 @@ export function SetlistConcertSelector({
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      disabled={!isSelected && !canSelectMore}
+                      disabled={isLoadingConcerts || (!isSelected && !canSelectMore)}
                       onChange={(event) => toggleConcert(concert.id, event.target.checked)}
                       aria-label={`Include concert ${concert.artist} ${descriptor}`}
                     />
@@ -193,7 +193,7 @@ export function SetlistConcertSelector({
               type="button"
               variant="soft"
               onClick={() => setPageNumber((value) => Math.max(1, value - 1))}
-              disabled={isLoadingConcerts || isFilterStale || !(setlistConcertsPage?.hasPreviousPage ?? false)}
+              disabled={isLoadingConcerts || isFilterStale || pageNumber <= 1}
             >
               Previous
             </Button>

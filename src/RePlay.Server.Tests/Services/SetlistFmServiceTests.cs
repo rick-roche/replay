@@ -111,6 +111,14 @@ public sealed class SetlistFmServiceTests
     [Fact]
     public async Task GetUserConcertsAsync_FetchesSelectedConcertsDirectly_AndHonorsTrackLimit()
     {
+        var attendedPayload = """
+            {
+              "setlist": [{ "id": "concert-1" }],
+              "total": 1,
+              "page": 1,
+              "itemsPerPage": 20
+            }
+            """;
         var setlistPayload = """
             {
               "id": "concert-1",
@@ -123,6 +131,7 @@ public sealed class SetlistFmServiceTests
               }
             }
             """;
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(attendedPayload) });
         _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(setlistPayload) });
 
         var result = await _service.GetUserConcertsAsync(
@@ -132,6 +141,22 @@ public sealed class SetlistFmServiceTests
 
         result.Concerts.Should().ContainSingle(concert => concert.Id == "concert-1");
         result.Tracks.Should().ContainSingle(track => track.Name == "First Song");
+    }
+
+    [Fact]
+    public async Task GetUserConcertsAsync_RejectsSelectedConcertNotAttendedByUser()
+    {
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{ "setlist": [], "total": 0, "page": 1, "itemsPerPage": 20 }""")
+        });
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter(),
+                ["concert-1"]))
+            .Should()
+            .ThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -211,6 +236,19 @@ public sealed class SetlistFmServiceTests
     }
 
     [Fact]
+    public async Task GetUserConcertsAsync_StopsPagingWhenProviderItemsPerPageIsZero()
+    {
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{ "setlist": [{ "id": "concert-1" }], "total": 100, "page": 1, "itemsPerPage": 0 }""")
+        });
+
+        var result = await _service.GetUserConcertsAsync("exampleUser", new SetlistFmFilter { MaxConcerts = 2 });
+
+        result.Concerts.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task GetUserConcertsPageAsync_SkipsConcertsWithoutIds()
     {
         var attendedPayload = """
@@ -247,6 +285,10 @@ public sealed class SetlistFmServiceTests
     [Fact]
     public async Task GetUserConcertsAsync_RejectsSelectedSetlistWithoutId()
     {
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{ "setlist": [{ "id": "concert-1" }], "total": 1, "page": 1, "itemsPerPage": 20 }""")
+        });
         _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{ "artist": { "name": "Missing ID" } }""")

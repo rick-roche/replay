@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
 import type { DiscogsFilter } from '../types/discogs'
@@ -70,6 +70,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [setlistFmFilter, setSetlistFmFilter] = useState<SetlistFmFilter>(DEFAULT_SETLISTFM_FILTER)
   const [setlistFmFetchMode, setSetlistFmFetchModeState] = useState<SetlistFmFetchMode>('quick')
   const [selectedSetlistConcertIdsByUser, setSelectedSetlistConcertIdsByUser] = useState<Record<string, string[]>>({})
+  const selectedSetlistConcertIdsByUserRef = useRef<Record<string, string[]>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [autoFetch, setAutoFetchState] = useState(true)
@@ -142,7 +143,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (!isSelectedConcertsByUser(parsed)) {
           throw new Error('Invalid selected concert storage')
         }
-        setSelectedSetlistConcertIdsByUser(dedupeSelectedConcertsByUser(parsed))
+        const deduped = dedupeSelectedConcertsByUser(parsed)
+        selectedSetlistConcertIdsByUserRef.current = deduped
+        setSelectedSetlistConcertIdsByUser(deduped)
       } catch {
         localStorage.removeItem(SETLISTFM_SELECTED_CONCERTS_KEY)
       }
@@ -235,21 +238,23 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       return [trimmedId]
     })
     const next = {
-      ...selectedSetlistConcertIdsByUser,
+      ...selectedSetlistConcertIdsByUserRef.current,
       [userId]: deduped
     }
 
+    selectedSetlistConcertIdsByUserRef.current = next
     setSelectedSetlistConcertIdsByUser(next)
     localStorage.setItem(SETLISTFM_SELECTED_CONCERTS_KEY, JSON.stringify(next))
   }
 
   function clearSelectedSetlistConcertIds(userId: string) {
-    if (!(userId in selectedSetlistConcertIdsByUser)) {
+    if (!(userId in selectedSetlistConcertIdsByUserRef.current)) {
       return
     }
 
-    const next = { ...selectedSetlistConcertIdsByUser }
+    const next = { ...selectedSetlistConcertIdsByUserRef.current }
     delete next[userId]
+    selectedSetlistConcertIdsByUserRef.current = next
     setSelectedSetlistConcertIdsByUser(next)
     localStorage.setItem(SETLISTFM_SELECTED_CONCERTS_KEY, JSON.stringify(next))
   }

@@ -156,6 +156,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const requestId = ++concertRequestId.current
     setIsLoadingConcerts(true)
     setError(null)
+    setSetlistConcertsPage(null)
 
     try {
       const concertsPage = await sourcesApi.fetchSetlistFmConcerts(userId, filter, pageNumber)

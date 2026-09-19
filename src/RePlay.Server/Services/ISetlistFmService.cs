@@ -155,6 +155,8 @@ public sealed class SetlistFmService : ISetlistFmService
                 throw new ArgumentException($"Select between 1 and {maxConcerts} unique concerts", nameof(selectedConcertIds));
             }
 
+            await ValidateSelectedConcertsAsync(userId, concertIds, cancellationToken).ConfigureAwait(false);
+
             foreach (var concertId in concertIds)
             {
                 var setlistItem = await GetSetlistAsync(concertId, cancellationToken).ConfigureAwait(false);
@@ -199,7 +201,8 @@ public sealed class SetlistFmService : ISetlistFmService
             }
 
             // Check if there are more pages
-            if (payload.Page >= (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage)
+            if (payload.ItemsPerPage <= 0 ||
+                payload.Page >= (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage)
             {
                 break;
             }
@@ -376,6 +379,41 @@ public sealed class SetlistFmService : ISetlistFmService
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         return await JsonSerializer.DeserializeAsync<SetlistAttendedResponse.SetlistItem>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Setlist.fm returned an invalid setlist response.");
+    }
+
+    private async Task ValidateSelectedConcertsAsync(
+        string userId,
+        IReadOnlyCollection<string> concertIds,
+        CancellationToken cancellationToken)
+    {
+        var remainingIds = concertIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var page = 1;
+
+        while (remainingIds.Count > 0)
+        {
+            var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
+            foreach (var item in payload.Setlist ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(item.Id))
+                {
+                    remainingIds.Remove(item.Id);
+                }
+            }
+
+            if (remainingIds.Count == 0 ||
+                payload.ItemsPerPage <= 0 ||
+                payload.Page >= (payload.Total + payload.ItemsPerPage - 1) / payload.ItemsPerPage)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        if (remainingIds.Count > 0)
+        {
+            throw new ArgumentException("Selected concerts must belong to the requested Setlist.fm user", nameof(concertIds));
+        }
     }
 
     private static (DateTime? StartDate, DateTime? EndDate) ParseDateRange(SetlistFmFilter filter)

@@ -247,6 +247,27 @@ public class SourcesEndpointsTests
     }
 
     [Fact]
+    public async Task PostFetchSetlistFmDataNormalized_ReturnsServiceUnavailableForProviderFailure()
+    {
+        var mi = GetPrivate("PostFetchSetlistFmDataNormalized");
+        var fake = new FakeSetlistFmService
+        {
+            OnGetUserConcertsNormalizedAsync = (_, _, _, _) => throw new HttpRequestException("rate limited")
+        };
+
+        var result = await InvokeAsync(
+            mi,
+            new FetchSetlistFmDataRequest { UserId = "user123", Filter = new SetlistFmFilter() },
+            fake,
+            ContextWithSessionCookie(),
+            CancellationToken.None);
+
+        var response = (JsonHttpResult<ApiError>)result;
+        response.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        response.Value!.Code.Should().Be("SETLISTFM_API_ERROR");
+    }
+
+    [Fact]
     public async Task PostFetchSetlistFmConcerts_ValidatesErrors()
     {
         var mi = GetPrivate("PostFetchSetlistFmConcerts");
@@ -302,6 +323,27 @@ public class SourcesEndpointsTests
 
         var result = await InvokeAsync(mi, req, fake, ctx, CancellationToken.None);
         result.Should().BeOfType<Ok<SetlistConcertsResponse>>();
+    }
+
+    [Fact]
+    public async Task PostFetchSetlistFmConcerts_ReturnsServiceUnavailableForProviderFailure()
+    {
+        var mi = GetPrivate("PostFetchSetlistFmConcerts");
+        var fake = new FakeSetlistFmService
+        {
+            OnGetUserConcertsPageAsync = (_, _, _, _, _) => throw new HttpRequestException("rate limited")
+        };
+
+        var result = await InvokeAsync(
+            mi,
+            new FetchSetlistFmConcertsRequest { UserId = "user123", Filter = new SetlistFmFilter(), PageNumber = 1 },
+            fake,
+            ContextWithSessionCookie(),
+            CancellationToken.None);
+
+        var response = (JsonHttpResult<ApiError>)result;
+        response.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        response.Value!.Code.Should().Be("SETLISTFM_API_ERROR");
     }
 
     [Fact]
