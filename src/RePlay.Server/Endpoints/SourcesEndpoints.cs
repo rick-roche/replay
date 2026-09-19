@@ -59,6 +59,24 @@ public static class SourcesEndpoints
                 return ApiErrorExtensions.Unauthorized("SESSION_EXPIRED", "Session has expired");
             }
 
+            var requestedUserId = context.Arguments
+                .Select(argument => argument switch
+                {
+                    FetchSetlistFmDataRequest request => request.UserId,
+                    FetchSetlistFmConcertsRequest request => request.UserId,
+                    _ => null
+                })
+                .FirstOrDefault(userId => userId is not null);
+            if (string.IsNullOrWhiteSpace(requestedUserId))
+            {
+                return await next(context);
+            }
+
+            if (ValidateSetlistFmUser(sessionStore, sessionId, requestedUserId) is { } userValidationError)
+            {
+                return userValidationError;
+            }
+
             return await next(context);
         });
 
@@ -69,6 +87,9 @@ public static class SourcesEndpoints
             .Accepts<FetchSetlistFmDataRequest>("application/json")
             .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
+            .Produces<ApiError>(StatusCodes.Status403Forbidden, "application/json")
+            .Produces<ApiError>(StatusCodes.Status502BadGateway, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         setlistfm.MapPost("/concerts", PostFetchSetlistFmConcerts)
@@ -78,9 +99,36 @@ public static class SourcesEndpoints
             .Accepts<FetchSetlistFmConcertsRequest>("application/json")
             .Produces<SetlistConcertsResponse>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
+            .Produces<ApiError>(StatusCodes.Status403Forbidden, "application/json")
+            .Produces<ApiError>(StatusCodes.Status502BadGateway, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         return group;
+    }
+
+    private static IResult? ValidateSetlistFmUser(
+        ISessionStore sessionStore,
+        string sessionId,
+        string? requestedUserId)
+    {
+        var configuredSetlist = sessionStore.GetSourceConfig(sessionId, "setlistfm");
+        if (configuredSetlist is null)
+        {
+            return ApiErrorExtensions.BadRequest(
+                "SETLISTFM_NOT_CONFIGURED",
+                "Configure a Setlist.fm profile before fetching concerts");
+        }
+
+        if (requestedUserId is null ||
+            !string.Equals(configuredSetlist.ConfigValue, requestedUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiErrorExtensions.Forbidden(
+                "SETLISTFM_USER_MISMATCH",
+                "The requested Setlist.fm user does not match the configured profile");
+        }
+
+        return null;
     }
 
     /// <summary>

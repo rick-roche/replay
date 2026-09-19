@@ -23,6 +23,9 @@ public class SourcesEndpointsTests
         return await task.ConfigureAwait(false);
     }
 
+    private static IResult InvokeResult(MethodInfo mi, params object[] args)
+        => (IResult)mi.Invoke(null, args)!;
+
     private sealed class FakeLastfmService : ILastfmService
     {
         public Func<string, CancellationToken, Task<LastfmUser?>>? OnGetUserAsync { get; set; }
@@ -106,6 +109,28 @@ public class SourcesEndpointsTests
             ctx.Request.Headers.Append("Cookie", $"replay_session_id={sessionId}");
         }
         return ctx;
+    }
+
+    [Fact]
+    public void ValidateSetlistFmUser_RejectsUserDifferentFromSessionConfiguration()
+    {
+        var store = new InMemorySessionStore();
+        store.StoreSourceConfig("sid", new ExternalSourceConfig
+        {
+            Source = "setlistfm",
+            ConfigValue = "configured-user",
+            ConfiguredAt = DateTime.UtcNow
+        });
+
+        var result = InvokeResult(
+            GetPrivate("ValidateSetlistFmUser"),
+            store,
+            "sid",
+            "requested-user");
+
+        var response = (JsonHttpResult<ApiError>)result;
+        response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        response.Value!.Code.Should().Be("SETLISTFM_USER_MISMATCH");
     }
 
 
