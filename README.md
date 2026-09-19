@@ -1,6 +1,6 @@
 # Re:Play
 
-[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy ACA from GHCR](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml)
+[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy to Coolify](https://github.com/rick-roche/replay/actions/workflows/deploy.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy.yml)
 
 ![Re:Play logo](src/frontend/public/replay-logo.svg)
 
@@ -14,7 +14,7 @@ Re:Play is a music-first social app that lets users explore, queue, and share li
 - Node: v24
 - Testing: xUnit (backend), vitest (frontend)
 - CI: GitHub Actions
-- Infra: Azure Container Apps (deployment targets)
+- Deployment: Coolify Application with immutable GHCR images
 
 ## Quickstart (development)
 
@@ -60,10 +60,10 @@ CI is defined in [.github/workflows/ci.yml](./.github/workflows/ci.yml) and runs
 
 ## Deployment
 
-Deploy to Azure Container Apps using images stored in GitHub Container Registry:
+Deploy to Coolify using immutable images stored in GitHub Container Registry:
 
-- Guide: [docs/deploy-aca-ghcr.md](./docs/deploy-aca-ghcr.md)
-- Workflow: [.github/workflows/deploy-aca-ghcr.yml](./.github/workflows/deploy-aca-ghcr.yml)
+- Guide: [docs/deployment.md](./docs/deployment.md)
+- Workflow: [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)
 
 ## Contributing
 

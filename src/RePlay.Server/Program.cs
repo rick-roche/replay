@@ -23,7 +23,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
         ForwardedHeaders.XForwardedProto |
         ForwardedHeaders.XForwardedHost;
 
-    // ACA terminates TLS and forwards headers through infrastructure proxies.
+    // Coolify's reverse proxy terminates TLS and forwards the original request headers.
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });

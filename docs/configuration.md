@@ -58,11 +58,11 @@ $env:Spotify__RedirectUri = "http://127.0.0.1:7286/api/auth/callback"
 
 ## Production
 
-For production deployments register an HTTPS redirect URI in the Spotify dashboard, for example:
+For the Coolify production deployment register this HTTPS redirect URI in the Spotify dashboard:
 
-- `https://your-domain.com/api/auth/callback`
+- `https://replay.rickroche.com/api/auth/callback`
 
-Provide the production Spotify credentials and RedirectUri through your hosting environment (environment variables or secure secret store). The application validates that RedirectUri is set and does not contain "localhost".
+Provide the production Spotify credentials and RedirectUri through Coolify environment variables or another secure secret store. The application validates that RedirectUri is set and does not contain "localhost".
 
 ## Programmatic validation
 
