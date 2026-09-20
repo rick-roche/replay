@@ -46,7 +46,7 @@ jobs:
           api_url="${COOLIFY_API_URL%/}/api/v1"
           auth_header="Authorization: Bearer ${COOLIFY_TOKEN}"
           application_url="${api_url}/applications/${COOLIFY_APPLICATION_UUID}"
-          deploy_url="${api_url}/deploy?uuid=${COOLIFY_APPLICATION_UUID}"
+          deploy_url="${application_url}/start?instant_deploy=true"
 
           curl --fail-with-body --retry 3 --request PATCH \
             --header "${auth_header}" \
