@@ -31,9 +31,15 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --base main \
             --state open \
-            --json number,headRefName,headRepository \
+            --json number,headRefName,headRepository,title,body,labels \
             | jq -r --arg branch "${HEAD_BRANCH}" --arg repo "${GITHUB_REPOSITORY}" \
-              '[.[] | select(.headRefName == $branch and .headRepository.nameWithOwner == $repo)] | first | .number // empty')"
+              '[.[]
+                | select(.headRefName == $branch
+                  and .headRepository.nameWithOwner == $repo
+                  and (.title | test("^chore\\(main\\): release [0-9]+\\.[0-9]+\\.[0-9]+$"))
+                  and (.body | contains("This PR was generated with [Release Please]"))
+                  and any(.labels[]; .name == "autorelease: pending"))]
+                | first | .number // empty')"
 
           if [[ -z "${pull_request_number}" ]]; then
             echo "No open Release Please pull request found for ${HEAD_BRANCH}."

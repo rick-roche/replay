@@ -135,6 +135,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [backend, frontend, container-build]
     runs-on: ubuntu-latest
+    concurrency:
+      group: publish-${{ github.sha }}
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
@@ -153,18 +156,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check for existing immutable image
-        id: image
         env:
           IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
         run: |
           if docker buildx imagetools inspect "${IMAGE}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Refusing to overwrite existing immutable image ${IMAGE}."
+            exit 1
           fi
 
       - name: Build and publish immutable image
-        if: steps.image.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
