@@ -1,0 +1,61 @@
+name: Deploy to Coolify
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coolify-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy validated image
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_APPLICATION_UUID: ${{ secrets.COOLIFY_APPLICATION_UUID }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          VALIDATED_TAG: ${{ github.event.workflow_run.head_sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${COOLIFY_API_URL}" || -z "${COOLIFY_APPLICATION_UUID}" || -z "${COOLIFY_TOKEN}" ]]; then
+            echo "COOLIFY_API_URL, COOLIFY_APPLICATION_UUID, and COOLIFY_TOKEN must be configured."
+            exit 1
+          fi
+
+          current_main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "${current_main_sha}" != "${VALIDATED_TAG}" ]]; then
+            echo "Skipping stale deployment ${VALIDATED_TAG}; main is now ${current_main_sha}."
+            exit 0
+          fi
+
+          api_url="${COOLIFY_API_URL%/}/api/v1"
+          auth_header="Authorization: Bearer ${COOLIFY_TOKEN}"
+          application_url="${api_url}/applications/${COOLIFY_APPLICATION_UUID}"
+          deploy_url="${application_url}/start?instant_deploy=true"
+
+          curl --fail-with-body --retry 3 --request PATCH \
+            --header "${auth_header}" \
+            --header 'Content-Type: application/json' \
+            --data "{\"docker_registry_image_tag\":\"${VALIDATED_TAG}\"}" \
+            "${application_url}"
+
+          curl --fail-with-body --retry 3 --request POST \
+            --header "${auth_header}" \
+            "${deploy_url}"
+
+          echo "Validated deployment SHA: ${VALIDATED_TAG}" >> "$GITHUB_STEP_SUMMARY"

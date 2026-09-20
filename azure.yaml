@@ -1,7 +1,0 @@
-name: replay
-metadata:
-  template: replay-aca-ghcr@0.0.1
-
-infra:
-  provider: bicep
-  path: infra
