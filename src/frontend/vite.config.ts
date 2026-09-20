@@ -2,8 +2,9 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import packageJson from '../../package.json'
+import { getBuildIdentifier } from './src/buildIdentifier'
 
-const buildIdentifier = process.env.GIT_SHA?.slice(0, 7) || 'development'
+const buildIdentifier = getBuildIdentifier(process.env.GIT_SHA)
 
 // https://vite.dev/config/
 export default defineConfig({
