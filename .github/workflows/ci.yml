@@ -159,8 +159,18 @@ jobs:
         env:
           IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
         run: |
-          if docker buildx imagetools inspect "${IMAGE}" >/dev/null 2>&1; then
+          inspect_output="$(mktemp)"
+          inspect_status=0
+          docker buildx imagetools inspect "${IMAGE}" > /dev/null 2>"${inspect_output}" || inspect_status=$?
+
+          if [[ "${inspect_status}" -eq 0 ]]; then
             echo "Refusing to overwrite existing immutable image ${IMAGE}."
+            exit 1
+          fi
+
+          if ! grep -Eiq 'manifest unknown|no such manifest|not found' "${inspect_output}"; then
+            echo "Unable to determine whether ${IMAGE} exists; refusing to publish."
+            cat "${inspect_output}"
             exit 1
           fi
 
