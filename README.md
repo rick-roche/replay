@@ -1,6 +1,6 @@
 # Re:Play
 
-[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy ACA from GHCR](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy-aca-ghcr.yml)
+[![CI](https://github.com/rick-roche/replay/actions/workflows/ci.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/ci.yml) [![Deploy to Coolify](https://github.com/rick-roche/replay/actions/workflows/deploy.yml/badge.svg)](https://github.com/rick-roche/replay/actions/workflows/deploy.yml) [![Release](https://img.shields.io/github/v/release/rick-roche/replay)](https://github.com/rick-roche/replay/releases)
 
 ![Re:Play logo](src/frontend/public/replay-logo.svg)
 
@@ -14,7 +14,7 @@ Re:Play is a music-first social app that lets users explore, queue, and share li
 - Node: v24
 - Testing: xUnit (backend), vitest (frontend)
 - CI: GitHub Actions
-- Infra: Azure Container Apps (deployment targets)
+- Deployment: Coolify Application with immutable GHCR images
 
 ## Quickstart (development)
 
@@ -58,12 +58,26 @@ Frontend (from repo root):
 
 CI is defined in [.github/workflows/ci.yml](./.github/workflows/ci.yml) and runs backend and frontend builds, tests, and uploads coverage artifacts for inspection.
 
+## Releases
+
+Releases are automated from Conventional Commit titles. After a successful
+`main` CI run, Release Please creates or updates a release pull request. Its
+pull-request CI must pass; then the release pull request is merged automatically
+using the configured release token. The merge publishes the versioned image and
+Coolify deployment, while Release Please creates the `vX.Y.Z` Git tag, GitHub
+Release, and changelog.
+
+The root `package.json` is the single application version source. The About
+page displays the release version with the short commit SHA, for example
+`1.0.0+a72d99a`; local builds display `0.0.0+development` until the first
+automated release.
+
 ## Deployment
 
-Deploy to Azure Container Apps using images stored in GitHub Container Registry:
+Deploy to Coolify using immutable images stored in GitHub Container Registry:
 
-- Guide: [docs/deploy-aca-ghcr.md](./docs/deploy-aca-ghcr.md)
-- Workflow: [.github/workflows/deploy-aca-ghcr.yml](./.github/workflows/deploy-aca-ghcr.yml)
+- Guide: [docs/deployment.md](./docs/deployment.md)
+- Workflow: [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)
 
 ## Contributing
 

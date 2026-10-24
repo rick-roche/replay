@@ -48,7 +48,7 @@ Re:Play is a music-focused app with an Aspire app host, a .NET 10/C# 14 backend 
 - `src/RePlay.Server.Tests`: Backend tests.
 - `src/frontend`: Frontend app (React/TypeScript/Vite + Vitest).
 - `docs/`: Supporting documentation.
-- `infra/`: Deployment infrastructure.
+- `docs/deployment.md`: Coolify deployment flow and configuration.
 
 ## Standard Commands
 
@@ -78,7 +78,8 @@ Keep this file lean. Put domain-specific detail in focused docs, then reference 
 
 - `README.md` for repo setup and workflows.
 - `docs/configuration.md` for runtime configuration.
-- `docs/deploy-aca-ghcr.md` for deployment flow.
+- `docs/deployment.md` for deployment flow.
+- `README.md` for release automation and versioning.
 - Before changing C#, read `docs/development/csharp.md`.
 - Before changing React UI, read `docs/development/react.md` and `docs/development/accessibility.md`.
 - Before changing TypeScript, read `docs/development/typescript.md`.

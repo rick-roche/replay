@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom/vitest'
+import packageJson from '../../../../package.json'
+
+Object.assign(globalThis, {
+	__APP_VERSION__: `${packageJson.version}+development`,
+})
 
 // Polyfill ResizeObserver for Radix UI components in JSDOM
 class ResizeObserverMock {

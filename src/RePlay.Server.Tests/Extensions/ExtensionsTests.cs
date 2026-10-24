@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -135,5 +136,10 @@ public class ExtensionsTests
         Microsoft.Extensions.Hosting.Extensions.MapDefaultEndpoints(app);
 
         app.Should().NotBeNull();
+        ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(dataSource => dataSource.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Should().Contain("/health");
     }
 }
