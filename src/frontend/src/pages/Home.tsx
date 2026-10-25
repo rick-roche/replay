@@ -7,6 +7,7 @@ import { useDataSource } from '../contexts/DataSourceContext'
 import { useData } from '../contexts/DataContext'
 import { useMatch } from '../contexts/MatchContext'
 import { useConfig } from '../contexts/ConfigContext'
+import { useCreatePlaylist } from '../contexts/CreatePlaylistContext'
 import { useWorkflow, WorkflowStep } from '../contexts/WorkflowContext'
 import { DataSource } from '../types/datasource'
 import { WorkflowStepper } from '../components/WorkflowStepper'
@@ -34,9 +35,22 @@ export function Home() {
   const { selectedSource } = useDataSource()
   const { matchedData, matchedAlbums, matchedArtists, clearMatches } = useMatch()
   const { clearData, clearError } = useData()
-  const { autoFetch, setlistFmFetchMode } = useConfig()
-  const { markStepComplete, nextStep, currentStep } = useWorkflow()
+  const { autoFetch, setlistFmFetchMode, lastfmConfig, discogsConfig, setlistConfig, lastfmFilter, discogsFilter, setlistFmFilter } = useConfig()
+  const { clearPlaylist } = useCreatePlaylist()
+  const { markStepComplete, nextStep, currentStep, invalidateFrom } = useWorkflow()
   const hasAutoAdvancedRef = useRef(false)
+  const upstreamKey = JSON.stringify([selectedSource, lastfmConfig, discogsConfig, setlistConfig, lastfmFilter, discogsFilter, setlistFmFilter, setlistFmFetchMode])
+  const previousUpstreamKey = useRef(upstreamKey)
+
+  useEffect(() => {
+    if (previousUpstreamKey.current === upstreamKey) return
+    previousUpstreamKey.current = upstreamKey
+    clearMatches()
+    clearData()
+    clearPlaylist()
+    invalidateFrom(WorkflowStep.CONFIGURE)
+    hasAutoAdvancedRef.current = false
+  }, [upstreamKey, clearMatches, clearData, clearPlaylist, invalidateFrom])
 
   // Clear matched and normalized data when back in early workflow steps
   // so they don't persist when reconfiguring and fetching again
@@ -45,8 +59,10 @@ export function Home() {
       clearMatches()
       clearData()
       clearError()
+      clearPlaylist()
+      invalidateFrom(currentStep)
     }
-  }, [currentStep, clearMatches, clearData, clearError])
+  }, [currentStep, clearMatches, clearData, clearError, clearPlaylist, invalidateFrom])
 
   // Auto-advance to curate when fetch+match completes with results for the first time
   useEffect(() => {

@@ -12,7 +12,7 @@ public static class ConfigurationEndpoints
 {
     public static RouteGroupBuilder MapConfigurationEndpoints(this RouteGroupBuilder group)
     {
-        var config = group.MapGroup("/config");
+        var config = group.MapGroup("/config").AddEndpointFilter<SessionEndpointFilter>().WithProviderErrors();
         
         config.MapPost("/lastfm", PostConfigureLastfm)
             .WithName("ConfigureLastfm")
@@ -120,12 +120,14 @@ public static class ConfigurationEndpoints
 
             return Results.Ok(response);
         }
-        catch (Exception ex)
+        catch (ArgumentException) { return ApiErrorExtensions.BadRequest("INVALID_PROFILE", "The profile identifier is invalid."); }
+        catch (HttpRequestException ex) { return ProviderErrors.Source("LASTFM", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "LASTFM_CONFIG_ERROR",
-                "Error configuring Last.fm",
-                ex.Message);
+                "Error configuring Last.fm");
         }
     }
 
@@ -189,12 +191,14 @@ public static class ConfigurationEndpoints
 
             return Results.Ok(response);
         }
-        catch (Exception ex)
+        catch (ArgumentException) { return ApiErrorExtensions.BadRequest("INVALID_PROFILE", "The profile identifier is invalid."); }
+        catch (HttpRequestException ex) { return ProviderErrors.Source("SETLISTFM", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "SETLIST_CONFIG_ERROR",
-                "Error configuring Setlist.fm",
-                ex.Message);
+                "Error configuring Setlist.fm");
         }
     }
 
@@ -246,12 +250,14 @@ public static class ConfigurationEndpoints
 
             return Results.Ok(response);
         }
-        catch (Exception ex)
+        catch (ArgumentException) { return ApiErrorExtensions.BadRequest("INVALID_PROFILE", "The profile identifier is invalid."); }
+        catch (HttpRequestException ex) { return ProviderErrors.Source("DISCOGS", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "DISCOGS_CONFIG_ERROR",
-                "Error configuring Discogs",
-                ex.Message);
+                "Error configuring Discogs");
         }
     }
 }

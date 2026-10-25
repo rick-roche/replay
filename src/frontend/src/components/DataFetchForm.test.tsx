@@ -3,7 +3,15 @@ import { render, screen } from '@testing-library/react'
 import { Theme } from '@radix-ui/themes'
 import { FetchDataButton, DataResults } from '@/components/DataFetchForm'
 import { DataProvider } from '@/contexts/DataContext'
-import { ConfigProvider } from '@/contexts/ConfigContext'
+import { ConfigProvider, useConfig } from '@/contexts/ConfigContext'
+import userEvent from '@testing-library/user-event'
+import { configApi } from '@/api/config'
+vi.mock('@/api/config')
+
+function ConfigureProfile() {
+  const { configureLastfm } = useConfig()
+  return <button onClick={() => configureLastfm('testuser')}>Configure test profile</button>
+}
 import { DataSourceProvider } from '@/contexts/DataSourceContext'
 const appendMatchesMock = vi.fn()
 
@@ -28,6 +36,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
     <Theme>
       <ConfigProvider>
+        <ConfigureProfile />
         <DataSourceProvider>
           <DataProvider>{children}</DataProvider>
         </DataSourceProvider>
@@ -41,6 +50,7 @@ describe('FetchDataButton', () => {
     vi.clearAllMocks()
     appendMatchesMock.mockReset()
     localStorage.clear()
+    vi.mocked(configApi.configureLastfm).mockResolvedValue({ username: 'testuser', profileUrl: '', playCount: 1000, isConfigured: true })
   })
 
   it('should render nothing when Last.fm is not configured', () => {
@@ -55,7 +65,7 @@ describe('FetchDataButton', () => {
     expect(screen.queryByText('Fetch Data')).not.toBeInTheDocument()
   })
 
-  it('should render fetch button when Last.fm is configured', () => {
+  it('should render fetch button when Last.fm is configured', async () => {
     // Set up a configured Last.fm profile
     const config = {
       username: 'testuser',
@@ -72,11 +82,12 @@ describe('FetchDataButton', () => {
     )
 
     // Button should be present
+    await userEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
     expect(screen.getByRole('button', { name: /Fetch Data/i })).toBeInTheDocument()
     appendMatchesMock.mockReset()
   })
 
-  it('should display filter info when configured', () => {
+  it('should display filter info when configured', async () => {
     const config = {
       username: 'testuser',
       playCount: 1000,
@@ -91,10 +102,11 @@ describe('FetchDataButton', () => {
       </TestWrapper>
     )
 
+    await userEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
     expect(screen.getByText(/Last.fm/)).toBeInTheDocument()
   })
 
-  it('should render within a Card component', () => {
+  it('should render within a Card component', async () => {
     const config = {
       username: 'testuser',
       playCount: 1000,
@@ -110,11 +122,12 @@ describe('FetchDataButton', () => {
     )
 
     // Button and heading should both be present
+    await userEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
     expect(screen.getByRole('button', { name: /Fetch Data/i })).toBeInTheDocument()
     appendMatchesMock.mockReset()
   })
 
-  it('should be dark mode compatible', () => {
+  it('should be dark mode compatible', async () => {
     const config = {
       username: 'testuser',
       playCount: 1000,
@@ -130,6 +143,7 @@ describe('FetchDataButton', () => {
     )
 
     // Component renders without errors in Theme context
+    await userEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
     expect(screen.getByRole('button', { name: /Fetch Data/i })).toBeInTheDocument()
     appendMatchesMock.mockReset()
   })

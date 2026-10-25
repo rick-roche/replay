@@ -6,10 +6,10 @@ import { useMatch } from '../contexts/MatchContext';
 import { useWorkflow } from '../contexts/WorkflowContext';
 
 export const CreatePlaylistButton: React.FC = () => {
-  const { createPlaylist, isCreating, error } = useCreatePlaylist();
+  const { createPlaylist, isCreating, error, playlistId, creationUnconfirmed, clearPlaylist } = useCreatePlaylist();
   const { config } = usePlaylist();
   const { matchedData } = useMatch();
-  const { lockWorkflow } = useWorkflow();
+  const { lockWorkflow, resetWorkflow } = useWorkflow();
   const [localError, setLocalError] = useState<string | null>(null);
 
   if (!matchedData?.tracks || matchedData.tracks.length === 0) {
@@ -36,9 +36,9 @@ export const CreatePlaylistButton: React.FC = () => {
     }
 
     try {
-      await createPlaylist(trackUris, config.name, config.description, config.isPublic);
-      // Lock workflow navigation after successful playlist creation
-      lockWorkflow();
+      const accepted = await createPlaylist(trackUris, config.name, config.description, config.isPublic);
+      // A discarded response belongs to an older workflow and must not lock this one.
+      if (accepted) lockWorkflow();
     } catch {
       // Error is already set in the context
     }
@@ -65,9 +65,15 @@ export const CreatePlaylistButton: React.FC = () => {
           </Box>
         )}
 
+        {creationUnconfirmed && (
+          <Button variant="outline" onClick={() => { clearPlaylist(); resetWorkflow(); }}>
+            Start over after checking Spotify
+          </Button>
+        )}
+
         <Button
           onClick={handleCreatePlaylist}
-          disabled={isCreating || matchedCount === 0}
+          disabled={isCreating || matchedCount === 0 || Boolean(playlistId) || creationUnconfirmed}
           className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-700"
           style={{
             width: '100%',

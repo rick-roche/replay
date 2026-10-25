@@ -246,6 +246,7 @@ public class ConfigurationEndpointsTests
 
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         ((JsonHttpResult<ApiError>)result).StatusCode.Should().Be(401);
+        ((JsonHttpResult<ApiError>)result).Value!.Code.Should().Be("NO_SESSION");
     }
 
     [Fact]
@@ -429,7 +430,7 @@ public class ConfigurationEndpointsTests
     }
 
     [Fact]
-    public async Task PostConfigureSetlistFm_ServiceThrowsException_ReturnsInternalServerError()
+    public async Task PostConfigureSetlistFm_ServiceThrowsHttpRequestException_ReturnsBadGateway()
     {
         var mi = GetPrivate("PostConfigureSetlistFm");
         var ctx = ContextWithSessionCookie();
@@ -456,12 +457,13 @@ public class ConfigurationEndpointsTests
 
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
-        json.StatusCode.Should().Be(500);
-        json.Value!.Code.Should().Be("SETLIST_CONFIG_ERROR");
+        json.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        json.Value!.Code.Should().Be("SETLISTFM_API_ERROR");
+        json.Value.Message.Should().NotContain("API error");
     }
 
     [Fact]
-    public async Task PostConfigureLastfm_ServiceThrowsException_ReturnsInternalServerError()
+    public async Task PostConfigureLastfm_ServiceThrowsHttpRequestException_ReturnsBadGateway()
     {
         var mi = GetPrivate("PostConfigureLastfm");
         var ctx = ContextWithSessionCookie();
@@ -488,12 +490,13 @@ public class ConfigurationEndpointsTests
 
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
-        json.StatusCode.Should().Be(500);
-        json.Value!.Code.Should().Be("LASTFM_CONFIG_ERROR");
+        json.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        json.Value!.Code.Should().Be("LASTFM_API_ERROR");
+        json.Value.Message.Should().NotContain("API error");
     }
 
     [Fact]
-    public async Task PostConfigureDiscogs_ServiceThrowsException_ReturnsInternalServerError()
+    public async Task PostConfigureDiscogs_ServiceThrowsHttpRequestException_ReturnsBadGateway()
     {
         var mi = GetPrivate("PostConfigureDiscogs");
         var ctx = ContextWithSessionCookie();
@@ -520,8 +523,9 @@ public class ConfigurationEndpointsTests
 
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
-        json.StatusCode.Should().Be(500);
-        json.Value!.Code.Should().Be("DISCOGS_CONFIG_ERROR");
+        json.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        json.Value!.Code.Should().Be("DISCOGS_API_ERROR");
+        json.Value.Message.Should().NotContain("API error");
     }
 
     [Fact]

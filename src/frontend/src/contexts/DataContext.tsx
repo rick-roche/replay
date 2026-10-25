@@ -81,28 +81,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [isLoadingConcerts, setIsLoadingConcerts] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const concertRequestId = useRef(0)
+  const dataRequestId = useRef(0)
 
   const fetchData = useCallback(async (username: string, filter: LastfmFilter) => {
+    const request = ++dataRequestId.current
     setIsLoading(true)
     setError(null)
     setNormalizedData(null)
 
     try {
       const normalized = await sourcesApi.fetchLastfmData(username, filter)
+      if (request !== dataRequestId.current) return
       setNormalizedData(normalized)
     } catch (err) {
+      if (request !== dataRequestId.current) return
       setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
-      setIsLoading(false)
+      if (request === dataRequestId.current) setIsLoading(false)
     }
   }, [])
 
   const fetchMoreData = useCallback(async (username: string, filter: LastfmFilter) => {
+    const request = ++dataRequestId.current
     setIsLoading(true)
     setError(null)
 
     try {
       const normalized = await sourcesApi.fetchLastfmData(username, filter)
+      if (request !== dataRequestId.current) return []
 
       // If data types differ from existing, treat as a fresh set
       if (!normalizedData || normalizedData.dataType !== normalized.dataType) {
@@ -130,25 +136,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const newlyAdded = (normalized.tracks ?? []).filter((t) => !existingKeys.has(trackKey(t)))
       return newlyAdded
     } catch (err) {
+      if (request !== dataRequestId.current) return []
       setError(err instanceof Error ? err.message : 'Failed to fetch more data')
       return []
     } finally {
-      setIsLoading(false)
+      if (request === dataRequestId.current) setIsLoading(false)
     }
   }, [normalizedData])
 
   const fetchSetlistFmData = useCallback(async (userId: string, filter: SetlistFmFilter, selectedConcertIds?: string[]) => {
+    const request = ++dataRequestId.current
     setIsLoading(true)
     setError(null)
     setNormalizedData(null)
 
     try {
       const normalized = await sourcesApi.fetchSetlistFmData(userId, filter, selectedConcertIds)
+      if (request !== dataRequestId.current) return
       setNormalizedData(normalized)
     } catch (err) {
+      if (request !== dataRequestId.current) return
       setError(err instanceof Error ? err.message : 'Failed to fetch Setlist.fm data')
     } finally {
-      setIsLoading(false)
+      if (request === dataRequestId.current) setIsLoading(false)
     }
   }, [])
 
@@ -175,21 +185,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const fetchDiscogsData = useCallback(async (username: string, filter: DiscogsFilter) => {
+    const request = ++dataRequestId.current
     setIsLoading(true)
     setError(null)
     setNormalizedData(null)
 
     try {
       const normalized = await sourcesApi.fetchDiscogsData(username, filter)
+      if (request !== dataRequestId.current) return
       setNormalizedData(normalized)
     } catch (err) {
+      if (request !== dataRequestId.current) return
       setError(err instanceof Error ? err.message : 'Failed to fetch Discogs data')
     } finally {
-      setIsLoading(false)
+      if (request === dataRequestId.current) setIsLoading(false)
     }
   }, [])
 
   const clearData = useCallback(() => {
+    ++dataRequestId.current
+    ++concertRequestId.current
+    setIsLoading(false)
+    setIsLoadingConcerts(false)
+    setError(null)
     setNormalizedData(null)
     setSetlistConcertsPage(null)
   }, [])

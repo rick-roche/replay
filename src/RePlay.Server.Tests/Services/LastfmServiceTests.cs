@@ -528,11 +528,95 @@ public class LastfmServiceTests
         result.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task ProviderHttpFailure_PreservesStatusForBothOperations(HttpStatusCode status)
+    {
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(status));
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(status));
+        var userError = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserAsync("alice"));
+        var dataError = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserDataAsync("alice", new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall }));
+        userError.StatusCode.Should().Be(status);
+        dataError.StatusCode.Should().Be(status);
+    }
+
+    [Theory]
+    [InlineData(9, HttpStatusCode.Unauthorized)]
+    [InlineData(29, HttpStatusCode.TooManyRequests)]
+    [InlineData(11, HttpStatusCode.ServiceUnavailable)]
+    public async Task ProviderBodyFailure_IsNotMisreportedAsMissingUser(int code, HttpStatusCode status)
+    {
+        for (var i = 0; i < 2; i++)
+            _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent($"{{\"error\":{code},\"message\":\"secret provider text\"}}") });
+        var userError = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserAsync("alice"));
+        var dataError = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserDataAsync("alice", new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall }));
+        userError.StatusCode.Should().Be(status);
+        dataError.StatusCode.Should().Be(status);
+        userError.Message.Should().NotContain("secret provider text");
+    }
+
+    [Fact]
+    public async Task MalformedResponse_PropagatesParsingFailure()
+    {
+        for (var i = 0; i < 2; i++)
+            _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("not json") });
+        await Assert.ThrowsAnyAsync<System.Text.Json.JsonException>(() => _service.GetUserAsync("alice"));
+        await Assert.ThrowsAnyAsync<System.Text.Json.JsonException>(() => _service.GetUserDataAsync("alice", new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall }));
+    }
+
+    [Fact]
+    public async Task Cancellation_IsNotMisreportedAsMissingUser()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _service.GetUserAsync("alice", cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _service.GetUserDataAsync("alice", new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall }, cancellation.Token));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0)]
+    [InlineData(501, 0, 0)]
+    [InlineData(10, 999, 0)]
+    [InlineData(10, 0, 999)]
+    public async Task GetUserDataAsync_RejectsInvalidLimitsAndEnums(int limit, int dataType, int period)
+    {
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => _service.GetUserDataAsync("alice", new LastfmFilter
+        {
+            MaxResults = limit, DataType = (LastfmDataType)dataType, TimePeriod = (LastfmTimePeriod)period
+        }));
+        _httpMessageHandler.LastRequestUri.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Username_IsTrimmedAndEscapedAsSingleQueryValue()
+    {
+        for (var i = 0; i < 2; i++)
+            _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"error":6}""") });
+        await _service.GetUserAsync(" alice&api_key=evil ");
+        _httpMessageHandler.LastRequestUri!.Query.Should().Contain("user=alice%26api_key%3Devil");
+        await _service.GetUserDataAsync(" alice&api_key=evil ", new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall });
+        _httpMessageHandler.LastRequestUri!.Query.Should().Contain("user=alice%26api_key%3Devil");
+    }
+
+    [Fact]
+    public async Task ProviderFailure_DisposesOutboundRequests()
+    {
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserAsync("alice"));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => _httpMessageHandler.LastRequest!.Content!.ReadAsStringAsync());
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserDataAsync("alice", new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall }));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => _httpMessageHandler.LastRequest!.Content!.ReadAsStringAsync());
+    }
+
     private sealed class TestHttpMessageHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
 
         public Uri? LastRequestUri { get; private set; }
+        public HttpRequestMessage? LastRequest { get; private set; }
 
         public void EnqueueResponse(HttpResponseMessage response)
         {
@@ -543,6 +627,10 @@ public class LastfmServiceTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            LastRequest = request;
+            // Sentinel content makes ownership/disposal of the outbound request observable.
+            request.Content = new StringContent("");
             LastRequestUri = request.RequestUri;
 
             if (_responses.Count == 0)

@@ -5,7 +5,7 @@ import { useConfig } from '../contexts/ConfigContext'
 
 export function DiscogsConfigForm() {
   const { discogsConfig, isLoading, error, configureDiscogs, clearError } = useConfig()
-  const [identifier, setIdentifier] = useState('')
+  const [identifier, setIdentifier] = useState(discogsConfig?.username ?? '')
   const [isEditing, setIsEditing] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {

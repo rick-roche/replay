@@ -42,10 +42,20 @@ Discogs__ConsumerKey=<secret>
 Discogs__ConsumerSecret=<secret>
 Lastfm__ApiKey=<optional-secret>
 SetlistFm__ApiKey=<optional-secret>
+AllowedHosts=replay.rickroche.com
+ReverseProxy__KnownProxies__0=<Coolify-proxy-IP>
 ```
 
 Spotify credentials and redirect URI are required. The other provider values
 are required when their integrations are used.
+
+Set the trusted proxy address to the actual proxy, or use
+`ReverseProxy__KnownNetworks__0=<dedicated-proxy-network-CIDR>` instead when its
+address changes within a dedicated network. Never trust all networks. Forwarded
+host headers are ignored; the configured Spotify callback is authoritative.
+Health checks must send the allowed application host (for example, configure a
+Host header of `replay.rickroche.com`). See [configuration](configuration.md) for
+session, provider, and rate limits.
 
 ## GitHub Actions
 
@@ -123,7 +133,7 @@ docker run --rm -p 8080:8080 \
   replay:test
 ```
 
-Then request `http://127.0.0.1:8080/health`. The health endpoint checks only
+Then run `curl -H 'Host: replay.rickroche.com' http://127.0.0.1:8080/health`. The health endpoint checks only
 process readiness and does not call external providers.
 
 ## Migration order

@@ -5,7 +5,7 @@ import { useConfig } from '../contexts/ConfigContext'
 
 export function SetlistConfigForm() {
   const { setlistConfig, isLoading, error, configureSetlistFm, clearError } = useConfig()
-  const [usernameOrId, setUsernameOrId] = useState('')
+  const [usernameOrId, setUsernameOrId] = useState(setlistConfig?.userId ?? '')
   const [isEditing, setIsEditing] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {

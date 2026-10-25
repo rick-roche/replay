@@ -20,6 +20,7 @@ interface WorkflowContextValue {
   completedSteps: Set<WorkflowStep>
   markStepComplete: (step: WorkflowStep) => void
   lockWorkflow: () => void
+  invalidateFrom: (step: WorkflowStep) => void
 }
 
 const WorkflowContext = createContext<WorkflowContextValue | null>(null)
@@ -106,6 +107,13 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     setIsLocked(true)
   }, [])
 
+  const invalidateFrom = useCallback((step: WorkflowStep) => {
+    const index = STEP_ORDER.indexOf(step)
+    setCompletedSteps(prev => new Set([...prev].filter(completed => STEP_ORDER.indexOf(completed) < index)))
+    setCurrentStep(prev => STEP_ORDER.indexOf(prev) > index ? step : prev)
+    setIsLocked(false)
+  }, [])
+
   const value: WorkflowContextValue = {
     currentStep,
     goToStep,
@@ -115,7 +123,8 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     canGoToStep,
     completedSteps,
     markStepComplete,
-    lockWorkflow
+    lockWorkflow,
+    invalidateFrom
   }
 
   return <WorkflowContext.Provider value={value}>{children}</WorkflowContext.Provider>

@@ -76,6 +76,42 @@ public class PlaylistEndpointsTests
     };
 
     [Fact]
+    public async Task CreatePlaylist_PartialResponse_ReturnsBadGatewayWithProgressAndError()
+    {
+        var store = new InMemorySessionStore();
+        store.StoreSession(NewSession());
+        var service = new FakeSpotifyMatchingService
+        {
+            OnCreatePlaylistAsync = (_, _, _, _) => Task.FromResult(new PlaylistCreationResponse
+            {
+                PlaylistId = "partial-playlist",
+                Uri = "spotify:playlist:partial-playlist",
+                Url = "https://open.spotify.com/playlist/partial-playlist",
+                TracksAdded = 1,
+                IsComplete = false,
+                ErrorCode = "SPOTIFY_API_ERROR",
+                ErrorMessage = "Spotify is temporarily unavailable."
+            })
+        };
+        var request = new PlaylistCreationRequest
+        {
+            Name = "Partial playlist",
+            IsPublic = false,
+            TrackUris = ["spotify:track:track1", "spotify:track:track2"]
+        };
+
+        var result = await InvokeAsync(GetPrivate("CreatePlaylist"), ContextWithSessionCookie(), request, store, service, CancellationToken.None);
+
+        var json = result.Should().BeOfType<JsonHttpResult<PlaylistCreationResponse>>().Subject;
+        json.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        json.Value!.PlaylistId.Should().Be("partial-playlist");
+        json.Value.TracksAdded.Should().Be(1);
+        json.Value.IsComplete.Should().BeFalse();
+        json.Value.ErrorCode.Should().Be("SPOTIFY_API_ERROR");
+        json.Value.ErrorMessage.Should().Be("Spotify is temporarily unavailable.");
+    }
+
+    [Fact]
     public async Task CreatePlaylist_ValidRequest_ReturnsOk()
     {
         var mi = GetPrivate("CreatePlaylist");
@@ -222,7 +258,7 @@ public class PlaylistEndpointsTests
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
         json.StatusCode.Should().Be(401);
-        json.Value!.Code.Should().Be("UNAUTHORIZED");
+        json.Value!.Code.Should().Be("NO_SESSION");
     }
 
     [Fact]
@@ -249,7 +285,7 @@ public class PlaylistEndpointsTests
     }
 
     [Fact]
-    public async Task CreatePlaylist_ExpiredSession_DeletesCookie_ReturnsUnauthorized()
+    public async Task CreatePlaylist_ExpiredSpotifyToken_PreservesSessionAndCookie_ReturnsUnauthorized()
     {
         var mi = GetPrivate("CreatePlaylist");
         var ctx = ContextWithSessionCookie("sid");
@@ -269,9 +305,9 @@ public class PlaylistEndpointsTests
         result.Should().BeOfType<JsonHttpResult<ApiError>>();
         var json = (JsonHttpResult<ApiError>)result;
         json.StatusCode.Should().Be(401);
-        json.Value!.Code.Should().Be("SESSION_EXPIRED");
-        var setCookie = string.Join(";", ctx.Response.Headers["Set-Cookie"].ToArray());
-        setCookie.Should().Contain("replay_session_id=");
+        json.Value!.Code.Should().Be("SPOTIFY_TOKEN_EXPIRED");
+        ctx.Response.Headers.Should().NotContainKey("Set-Cookie");
+        store.GetSession("sid").Should().NotBeNull();
     }
 
     [Fact]
@@ -348,7 +384,7 @@ public class PlaylistEndpointsTests
 
         var service = new FakeSpotifyMatchingService
         {
-            OnCreatePlaylistAsync = (r, at, uid, ct) => throw new InvalidOperationException("Failed to create playlist")
+            OnCreatePlaylistAsync = (r, at, uid, ct) => throw new InvalidOperationException("private provider failure detail")
         };
 
         var request = new PlaylistCreationRequest
@@ -364,6 +400,7 @@ public class PlaylistEndpointsTests
         var json = (JsonHttpResult<ApiError>)result;
         json.StatusCode.Should().Be(500);
         json.Value!.Code.Should().Be("PLAYLIST_CREATION_FAILED");
+        json.Value.Message.Should().NotContain("private provider failure detail");
     }
 
     [Fact]
@@ -392,6 +429,7 @@ public class PlaylistEndpointsTests
         var json = (JsonHttpResult<ApiError>)result;
         json.StatusCode.Should().Be(500);
         json.Value!.Code.Should().Be("INTERNAL_SERVER_ERROR");
+        json.Value.Message.Should().NotContain("Unexpected error");
     }
 
     [Fact]
@@ -468,7 +506,7 @@ public class PlaylistEndpointsTests
     }
 
     [Fact]
-    public async Task CreatePlaylist_VeryLongPlaylistName_ReturnsOk()
+    public async Task CreatePlaylist_VeryLongPlaylistName_ReturnsBadRequest()
     {
         var mi = GetPrivate("CreatePlaylist");
         var ctx = ContextWithSessionCookie();
@@ -486,7 +524,9 @@ public class PlaylistEndpointsTests
 
         var result = await InvokeAsync(mi, ctx, request, store, service, CancellationToken.None);
 
-        result.Should().BeOfType<Ok<PlaylistCreationResponse>>();
+        var error = result.Should().BeOfType<BadRequest<ApiError>>().Subject;
+        error.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+        error.Value!.Code.Should().Be("INVALID_PLAYLIST_NAME");
     }
 
     [Fact]
@@ -571,10 +611,11 @@ public class PlaylistEndpointsTests
             TrackUris = ["spotify:track:id:extra"]
         };
 
-        // This might actually be valid if the ID contains colons, but let's check the validation logic
         var result = await InvokeAsync(mi, ctx, request, store, service, CancellationToken.None);
 
-        result.Should().BeOfType<Ok<PlaylistCreationResponse>>();
+        var error = result.Should().BeOfType<BadRequest<ApiError>>().Subject;
+        error.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+        error.Value!.Code.Should().Be("INVALID_TRACK_URI");
     }
 
     [Fact]

@@ -58,6 +58,12 @@ Re:Play is a music-focused app with an Aspire app host, a .NET 10/C# 14 backend 
 - Validate frontend: `cd src/frontend && npm run validate`
 - Test frontend: `cd src/frontend && npm run test`
 
+## Pull Request Readiness
+
+- Pull request titles must follow the Conventional Commit types enforced by `.github/workflows/ci.yml` (for example, `fix: ...`, `feat: ...`, or `docs: ...`). A compliant commit message does not make a noncompliant PR title pass.
+- Before reporting a pull request ready, check the PR title and inspect all required GitHub checks with `gh pr checks <number>`; local build and test commands do not validate PR metadata or replace remote CI.
+- When changing workflows or CI behavior, use `.github/workflows/ci.yml` as the source of truth for the checks and run the corresponding local commands where available.
+
 ## Testing Expectations
 
 - Prefer non-integrated tests.

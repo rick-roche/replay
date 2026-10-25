@@ -71,17 +71,125 @@ public class DiscogsServiceBasicTests : IDisposable
         await Assert.ThrowsAsync<ArgumentException>(() => _service.GetCollectionNormalizedAsync("", filter));
     }
 
+    [Theory]
+    [InlineData("https://www.discogs.com.evil.test/user/alice/collection")]
+    [InlineData("alice/../../admin")]
+    [InlineData("alice?secret=value")]
+    [InlineData("https://www.discogs.com/user/alice/collection?redirect=evil")]
+    [InlineData("https://www.discogs.com/user/alice/extra/../collection")]
+    [InlineData("https://www.discogs.com/user/alice/extra/%2e%2e/collection")]
+    public async Task GetProfileAsync_RejectsUntrustedOrInjectedIdentifiers(string identifier)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetProfileAsync(identifier));
+        _httpHandler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetProfileAsync_NormalizesActualCollectionUrlBeforeRequest()
+    {
+        _httpHandler.EnqueueResponse("""{"username":"alice"}""");
+        _httpHandler.EnqueueResponse("""{"pagination":{"items":4},"releases":[]}""");
+        var profile = await _service.GetProfileAsync(" https://www.discogs.com/user/alice/collection ");
+        profile!.Username.Should().Be("alice");
+        _httpHandler.Requests[0].Should().Be("https://api.discogs.com/users/alice");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(501)]
+    public async Task GetCollectionAsync_RejectsUnboundedTrackLimits(int limit)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetCollectionAsync("alice", new DiscogsFilter { MaxTracks = limit }));
+        _httpHandler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetCollectionAsync_StopsAfterEnoughTracksWithoutRefetchingFirstPage()
+    {
+        _httpHandler.EnqueueResponse("""{"username":"alice"}""");
+        _httpHandler.EnqueueResponse("""{"pagination":{"pages":1000,"items":100000},"releases":[{"basic_information":{"id":42,"title":"Album","year":2024}}]}""");
+        _httpHandler.EnqueueResponse("""{"id":42,"title":"Album","tracklist":[{"title":"Song"}]}""");
+
+        var result = await _service.GetCollectionAsync("alice", new DiscogsFilter { MaxTracks = 1 });
+
+        result!.Tracks.Should().ContainSingle(track => track.Name == "Song");
+        _httpHandler.Requests.Should().HaveCount(3);
+        _httpHandler.Requests[2].Should().Be("https://api.discogs.com/releases/42");
+    }
+
+    [Fact]
+    public async Task GetCollectionAsync_ThrowsRatherThanReturningTruncatedScan()
+    {
+        _httpHandler.EnqueueResponse("""{"username":"alice"}""");
+        for (var page = 1; page <= 100; page++)
+            _httpHandler.EnqueueResponse("""{"pagination":{"pages":101,"items":101},"releases":[]}""");
+
+        var error = await Assert.ThrowsAsync<ProviderScanLimitException>(() => _service.GetCollectionAsync("alice", new DiscogsFilter { MaxTracks = 1 }));
+        error.Message.Should().Contain("100");
+        _httpHandler.Requests.Should().HaveCount(101);
+    }
+
+    [Fact]
+    public async Task GetCollectionAsync_FiltersEachPageBeforeFetchingDetails()
+    {
+        _httpHandler.EnqueueResponse("""{"username":"alice"}""");
+        _httpHandler.EnqueueResponse("""{"pagination":{"pages":2,"items":2},"releases":[{"basic_information":{"id":1,"year":1999}}]}""");
+        _httpHandler.EnqueueResponse("""{"pagination":{"pages":2,"items":2},"releases":[{"basic_information":{"id":2,"year":2024}}]}""");
+        _httpHandler.EnqueueResponse("""{"id":2,"title":"Album","tracklist":[{"title":"Song"}]}""");
+
+        var result = await _service.GetCollectionAsync("alice", new DiscogsFilter { MaxTracks = 1, MinReleaseYear = 2020 });
+
+        result!.Tracks.Should().ContainSingle(track => track.Name == "Song");
+        _httpHandler.Requests.Should().HaveCount(4);
+        _httpHandler.Requests.Should().NotContain("https://api.discogs.com/releases/1");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task GetProfileAsync_PreservesProviderFailureStatus(HttpStatusCode status)
+    {
+        _httpHandler.Status = status;
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetProfileAsync("alice"));
+        error.StatusCode.Should().Be(status);
+    }
+
+    [Fact]
+    public async Task GetCollectionAsync_RejectsInvalidProviderReleaseIds()
+    {
+        _httpHandler.EnqueueResponse("""{"username":"alice"}""");
+        _httpHandler.EnqueueResponse("""{"pagination":{"pages":1,"items":1},"releases":[{"basic_information":{"id":0}}]}""");
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => _service.GetCollectionAsync("alice", new DiscogsFilter()));
+        _httpHandler.Requests.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetProfileAsync_DisposesOutboundRequestOnProviderFailure()
+    {
+        await _service.GetProfileAsync("alice");
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => _httpHandler.LastRequest!.Content!.ReadAsStringAsync());
+    }
+
     private sealed class MockHttpHandler : HttpMessageHandler
     {
         private readonly Queue<string> _responses = new();
+        public List<string> Requests { get; } = [];
+        public HttpStatusCode Status { get; set; } = HttpStatusCode.NotFound;
+        public HttpRequestMessage? LastRequest { get; private set; }
 
         public void EnqueueResponse(string json) => _responses.Enqueue(json);
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            LastRequest = request;
+            // Sentinel content makes ownership/disposal of the outbound request observable.
+            request.Content = new StringContent("");
+            Requests.Add(request.RequestUri!.ToString());
             if (_responses.Count == 0)
             {
-                return Task.FromResult(new HttpResponseMessage { StatusCode = HttpStatusCode.NotFound });
+                return Task.FromResult(new HttpResponseMessage { StatusCode = Status });
             }
 
             var json = _responses.Dequeue();

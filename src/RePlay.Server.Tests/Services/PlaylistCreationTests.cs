@@ -12,7 +12,7 @@ public class PlaylistCreationTests
         // Arrange
         var mockHttpClientHandler = new MockHttpClientHandler();
         mockHttpClientHandler.RegisterResponse(
-            "https://api.spotify.com/v1/users/userid123/playlists",
+            "https://api.spotify.com/v1/me/playlists",
             HttpMethod.Post,
             new StringContent("""
                 {
@@ -25,7 +25,7 @@ public class PlaylistCreationTests
                 """));
 
         mockHttpClientHandler.RegisterResponse(
-            "https://api.spotify.com/v1/playlists/playlistid123/tracks",
+            "https://api.spotify.com/v1/playlists/playlistid123/items",
             HttpMethod.Post,
             new StringContent("""
                 {
@@ -60,6 +60,8 @@ public class PlaylistCreationTests
         Assert.Equal("spotify:playlist:playlistid123", response.Uri);
         Assert.Equal("https://open.spotify.com/playlist/playlistid123", response.Url);
         Assert.Equal(2, response.TracksAdded);
+        Assert.True(response.IsComplete);
+        Assert.Null(response.ErrorCode);
     }
 
     [Fact]
@@ -137,7 +139,7 @@ public class PlaylistCreationTests
         // Arrange
         var mockHttpClientHandler = new MockHttpClientHandler();
         mockHttpClientHandler.RegisterResponse(
-            "https://api.spotify.com/v1/users/userid123/playlists",
+            "https://api.spotify.com/v1/me/playlists",
             HttpMethod.Post,
             new StringContent("""
                 {
@@ -150,7 +152,7 @@ public class PlaylistCreationTests
                 """));
 
         mockHttpClientHandler.RegisterResponse(
-            "https://api.spotify.com/v1/playlists/playlistid123/tracks",
+            "https://api.spotify.com/v1/playlists/playlistid123/items",
             HttpMethod.Post,
             new StringContent("""
                 {
@@ -184,8 +186,9 @@ public class PlaylistCreationTests
         Assert.NotNull(response);
         Assert.Equal("playlistid123", response.PlaylistId);
         Assert.Equal(250, response.TracksAdded);
+        Assert.True(response.IsComplete);
         // Should have been called twice (100 + 100 + 50)
-        Assert.Equal(3, mockHttpClientHandler.GetRequestCount("https://api.spotify.com/v1/playlists/playlistid123/tracks"));
+        Assert.Equal(3, mockHttpClientHandler.GetRequestCount("https://api.spotify.com/v1/playlists/playlistid123/items"));
     }
 }
 
@@ -194,12 +197,12 @@ public class PlaylistCreationTests
 /// </summary>
 public class MockHttpClientHandler : HttpClientHandler
 {
-    private readonly Dictionary<string, (HttpMethod method, HttpContent response)> _responses = new();
+    private readonly Dictionary<string, (HttpMethod method, string response)> _responses = new();
     private readonly Dictionary<string, int> _requestCounts = new();
 
     public void RegisterResponse(string url, HttpMethod method, HttpContent response)
     {
-        _responses[$"{method} {url}"] = (method, response);
+        _responses[$"{method} {url}"] = (method, response.ReadAsStringAsync().GetAwaiter().GetResult());
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -222,7 +225,7 @@ public class MockHttpClientHandler : HttpClientHandler
         {
             return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
-                Content = response.response
+                Content = new StringContent(response.response)
             };
         }
 
@@ -238,4 +241,3 @@ public class MockHttpClientHandler : HttpClientHandler
         return _requestCounts.TryGetValue(url, out var count) ? count : 0;
     }
 }
-

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { Theme } from '@radix-ui/themes'
 import { DiscogsConfigForm } from '@/components/DiscogsConfigForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
+import { configApi } from '@/api/config'
+vi.mock('@/api/config')
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -110,7 +112,7 @@ describe('DiscogsConfigForm', () => {
     expect(input).toBeInTheDocument()
   })
 
-  it('should show configured state with username and release count', () => {
+  it('should show configured state with username and release count', async () => {
     const config = {
       username: 'testuser',
       releaseCount: 42,
@@ -125,12 +127,14 @@ describe('DiscogsConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureDiscogs).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Discogs/i }))
     expect(screen.getByText('testuser')).toBeInTheDocument()
     expect(screen.getByText('42 releases linked')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Change Profile/i })).toBeInTheDocument()
   })
 
-  it('should show change profile button when configured', () => {
+  it('should show change profile button when configured', async () => {
     const config = {
       username: 'testuser',
       releaseCount: 42,
@@ -145,6 +149,8 @@ describe('DiscogsConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureDiscogs).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Discogs/i }))
     expect(screen.getByRole('button', { name: /Change Profile/i })).toBeInTheDocument()
   })
 
@@ -164,6 +170,8 @@ describe('DiscogsConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureDiscogs).mockResolvedValue(config)
+    await user.click(screen.getByRole('button', { name: /Connect Discogs/i }))
     const changeButton = screen.getByRole('button', { name: /Change Profile/i })
     await user.click(changeButton)
 

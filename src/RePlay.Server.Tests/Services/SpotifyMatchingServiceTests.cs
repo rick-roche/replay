@@ -954,7 +954,7 @@ public class SpotifyMatchingServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task MatchTracksAsync_HttpErrorResponse_ReturnsNoMatches()
+    public async Task MatchTracksAsync_HttpErrorResponse_ThrowsProviderFailure()
     {
         // Arrange
         var tracks = new List<NormalizedTrack>
@@ -972,16 +972,12 @@ public class SpotifyMatchingServiceTests : IDisposable
         _mockHandler.SetResponseError(HttpStatusCode.BadRequest, "Bad request");
 
         // Act
-        var result = await _service.MatchTracksAsync(tracks, "test_access_token");
-
-        // Assert
-        Assert.Single(result.Tracks);
-        Assert.False(result.Tracks[0].IsMatched);
-        Assert.Null(result.Tracks[0].Match);
+        var error = await Assert.ThrowsAsync<SpotifyApiException>(() => _service.MatchTracksAsync(tracks, "test_access_token"));
+        Assert.Equal(HttpStatusCode.BadRequest, error.StatusCode);
     }
 
     [Fact]
-    public async Task MatchAlbumsAsync_HttpErrorResponse_ReturnsNoMatches()
+    public async Task MatchAlbumsAsync_HttpErrorResponse_ThrowsProviderFailure()
     {
         // Arrange
         var albums = new List<NormalizedAlbum>
@@ -999,16 +995,12 @@ public class SpotifyMatchingServiceTests : IDisposable
         _mockHandler.SetResponseError(HttpStatusCode.BadRequest, "Bad request");
 
         // Act
-        var result = await _service.MatchAlbumsAsync(albums, "test_access_token");
-
-        // Assert
-        Assert.Single(result.Albums);
-        Assert.False(result.Albums[0].IsMatched);
-        Assert.Null(result.Albums[0].Match);
+        var error = await Assert.ThrowsAsync<SpotifyApiException>(() => _service.MatchAlbumsAsync(albums, "test_access_token"));
+        Assert.Equal(HttpStatusCode.BadRequest, error.StatusCode);
     }
 
     [Fact]
-    public async Task MatchArtistsAsync_HttpErrorResponse_ReturnsNoMatches()
+    public async Task MatchArtistsAsync_HttpErrorResponse_ThrowsProviderFailure()
     {
         // Arrange
         var artists = new List<NormalizedArtist>
@@ -1024,12 +1016,8 @@ public class SpotifyMatchingServiceTests : IDisposable
         _mockHandler.SetResponseError(HttpStatusCode.BadRequest, "Bad request");
 
         // Act
-        var result = await _service.MatchArtistsAsync(artists, "test_access_token");
-
-        // Assert
-        Assert.Single(result.Artists);
-        Assert.False(result.Artists[0].IsMatched);
-        Assert.Null(result.Artists[0].Match);
+        var error = await Assert.ThrowsAsync<SpotifyApiException>(() => _service.MatchArtistsAsync(artists, "test_access_token"));
+        Assert.Equal(HttpStatusCode.BadRequest, error.StatusCode);
     }
 
     private sealed class MockHttpMessageHandler : HttpMessageHandler

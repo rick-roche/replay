@@ -12,6 +12,39 @@ namespace RePlay.Server.Tests.Extensions;
 
 public class ExtensionsTests
 {
+    [Theory]
+    [InlineData(false, "/v1/me/playlists")]
+    [InlineData(true, "/v1/me/playlists")]
+    [InlineData(false, "/v1/playlists/list1/items")]
+    [InlineData(true, "/v1/playlists/list1/items")]
+    public async Task DefaultPipeline_DoesNotRetryPlaylistWrites(bool timeout, string path)
+    {
+        var builder = new HostApplicationBuilder();
+        builder.AddServiceDefaults();
+        var handler = new WriteFailureHandler(timeout);
+        builder.Services.AddHttpClient("writes").ConfigurePrimaryHttpMessageHandler(() => handler);
+        using var provider = builder.Services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("writes");
+        try
+        {
+            using var response = await client.PostAsync($"https://api.spotify.com{path}", new StringContent("{}"));
+            Assert.Equal(System.Net.HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        }
+        catch (Polly.Timeout.TimeoutRejectedException) when (timeout) { }
+        Assert.Equal(1, handler.Calls);
+    }
+
+    private sealed class WriteFailureHandler(bool timeout) : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            if (timeout) throw new Polly.Timeout.TimeoutRejectedException();
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        }
+    }
+
     [Fact]
     public void AddServiceDefaults_Succeeds()
     {

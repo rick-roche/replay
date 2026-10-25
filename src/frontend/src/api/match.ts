@@ -17,8 +17,7 @@ export const matchApi = {
    * Match normalized tracks to Spotify
    */
   async matchTracksToSpotify(request: MatchTracksRequest): Promise<MatchedDataResponse> {
-    // Use the generated client path; backend OpenAPI currently exposes this double-prefixed route
-    const { data, error } = await client.POST('/api/api/match/spotify', {
+    const { data, error } = await client.POST('/api/match/spotify', {
       body: request
     })
     if (error) handleApiError(error, 'Failed to match tracks to Spotify')
@@ -29,7 +28,7 @@ export const matchApi = {
    * Search Spotify for tracks to manually match
    */
   async searchTracksForManualMatch(query: string): Promise<SpotifyTrack[]> {
-    const { data, error } = await client.GET('/api/api/match/spotify/search', {
+    const { data, error } = await client.GET('/api/match/spotify/search', {
       params: {
         query: {
           query
@@ -44,7 +43,7 @@ export const matchApi = {
    * Match normalized albums to Spotify and load tracks from each album
    */
   async matchAlbumsToSpotify(request: MatchAlbumsRequest): Promise<MatchedAlbumsResponse> {
-    const { data, error } = await client.POST('/api/api/match/spotify/albums', {
+    const { data, error } = await client.POST('/api/match/spotify/albums', {
       body: request
     })
     if (error) handleApiError(error, 'Failed to match albums to Spotify')
@@ -55,7 +54,7 @@ export const matchApi = {
    * Search Spotify for albums
    */
   async searchAlbumsForManualMatch(query: string): Promise<SpotifyAlbumInfo[]> {
-    const { data, error } = await client.GET('/api/api/match/spotify/albums/search', {
+    const { data, error } = await client.GET('/api/match/spotify/albums/search', {
       params: {
         query: {
           query
@@ -70,7 +69,7 @@ export const matchApi = {
    * Match normalized artists to Spotify and load top tracks from each artist
    */
   async matchArtistsToSpotify(request: MatchArtistsRequest): Promise<MatchedArtistsResponse> {
-    const { data, error } = await client.POST('/api/api/match/spotify/artists', {
+    const { data, error } = await client.POST('/api/match/spotify/artists', {
       body: request
     })
     if (error) handleApiError(error, 'Failed to match artists to Spotify')
@@ -81,7 +80,7 @@ export const matchApi = {
    * Search Spotify for artists
    */
   async searchArtistsForManualMatch(query: string): Promise<SpotifyArtistInfo[]> {
-    const { data, error } = await client.GET('/api/api/match/spotify/artists/search', {
+    const { data, error } = await client.GET('/api/match/spotify/artists/search', {
       params: {
         query: {
           query
@@ -92,4 +91,3 @@ export const matchApi = {
     return data || []
   }
 }
-

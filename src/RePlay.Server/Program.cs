@@ -1,7 +1,7 @@
 using RePlay.Server.Configuration;
 using RePlay.Server.Endpoints;
 using RePlay.Server.Services;
-using Microsoft.AspNetCore.HttpOverrides;
+using RePlay.Server;
 using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
 
@@ -16,17 +16,7 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto |
-        ForwardedHeaders.XForwardedHost;
-
-    // Coolify's reverse proxy terminates TLS and forwards the original request headers.
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+builder.AddRequestSecurity();
 
 // Configure Spotify options with validation
 builder.Services.AddOptions<SpotifyOptions>()
@@ -80,8 +70,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-app.UseForwardedHeaders();
-app.UseExceptionHandler();
+app.UseRequestSecurity();
 
 if (app.Environment.IsDevelopment())
 {

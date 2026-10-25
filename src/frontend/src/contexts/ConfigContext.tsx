@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useRef, useState, type ReactNode } from 'react'
 import type { components } from '../api/generated-client'
 import { configApi } from '../api/config'
 import type { DiscogsFilter } from '../types/discogs'
@@ -62,95 +62,36 @@ const DEFAULT_SETLISTFM_FILTER: SetlistFmFilter = {
 }
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
-  const [lastfmConfig, setLastfmConfig] = useState<ConfigureLastfmResponse | null>(null)
-  const [discogsConfig, setDiscogsConfig] = useState<ConfigureDiscogsResponse | null>(null)
-  const [setlistConfig, setSetlistConfig] = useState<ConfigureSetlistResponse | null>(null)
-  const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(DEFAULT_FILTER)
-  const [discogsFilter, setDiscogsFilter] = useState<DiscogsFilter>(DEFAULT_DISCOGS_FILTER)
-  const [setlistFmFilter, setSetlistFmFilter] = useState<SetlistFmFilter>(DEFAULT_SETLISTFM_FILTER)
-  const [setlistFmFetchMode, setSetlistFmFetchModeState] = useState<SetlistFmFetchMode>('quick')
-  const [selectedSetlistConcertIdsByUser, setSelectedSetlistConcertIdsByUser] = useState<Record<string, string[]>>({})
-  const selectedSetlistConcertIdsByUserRef = useRef<Record<string, string[]>>({})
+  // Stored profile names are input preferences, not proof of a live server session.
+  const [lastfmConfig, setLastfmConfig] = useState<ConfigureLastfmResponse | null>(() => {
+    const stored = readStored(LASTFM_CONFIG_KEY)
+    return isRecord(stored) && typeof stored.username === 'string'
+      ? { username: stored.username, isConfigured: false, playCount: 0, profileUrl: '' } : null
+  })
+  const [discogsConfig, setDiscogsConfig] = useState<ConfigureDiscogsResponse | null>(() => {
+    const stored = readStored(DISCOGS_CONFIG_KEY)
+    return isRecord(stored) && typeof stored.username === 'string'
+      ? { username: stored.username, isConfigured: false, releaseCount: 0, collectionUrl: '' } : null
+  })
+  const [setlistConfig, setSetlistConfig] = useState<ConfigureSetlistResponse | null>(() => {
+    const stored = readStored(SETLIST_CONFIG_KEY)
+    return isRecord(stored) && typeof stored.userId === 'string'
+      ? { userId: stored.userId, displayName: typeof stored.displayName === 'string' ? stored.displayName : stored.userId, isConfigured: false } : null
+  })
+  const [lastfmFilter, setLastfmFilter] = useState<LastfmFilter>(() => loadLastfmFilter())
+  const [discogsFilter, setDiscogsFilter] = useState<DiscogsFilter>(() => loadDiscogsFilter())
+  const [setlistFmFilter, setSetlistFmFilter] = useState<SetlistFmFilter>(() => loadSetlistFilter())
+  const [setlistFmFetchMode, setSetlistFmFetchModeState] = useState<SetlistFmFetchMode>(() => localStorage.getItem(SETLISTFM_FETCH_MODE_KEY) === 'selectConcerts' ? 'selectConcerts' : 'quick')
+  const [selectedSetlistConcertIdsByUser, setSelectedSetlistConcertIdsByUser] = useState<Record<string, string[]>>(() => {
+    const stored = readStored(SETLISTFM_SELECTED_CONCERTS_KEY)
+    if (isSelectedConcertsByUser(stored)) return dedupeSelectedConcertsByUser(stored)
+    localStorage.removeItem(SETLISTFM_SELECTED_CONCERTS_KEY)
+    return {}
+  })
+  const selectedSetlistConcertIdsByUserRef = useRef(selectedSetlistConcertIdsByUser)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [autoFetch, setAutoFetchState] = useState(true)
-
-  // Load configuration and filter from localStorage on mount
-  useEffect(() => {
-    const storedConfig = localStorage.getItem(LASTFM_CONFIG_KEY)
-    if (storedConfig) {
-      try {
-        setLastfmConfig(JSON.parse(storedConfig))
-      } catch {
-        localStorage.removeItem(LASTFM_CONFIG_KEY)
-      }
-    }
-
-    const storedDiscogs = localStorage.getItem(DISCOGS_CONFIG_KEY)
-    if (storedDiscogs) {
-      try {
-        setDiscogsConfig(JSON.parse(storedDiscogs))
-      } catch {
-        localStorage.removeItem(DISCOGS_CONFIG_KEY)
-      }
-    }
-
-    const storedSetlist = localStorage.getItem(SETLIST_CONFIG_KEY)
-    if (storedSetlist) {
-      try {
-        setSetlistConfig(JSON.parse(storedSetlist))
-      } catch {
-        localStorage.removeItem(SETLIST_CONFIG_KEY)
-      }
-    }
-
-    const storedFilter = localStorage.getItem(LASTFM_FILTER_KEY)
-    if (storedFilter) {
-      try {
-        setLastfmFilter(JSON.parse(storedFilter))
-      } catch {
-        localStorage.removeItem(LASTFM_FILTER_KEY)
-      }
-    }
-
-    const storedDiscogsFilter = localStorage.getItem(DISCOGS_FILTER_KEY)
-    if (storedDiscogsFilter) {
-      try {
-        setDiscogsFilter(JSON.parse(storedDiscogsFilter))
-      } catch {
-        localStorage.removeItem(DISCOGS_FILTER_KEY)
-      }
-    }
-
-    const storedSetlistFmFilter = localStorage.getItem(SETLISTFM_FILTER_KEY)
-    if (storedSetlistFmFilter) {
-      try {
-        setSetlistFmFilter(JSON.parse(storedSetlistFmFilter))
-      } catch {
-        localStorage.removeItem(SETLISTFM_FILTER_KEY)
-      }
-    }
-
-    const storedSetlistFmFetchMode = localStorage.getItem(SETLISTFM_FETCH_MODE_KEY)
-    if (storedSetlistFmFetchMode === 'quick' || storedSetlistFmFetchMode === 'selectConcerts') {
-      setSetlistFmFetchModeState(storedSetlistFmFetchMode)
-    }
-
-    const storedSelectedConcerts = localStorage.getItem(SETLISTFM_SELECTED_CONCERTS_KEY)
-    if (storedSelectedConcerts) {
-      try {
-        const parsed: unknown = JSON.parse(storedSelectedConcerts)
-        if (!isSelectedConcertsByUser(parsed)) {
-          throw new Error('Invalid selected concert storage')
-        }
-        const deduped = dedupeSelectedConcertsByUser(parsed)
-        selectedSetlistConcertIdsByUserRef.current = deduped
-        setSelectedSetlistConcertIdsByUser(deduped)
-      } catch {
-        localStorage.removeItem(SETLISTFM_SELECTED_CONCERTS_KEY)
-      }
-    }
-  }, [])
 
   async function configureLastfm(username: string) {
     setIsLoading(true)
@@ -159,7 +100,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const config = await configApi.configureLastfm(username)
       setLastfmConfig(config)
       // Persist to localStorage
-      localStorage.setItem(LASTFM_CONFIG_KEY, JSON.stringify(config))
+      localStorage.setItem(LASTFM_CONFIG_KEY, JSON.stringify({ ...config, isConfigured: false }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -173,7 +114,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     try {
       const config = await configApi.configureDiscogs(identifier)
       setDiscogsConfig(config)
-      localStorage.setItem(DISCOGS_CONFIG_KEY, JSON.stringify(config))
+      localStorage.setItem(DISCOGS_CONFIG_KEY, JSON.stringify({ ...config, isConfigured: false }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -187,7 +128,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     try {
       const config = await configApi.configureSetlistFm(usernameOrId)
       setSetlistConfig(config)
-      localStorage.setItem(SETLIST_CONFIG_KEY, JSON.stringify(config))
+      localStorage.setItem(SETLIST_CONFIG_KEY, JSON.stringify({ ...config, isConfigured: false }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -293,6 +234,60 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
+}
+
+function readStored(key: string): unknown {
+  try {
+    const stored = localStorage.getItem(key)
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    localStorage.removeItem(key)
+    return null
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function loadLastfmFilter(): LastfmFilter {
+  const stored = readStored(LASTFM_FILTER_KEY)
+  if (!isRecord(stored)) return DEFAULT_FILTER
+  const { dataType, timePeriod } = stored
+  if (dataType !== 'Tracks' && dataType !== 'Albums' && dataType !== 'Artists') return DEFAULT_FILTER
+  if (timePeriod !== 'Last7Days' && timePeriod !== 'Last1Month' && timePeriod !== 'Last3Months' && timePeriod !== 'Last6Months' && timePeriod !== 'Last12Months' && timePeriod !== 'Overall' && timePeriod !== 'Custom') return DEFAULT_FILTER
+  return {
+    dataType, timePeriod,
+    maxResults: positiveNumber(stored.maxResults) ?? DEFAULT_FILTER.maxResults,
+    customStartDate: typeof stored.customStartDate === 'string' ? stored.customStartDate : undefined,
+    customEndDate: typeof stored.customEndDate === 'string' ? stored.customEndDate : undefined,
+  }
+}
+
+function positiveNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function loadDiscogsFilter(): DiscogsFilter {
+  const stored = readStored(DISCOGS_FILTER_KEY)
+  if (!isRecord(stored)) return DEFAULT_DISCOGS_FILTER
+  return {
+    minReleaseYear: positiveNumber(stored.minReleaseYear), maxReleaseYear: positiveNumber(stored.maxReleaseYear),
+    minYearAdded: positiveNumber(stored.minYearAdded), maxYearAdded: positiveNumber(stored.maxYearAdded),
+    mediaFormat: typeof stored.mediaFormat === 'string' ? stored.mediaFormat : undefined,
+    maxTracks: positiveNumber(stored.maxTracks) ?? DEFAULT_DISCOGS_FILTER.maxTracks,
+  }
+}
+
+function loadSetlistFilter(): SetlistFmFilter {
+  const stored = readStored(SETLISTFM_FILTER_KEY)
+  if (!isRecord(stored)) return DEFAULT_SETLISTFM_FILTER
+  return {
+    maxConcerts: positiveNumber(stored.maxConcerts) ?? DEFAULT_SETLISTFM_FILTER.maxConcerts,
+    maxTracks: positiveNumber(stored.maxTracks) ?? DEFAULT_SETLISTFM_FILTER.maxTracks,
+    startDate: typeof stored.startDate === 'string' ? stored.startDate : undefined,
+    endDate: typeof stored.endDate === 'string' ? stored.endDate : undefined,
+  }
 }
 
 function isSelectedConcertsByUser(value: unknown): value is Record<string, string[]> {

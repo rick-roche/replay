@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { components } from '@/api/generated-client';
@@ -71,21 +72,28 @@ export function MatchProvider({ children }: { children: ReactNode }) {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const retries = useRef(new WeakMap<object, number>());
 
   const matchTracks = useCallback(
     async (tracks: NormalizedTrack[]) => {
+      const request = ++generation.current;
       setIsLoading(true);
       setError(null);
 
       try {
         const result = await matchApi.matchTracksToSpotify({ tracks });
+        if (request !== generation.current) return;
+        setMatchedAlbums(null);
+        setMatchedArtists(null);
         setMatchedData(withCounts(result));
       } catch (err) {
+        if (request !== generation.current) return;
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to match tracks';
         setError(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (request === generation.current) setIsLoading(false);
       }
     },
     []
@@ -93,18 +101,28 @@ export function MatchProvider({ children }: { children: ReactNode }) {
 
   const matchAlbums = useCallback(
     async (albums: NormalizedAlbum[]) => {
+      const request = ++generation.current;
       setIsLoading(true);
       setError(null);
 
       try {
         const result = await matchApi.matchAlbumsToSpotify({ albums });
+        if (request !== generation.current) return;
         setMatchedAlbums(result);
+        setMatchedArtists(null);
+        setMatchedData(withCounts({ tracks: result.albums.flatMap(album =>
+          (album.match?.tracks ?? []).map(match => ({
+            sourceTrack: { name: match.name, artist: match.artist, album: album.sourceAlbum.name, source: album.sourceAlbum.source, sourceMetadata: album.sourceAlbum.sourceMetadata },
+            match,
+          }))
+        ) }));
       } catch (err) {
+        if (request !== generation.current) return;
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to match albums';
         setError(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (request === generation.current) setIsLoading(false);
       }
     },
     []
@@ -112,18 +130,28 @@ export function MatchProvider({ children }: { children: ReactNode }) {
 
   const matchArtists = useCallback(
     async (artists: NormalizedArtist[]) => {
+      const request = ++generation.current;
       setIsLoading(true);
       setError(null);
 
       try {
         const result = await matchApi.matchArtistsToSpotify({ artists });
+        if (request !== generation.current) return;
         setMatchedArtists(result);
+        setMatchedAlbums(null);
+        setMatchedData(withCounts({ tracks: result.artists.flatMap(artist =>
+          (artist.match?.topTracks ?? []).map(match => ({
+            sourceTrack: { name: match.name, artist: match.artist, source: artist.sourceArtist.source, sourceMetadata: artist.sourceArtist.sourceMetadata },
+            match,
+          }))
+        ) }));
       } catch (err) {
+        if (request !== generation.current) return;
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to match artists';
         setError(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (request === generation.current) setIsLoading(false);
       }
     },
     []
@@ -132,35 +160,37 @@ export function MatchProvider({ children }: { children: ReactNode }) {
   const appendMatches = useCallback(
     async (tracks: NormalizedTrack[]) => {
       if (tracks.length === 0) return;
+      const request = ++generation.current;
       setIsLoading(true);
       setError(null);
 
       try {
         const result = await matchApi.matchTracksToSpotify({ tracks });
-        const existing = matchedData?.tracks ?? [];
-        const seen = new Set(existing.map((t) => trackKey(t.sourceTrack)));
+        if (request !== generation.current) return;
+        setMatchedData(prev => {
+          const existing = prev?.tracks ?? [];
+          const seen = new Set(existing.map((t) => trackKey(t.sourceTrack)));
 
-        const newTracks: MatchedDataResponse['tracks'] = [];
-        for (const t of result.tracks ?? []) {
-          const key = trackKey(t.sourceTrack);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          newTracks.push(t);
-        }
+          const newTracks: MatchedDataResponse['tracks'] = [];
+          for (const t of result.tracks ?? []) {
+            const key = trackKey(t.sourceTrack);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            newTracks.push(t);
+          }
 
-        const merged: MatchedDataResponse = {
-          tracks: [...existing, ...newTracks],
-        };
-        setMatchedData(withCounts(merged));
+          return withCounts({ tracks: [...existing, ...newTracks] });
+        });
       } catch (err) {
+        if (request !== generation.current) return;
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to match new tracks';
         setError(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (request === generation.current) setIsLoading(false);
       }
     },
-    [matchedData]
+    []
   );
 
   const retryMatch = useCallback(
@@ -168,6 +198,9 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       if (!matchedData?.tracks || !matchedData.tracks[trackIndex]) return;
 
       const track = matchedData.tracks[trackIndex];
+      const request = generation.current;
+      const retry = (retries.current.get(track.sourceTrack) ?? 0) + 1;
+      retries.current.set(track.sourceTrack, retry);
       setError(null);
 
       try {
@@ -176,17 +209,16 @@ export function MatchProvider({ children }: { children: ReactNode }) {
           tracks: [track.sourceTrack],
         });
 
-        if (result.tracks && result.tracks[0]) {
-          const updatedTracks = [...matchedData.tracks];
-          updatedTracks[trackIndex] = result.tracks[0];
-          setMatchedData(
-            withCounts({
-              ...matchedData,
-              tracks: updatedTracks,
-            })
-          );
+        if (request !== generation.current || retries.current.get(track.sourceTrack) !== retry) return;
+        const replacement = result.tracks?.[0];
+        if (replacement) {
+          // Source object identity survives reorder, but not removal/replacement.
+          setMatchedData(prev => prev ? withCounts({ ...prev, tracks: prev.tracks.map(item =>
+            item === track ? { ...replacement, sourceTrack: track.sourceTrack } : item
+          ) }) : prev);
         }
       } catch (err) {
+        if (request !== generation.current || retries.current.get(track.sourceTrack) !== retry) return;
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to retry matching';
         setError(errorMessage);
@@ -230,8 +262,7 @@ export function MatchProvider({ children }: { children: ReactNode }) {
 
       const track = matchedData.tracks[trackIndex];
 
-      const updatedTracks = [...matchedData.tracks];
-      updatedTracks[trackIndex] = {
+      setMatchedData(prev => prev ? withCounts({ ...prev, tracks: prev.tracks.map(item => item !== track ? item : {
         ...track,
         match: {
           spotifyId: spotifyTrack.id,
@@ -242,14 +273,7 @@ export function MatchProvider({ children }: { children: ReactNode }) {
           confidence: 100, // Manual selections are high confidence
           method: 'Exact', // Mark as exact since user confirmed it
         },
-      };
-
-      setMatchedData(
-        withCounts({
-          ...matchedData,
-          tracks: updatedTracks,
-        })
-      );
+      }) }) : prev);
     },
     [matchedData]
   );
@@ -294,6 +318,8 @@ export function MatchProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearMatches = useCallback(() => {
+    generation.current++;
+    setIsLoading(false);
     setMatchedData(null);
     setMatchedAlbums(null);
     setMatchedArtists(null);
