@@ -6,10 +6,6 @@ import { ManualSearchModal } from './ManualSearchModal';
 import type { components } from '@/api/generated-client';
 
 type MatchedTrack = components['schemas']['MatchedTrack']
-type MatchedAlbum = components['schemas']['MatchedAlbum']
-type MatchedArtist = components['schemas']['MatchedArtist']
-type SpotifyMatch = components['schemas']['SpotifyMatch']
-type NormalizedTrack = components['schemas']['NormalizedTrack']
 type MatchMethod = 'Exact' | 'Normalized' | 'Fuzzy' | 'AlbumBased'
 type SpotifyTrack = components['schemas']['SpotifyTrack']
 
@@ -232,7 +228,7 @@ const MatchedTrackRow = ({ matchedTrack, trackIndex }: { matchedTrack: MatchedTr
 };
 
 export function MatchResults() {
-  const { matchedData, matchedAlbums, matchedArtists, isLoading, moveTrack } = useMatch();
+  const { matchedData, isLoading, moveTrack } = useMatch();
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const handleDrop = (toIndex: number) => {
@@ -254,76 +250,10 @@ export function MatchResults() {
     );
   }
 
-  // Extract tracks from matched data - could be from tracks, albums, or artists
-  let tracks: MatchedTrack[] = [];
-  let totalMatchedTracks = 0;
-  let totalUnmatchedItems = 0;
-  let matchName = 'Matching Complete';
-
-  if (matchedData?.tracks) {
-    // Direct track matches
-    tracks = matchedData.tracks;
-    totalMatchedTracks = typeof matchedData.matchedCount === 'string' 
-      ? parseInt(matchedData.matchedCount, 10) 
-      : matchedData.matchedCount ?? 0;
-    totalUnmatchedItems = typeof matchedData.unmatchedCount === 'string'
-      ? parseInt(matchedData.unmatchedCount, 10)
-      : matchedData.unmatchedCount ?? 0;
-    matchName = 'Tracks Matched';
-  } else if (matchedAlbums?.albums) {
-    // Extract tracks from matched albums
-    matchedAlbums.albums.forEach((album: MatchedAlbum) => {
-      if (album.match?.tracks) {
-        album.match.tracks.forEach((track: SpotifyMatch) => {
-          const sourceTrack: NormalizedTrack = {
-            name: track.name,
-            artist: track.artist,
-            album: album.match?.name || undefined,
-            source: 'album',
-            sourceMetadata: {},
-          };
-          tracks.push({
-            sourceTrack,
-            match: track,
-            isMatched: true,
-          } as MatchedTrack);
-        });
-      }
-    });
-    totalMatchedTracks = typeof matchedAlbums.matchedCount === 'string'
-      ? parseInt(matchedAlbums.matchedCount, 10)
-      : matchedAlbums.matchedCount ?? 0;
-    totalUnmatchedItems = typeof matchedAlbums.unmatchedCount === 'string'
-      ? parseInt(matchedAlbums.unmatchedCount, 10)
-      : matchedAlbums.unmatchedCount ?? 0;
-    matchName = 'Albums Matched';
-  } else if (matchedArtists?.artists) {
-    // Extract tracks from matched artists
-    matchedArtists.artists.forEach((artist: MatchedArtist) => {
-      if (artist.match?.topTracks) {
-        artist.match.topTracks.forEach((track: SpotifyMatch) => {
-          const sourceTrack: NormalizedTrack = {
-            name: track.name,
-            artist: track.artist,
-            source: 'artist',
-            sourceMetadata: {},
-          };
-          tracks.push({
-            sourceTrack,
-            match: track,
-            isMatched: true,
-          } as MatchedTrack);
-        });
-      }
-    });
-    totalMatchedTracks = typeof matchedArtists.matchedCount === 'string'
-      ? parseInt(matchedArtists.matchedCount, 10)
-      : matchedArtists.matchedCount ?? 0;
-    totalUnmatchedItems = typeof matchedArtists.unmatchedCount === 'string'
-      ? parseInt(matchedArtists.unmatchedCount, 10)
-      : matchedArtists.unmatchedCount ?? 0;
-    matchName = 'Artists Matched';
-  }
+  const tracks = matchedData?.tracks ?? [];
+  const totalMatchedTracks = tracks.filter(track => track.match).length;
+  const totalUnmatchedItems = tracks.length - totalMatchedTracks;
+  const matchName = 'Tracks Matched';
 
   if (tracks.length === 0) {
     return null;
@@ -393,6 +323,8 @@ export function MatchResults() {
                     <GripVertical size={16} />
                   </span>
                   <Box style={{ flex: 1 }}>
+                    <button type="button" aria-label={`Move ${track.sourceTrack.name} up`} disabled={index === 0} onClick={() => moveTrack(index, index - 1)}>Move up</button>
+                    <button type="button" aria-label={`Move ${track.sourceTrack.name} down`} disabled={index === tracks.length - 1} onClick={() => moveTrack(index, index + 1)}>Move down</button>
                     {track.match ? (
                       <MatchedTrackRow matchedTrack={track} trackIndex={index} />
                     ) : (

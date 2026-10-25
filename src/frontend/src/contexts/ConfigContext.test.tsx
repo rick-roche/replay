@@ -27,7 +27,7 @@ describe('ConfigContext', () => {
     localStorage.clear()
   })
 
-  it('loads configs and filter from localStorage', () => {
+  it('preserves profile input and filters without restoring server configuration claims', () => {
     const lastfmCfg = { username: 'alice', playCount: 100, isConfigured: true }
     const discogsCfg = { username: 'collector', collectionUrl: 'https://discogs.com/users/collector/collection', releaseCount: 12, isConfigured: true }
     const flt = { dataType: 'Albums', timePeriod: 'Last3Months', maxResults: 75 }
@@ -36,8 +36,10 @@ describe('ConfigContext', () => {
     localStorage.setItem('replay:lastfm_filter', JSON.stringify(flt))
 
     const { result } = renderHook(() => useConfig(), { wrapper })
-    expect(result.current.lastfmConfig).toEqual(lastfmCfg)
-    expect(result.current.discogsConfig).toEqual(discogsCfg)
+    expect(result.current.lastfmConfig?.username).toBe('alice')
+    expect(result.current.lastfmConfig?.isConfigured).toBe(false)
+    expect(result.current.discogsConfig?.username).toBe('collector')
+    expect(result.current.discogsConfig?.isConfigured).toBe(false)
     expect(result.current.lastfmFilter).toEqual(expect.objectContaining(flt))
   })
 

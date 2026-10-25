@@ -4,7 +4,7 @@ import { useCreatePlaylist } from '../contexts/CreatePlaylistContext';
 import { useWorkflow } from '../contexts/WorkflowContext';
 
 export const PlaylistConfirmation: React.FC = () => {
-  const { playlistUrl, playlistId, clearPlaylist } = useCreatePlaylist();
+  const { playlistUrl, playlistId, clearPlaylist, isComplete = true, tracksAdded } = useCreatePlaylist();
   const { resetWorkflow } = useWorkflow();
 
   if (!playlistUrl || !playlistId) {
@@ -35,13 +35,14 @@ export const PlaylistConfirmation: React.FC = () => {
 
         <Box className="flex-1">
           <Text as="div" size="5" weight="bold" className="text-green-400 mb-2">
-            Playlist Created Successfully!
+            {isComplete ? 'Playlist Created Successfully!' : 'Playlist Partially Created'}
           </Text>
           <Text as="div" color="gray" size="2" mb="4">
-            Your playlist has been created on Spotify. Open it now to see your curated tracks.
+            {isComplete ? 'Your playlist has been created on Spotify. Open it now to see your curated tracks.' : `${tracksAdded} tracks added. Review this playlist in Spotify before creating another to avoid duplicates.`}
           </Text>
 
           <Flex gap="3" mb="2" direction={{ initial: 'column', md: 'row' }}>
+            {!isComplete && <a href={playlistUrl} target="_blank" rel="noopener noreferrer">Open partial playlist in Spotify</a>}
             <Button
               onClick={handleOpenSpotify}
               size="2"

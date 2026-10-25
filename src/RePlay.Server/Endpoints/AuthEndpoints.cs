@@ -17,9 +17,15 @@ public static class AuthEndpoints
     {
         group.MapGet("/login", GetLogin);
         group.MapGet("/callback", GetCallback);
-        group.MapGet("/session", GetSession);
-        group.MapPost("/refresh", PostRefresh);
-        group.MapPost("/logout", PostLogout);
+        group.MapGet("/session", GetSession)
+            .Produces<SessionInfo>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized);
+        group.MapPost("/refresh", PostRefresh)
+            .Produces<SessionInfo>(StatusCodes.Status200OK)
+            .Produces<ApiError>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiError>(StatusCodes.Status502BadGateway);
+        group.MapPost("/logout", PostLogout)
+            .Produces(StatusCodes.Status204NoContent);
 
         return group;
     }
@@ -40,23 +46,10 @@ public static class AuthEndpoints
         var state = Guid.NewGuid().ToString();
 
         // Default return url (fallback)
-        returnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
-
-        // Get the request host to ensure cookie domain matches redirect URI
-        var requestHost = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}";
-        var dynamicRedirectUri = $"{requestHost}/api/auth/callback";
+        returnUrl = LocalReturnPath(returnUrl);
 
         // Store state in cookie for validation on callback
         httpContext.Response.Cookies.Append(StateCookieName, state, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = !isDev,
-            SameSite = SameSiteMode.Lax,
-            MaxAge = TimeSpan.FromMinutes(10)
-        });
-
-        // Store the redirect URI used for this auth flow
-        httpContext.Response.Cookies.Append("replay_redirect_uri", dynamicRedirectUri, new CookieOptions
         {
             HttpOnly = true,
             Secure = !isDev,
@@ -75,15 +68,14 @@ public static class AuthEndpoints
 
         try
         {
-            var authUrl = authService.GetAuthorizationUrl(state, dynamicRedirectUri);
+            var authUrl = authService.GetAuthorizationUrl(state);
             return Results.Redirect(authUrl);
         }
-        catch (ArgumentException ex)
+        catch (ArgumentException)
         {
             return ApiErrorExtensions.InternalServerError(
                 "SPOTIFY_CONFIG_ERROR",
-                "Spotify configuration is invalid",
-                ex.Message);
+                "Spotify configuration is invalid");
         }
     }
 
@@ -105,8 +97,7 @@ public static class AuthEndpoints
         {
             return ApiErrorExtensions.BadRequest(
                 "OAUTH_ERROR",
-                "Spotify authorization failed",
-                error);
+                "Spotify authorization failed");
         }
 
         // Validate required parameters
@@ -131,11 +122,8 @@ public static class AuthEndpoints
             var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
             var isDev = env.IsDevelopment();
 
-            // Retrieve the redirect URI that was used for this auth flow
-            httpContext.Request.Cookies.TryGetValue("replay_redirect_uri", out var redirectUri);
-
             // Exchange authorization code for tokens
-            var session = await authService.ExchangeCodeAsync(code, redirectUri, cancellationToken);
+            var session = await authService.ExchangeCodeAsync(code, cancellationToken);
 
             // Store session
             sessionStore.StoreSession(session);
@@ -151,21 +139,19 @@ public static class AuthEndpoints
 
             // Clean up cookies
             httpContext.Response.Cookies.Delete(StateCookieName);
-            httpContext.Response.Cookies.Delete("replay_redirect_uri");
 
             // Read return url
             httpContext.Request.Cookies.TryGetValue(ReturnUrlCookieName, out var returnUrl);
             httpContext.Response.Cookies.Delete(ReturnUrlCookieName);
 
             // Redirect to frontend (fallback if missing)
-            return Results.Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl);
+            return Results.LocalRedirect(LocalReturnPath(returnUrl));
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
             return ApiErrorExtensions.ServiceUnavailable(
                 "SPOTIFY_API_ERROR",
-                "Failed to communicate with Spotify API",
-                ex.Message);
+                "Failed to communicate with Spotify API");
         }
     }
 
@@ -192,7 +178,7 @@ public static class AuthEndpoints
         }
 
         // Check if session is expired
-        if (session.IsExpired())
+        if (session.IsSessionExpired())
         {
             sessionStore.RemoveSession(sessionId);
             httpContext.Response.Cookies.Delete(SessionCookieName);
@@ -240,11 +226,13 @@ public static class AuthEndpoints
             var env = httpContext.RequestServices.GetRequiredService<IHostEnvironment>();
             var isDev = env.IsDevelopment();
 
-            // Refresh the token
-            var newSession = await authService.RefreshTokenAsync(session.RefreshToken, cancellationToken);
-
-            // Update stored session
-            sessionStore.StoreSession(newSession);
+            var newSession = await sessionStore.RefreshSessionAsync(sessionId,
+                authService.RefreshTokenAsync, cancellationToken);
+            if (newSession == null)
+            {
+                httpContext.Response.Cookies.Delete(SessionCookieName);
+                return ApiErrorExtensions.Unauthorized("INVALID_SESSION", "Session not found or has been invalidated");
+            }
 
             // Update session cookie
             httpContext.Response.Cookies.Append(SessionCookieName, newSession.SessionId, new CookieOptions
@@ -252,7 +240,7 @@ public static class AuthEndpoints
                 HttpOnly = true,
                 Secure = !isDev,
                 SameSite = SameSiteMode.Lax,
-                MaxAge = TimeSpan.FromDays(30)
+                MaxAge = newSession.SessionExpiresAt - DateTime.UtcNow
             });
 
             var sessionInfo = new SessionInfo
@@ -264,15 +252,18 @@ public static class AuthEndpoints
 
             return Results.Ok(sessionInfo);
         }
-        catch (HttpRequestException ex)
+        catch (SpotifyRefreshTokenRejectedException)
         {
             sessionStore.RemoveSession(sessionId);
             httpContext.Response.Cookies.Delete(SessionCookieName);
-
+            return ApiErrorExtensions.Unauthorized(
+                "TOKEN_REFRESH_REJECTED", "Spotify authorization has expired. Please sign in again");
+        }
+        catch (HttpRequestException)
+        {
             return ApiErrorExtensions.ServiceUnavailable(
                 "TOKEN_REFRESH_FAILED",
-                "Failed to refresh access token",
-                ex.Message);
+                "Failed to refresh access token");
         }
     }
 
@@ -291,4 +282,9 @@ public static class AuthEndpoints
 
         return Results.NoContent();
     }
+
+    private static string LocalReturnPath(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && path.StartsWith('/') &&
+        !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains('\\') &&
+        !path.Any(char.IsControl) ? path : "/";
 }

@@ -13,7 +13,7 @@ public static class PlaylistEndpoints
     /// </summary>
     public static void MapPlaylistEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/playlist");
+        var group = endpoints.MapGroup("/playlist").AddEndpointFilter<SessionEndpointFilter>().WithProviderErrors();
 
         group.MapPost("/create", CreatePlaylist)
             .WithName("CreatePlaylist")
@@ -21,9 +21,19 @@ public static class PlaylistEndpoints
             .WithDescription("Creates a new Spotify playlist with the provided tracks. Requires an authenticated session.")
             .Accepts<PlaylistCreationRequest>("application/json")
             .Produces<PlaylistCreationResponse>(StatusCodes.Status200OK)
+            .Produces<PlaylistCreationResponse>(StatusCodes.Status502BadGateway)
             .Produces<ApiError>(StatusCodes.Status400BadRequest)
             .Produces<ApiError>(StatusCodes.Status401Unauthorized)
-            .Produces<ApiError>(StatusCodes.Status500InternalServerError);
+            .Produces<ApiError>(StatusCodes.Status500InternalServerError)
+            .AddOpenApiOperationTransformer(async (operation, context, cancellationToken) =>
+            {
+                // A known partial playlist and an unconfirmed creation have different recovery data.
+                var response = operation.Responses!["502"].Content!["application/json"];
+                response.Schema = new Microsoft.OpenApi.OpenApiSchema
+                {
+                    OneOf = [response.Schema!, await context.GetOrCreateSchemaAsync(typeof(ApiError), null, cancellationToken)]
+                };
+            });
     }
 
     /// <summary>
@@ -44,7 +54,7 @@ public static class PlaylistEndpoints
                 "Request body is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Name))
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 100 || request.Description?.Length > 300)
         {
             return ApiErrorExtensions.BadRequest(
                 "INVALID_PLAYLIST_NAME",
@@ -61,7 +71,7 @@ public static class PlaylistEndpoints
             ? request with { Description = sanitizedDescription }
             : request;
 
-        if (sanitizedRequest.TrackUris == null || sanitizedRequest.TrackUris.Count == 0)
+        if (sanitizedRequest.TrackUris == null || sanitizedRequest.TrackUris.Count is 0 or > 10000)
         {
             return ApiErrorExtensions.BadRequest(
                 "INVALID_TRACKS",
@@ -71,7 +81,8 @@ public static class PlaylistEndpoints
         // Validate all track URIs have correct format
         foreach (var uri in sanitizedRequest.TrackUris)
         {
-            if (!uri.StartsWith("spotify:track:", StringComparison.Ordinal))
+            if (uri is null || !uri.StartsWith("spotify:track:", StringComparison.Ordinal) ||
+                uri.Length is <= 14 or > 78 || uri.Skip(14).Any(c => !char.IsAsciiLetterOrDigit(c)))
             {
                 return ApiErrorExtensions.BadRequest(
                     "INVALID_TRACK_URI",
@@ -79,34 +90,10 @@ public static class PlaylistEndpoints
             }
         }
 
-        // Get session from cookie
-        if (!context.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return ApiErrorExtensions.Unauthorized(
-                "UNAUTHORIZED",
-                "User not authenticated.");
-        }
+        var (session, sessionError) = SessionAccess.Get(context, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
-        // Retrieve session data
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return ApiErrorExtensions.Unauthorized(
-                "INVALID_SESSION",
-                "Session not found or invalid.");
-        }
-
-        if (session.IsExpired())
-        {
-            sessionStore.RemoveSession(sessionId);
-            context.Response.Cookies.Delete("replay_session_id");
-            return ApiErrorExtensions.Unauthorized(
-                "SESSION_EXPIRED",
-                "Session has expired.");
-        }
-
-        var userId = session.User.Id;
+        var userId = session!.User.Id;
         var accessToken = session.AccessToken;
 
         if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(accessToken))
@@ -124,22 +111,21 @@ public static class PlaylistEndpoints
                 userId,
                 cancellationToken);
 
-            return Results.Ok(response);
+            return response.IsComplete ? Results.Ok(response) : Results.Json(response, statusCode: StatusCodes.Status502BadGateway);
         }
-        catch (InvalidOperationException ex)
+        catch (HttpRequestException ex) { return ProviderErrors.Spotify(ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (InvalidOperationException)
         {
             return ApiErrorExtensions.InternalServerError(
                 "PLAYLIST_CREATION_FAILED",
-                "Failed to create playlist on Spotify.",
-                ex.Message);
+                "Failed to create playlist on Spotify.");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "INTERNAL_SERVER_ERROR",
-                "An unexpected error occurred while creating the playlist.",
-                ex.Message);
+                "An unexpected error occurred while creating the playlist.");
         }
     }
 }
-

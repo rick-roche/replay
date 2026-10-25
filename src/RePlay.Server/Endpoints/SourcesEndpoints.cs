@@ -12,7 +12,7 @@ public static class SourcesEndpoints
 {
     public static RouteGroupBuilder MapSourcesEndpoints(this RouteGroupBuilder group)
     {
-        var sources = group.MapGroup("/sources");
+        var sources = group.MapGroup("/sources").AddEndpointFilter<SessionEndpointFilter>().WithProviderErrors();
         var lastfm = sources.MapGroup("/lastfm");
 
         lastfm.MapPost("/data", PostFetchLastfmDataNormalized)
@@ -39,25 +39,8 @@ public static class SourcesEndpoints
         setlistfm.AddEndpointFilter(async (context, next) =>
         {
             var httpContext = context.HttpContext;
-            if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-                string.IsNullOrWhiteSpace(sessionId))
-            {
-                return ApiErrorExtensions.Unauthorized("NO_SESSION", "No active session found");
-            }
-
+            var sessionId = httpContext.Request.Cookies["replay_session_id"]!;
             var sessionStore = httpContext.RequestServices.GetRequiredService<ISessionStore>();
-            var session = sessionStore.GetSession(sessionId);
-            if (session is null)
-            {
-                return ApiErrorExtensions.Unauthorized("INVALID_SESSION", "Session not found or has been invalidated");
-            }
-
-            if (session.IsExpired())
-            {
-                sessionStore.RemoveSession(sessionId);
-                httpContext.Response.Cookies.Delete("replay_session_id");
-                return ApiErrorExtensions.Unauthorized("SESSION_EXPIRED", "Session has expired");
-            }
 
             var requestedUserId = context.Arguments
                 .Select(argument => argument switch
@@ -164,6 +147,10 @@ public static class SourcesEndpoints
                 "Filter is required");
         }
 
+        if (request.Username.Length > 100 || request.Filter.MaxResults is < 1 or > 500 ||
+            !Enum.IsDefined(request.Filter.DataType) || !Enum.IsDefined(request.Filter.TimePeriod))
+            return ApiErrorExtensions.BadRequest("INVALID_FILTER", "Choose a valid data type, time period and between 1 and 500 results.");
+
         // Validate custom date range if specified
         if (request.Filter.TimePeriod == LastfmTimePeriod.Custom)
         {
@@ -211,12 +198,13 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex) { return ProviderErrors.Source("LASTFM", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "LASTFM_FETCH_ERROR",
-                "Error fetching Last.fm data",
-                ex.Message);
+                "Error fetching Last.fm data");
         }
     }
 
@@ -252,6 +240,10 @@ public static class SourcesEndpoints
                 "MISSING_FILTER",
                 "Filter is required");
         }
+
+        if (request.UsernameOrCollectionId.Length > 500 || request.Filter.MaxTracks is < 1 or > 500 ||
+            (request.Filter.MediaFormat.HasValue && !Enum.IsDefined(request.Filter.MediaFormat.Value)))
+            return ApiErrorExtensions.BadRequest("INVALID_FILTER", "Choose a valid media format and between 1 and 500 tracks.");
 
         // Validate year ranges if specified
         if ((request.Filter.MinReleaseYear.HasValue || request.Filter.MaxReleaseYear.HasValue) &&
@@ -292,12 +284,13 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex) { return ProviderErrors.Source("DISCOGS", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "DISCOGS_FETCH_ERROR",
-                "Error fetching Discogs data",
-                ex.Message);
+                "Error fetching Discogs data");
         }
     }
 
@@ -363,19 +356,13 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
-        catch (HttpRequestException ex)
-        {
-            return ApiErrorExtensions.ServiceUnavailable(
-                "SETLISTFM_API_ERROR",
-                "Failed to communicate with Setlist.fm",
-                ex.Message);
-        }
-        catch (Exception ex)
+        catch (HttpRequestException ex) { return ProviderErrors.Source("SETLISTFM", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "SETLISTFM_FETCH_ERROR",
-                "Error fetching Setlist.fm data",
-                ex.Message);
+                "Error fetching Setlist.fm data");
         }
     }
 
@@ -431,19 +418,13 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
-        catch (HttpRequestException ex)
-        {
-            return ApiErrorExtensions.ServiceUnavailable(
-                "SETLISTFM_API_ERROR",
-                "Failed to communicate with Setlist.fm",
-                ex.Message);
-        }
-        catch (Exception ex)
+        catch (HttpRequestException ex) { return ProviderErrors.Source("SETLISTFM", ex); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return ApiErrorExtensions.InternalServerError(
                 "SETLISTFM_FETCH_ERROR",
-                "Error fetching Setlist.fm concerts",
-                ex.Message);
+                "Error fetching Setlist.fm concerts");
         }
     }
 

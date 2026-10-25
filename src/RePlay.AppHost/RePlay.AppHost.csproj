@@ -14,5 +14,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.1.1" />
+    <!-- Security floor for Aspire's existing transitive dependency; no orchestration upgrade required. -->
+    <PackageReference Include="MessagePack" Version="2.5.307" />
   </ItemGroup>
 </Project>

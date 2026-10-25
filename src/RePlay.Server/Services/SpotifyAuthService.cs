@@ -92,7 +92,7 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
         {
             SessionId = Guid.NewGuid().ToString(),
             AccessToken = tokenResponse.AccessToken,
-            RefreshToken = tokenResponse.RefreshToken,
+            RefreshToken = tokenResponse.RefreshToken ?? throw new HttpRequestException("Spotify omitted the refresh token"),
             ExpiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn),
             User = user
         };
@@ -112,7 +112,7 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
         {
             SessionId = Guid.NewGuid().ToString(),
             AccessToken = tokenResponse.AccessToken,
-            RefreshToken = tokenResponse.RefreshToken,
+            RefreshToken = string.IsNullOrWhiteSpace(tokenResponse.RefreshToken) ? refreshToken : tokenResponse.RefreshToken,
             ExpiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn),
             User = user
         };
@@ -153,9 +153,24 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
         request.Content = new FormUrlEncodedContent(parameters);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && parameters["grant_type"] == "refresh_token")
+        {
+            try
+            {
+                using var error = JsonDocument.Parse(json);
+                if (error.RootElement.ValueKind == JsonValueKind.Object &&
+                    error.RootElement.TryGetProperty("error", out var code) &&
+                    code.ValueKind == JsonValueKind.String && code.GetString() == "invalid_grant")
+                    throw new SpotifyRefreshTokenRejectedException();
+            }
+            catch (JsonException)
+            {
+                // An unrecognized provider response does not prove the refresh grant was revoked.
+            }
+        }
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize<TokenResponse>(json)
             ?? throw new InvalidOperationException("Failed to deserialize token response");
     }
@@ -165,7 +180,7 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
         [property: JsonPropertyName("access_token")] string AccessToken,
         [property: JsonPropertyName("token_type")] string TokenType,
         [property: JsonPropertyName("expires_in")] int ExpiresIn,
-        [property: JsonPropertyName("refresh_token")] string RefreshToken,
+        [property: JsonPropertyName("refresh_token")] string? RefreshToken,
         [property: JsonPropertyName("scope")] string Scope
     );
 

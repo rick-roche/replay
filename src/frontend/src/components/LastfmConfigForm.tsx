@@ -5,7 +5,7 @@ import { useConfig } from '../contexts/ConfigContext'
 
 export function LastfmConfigForm() {
   const { lastfmConfig, isLoading, error, configureLastfm, clearError } = useConfig()
-  const [username, setUsername] = useState('')
+  const [username, setUsername] = useState(lastfmConfig?.username ?? '')
   const [isEditing, setIsEditing] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {

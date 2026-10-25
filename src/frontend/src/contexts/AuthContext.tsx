@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { authApi } from '../api/auth'
 import type { SessionInfo, SpotifyUser } from '../types/auth'
 
@@ -18,10 +18,36 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000 // Refresh 5 minutes before expiry
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const generation = useRef(0)
+  const loggingOut = useRef(false)
+
+  const tryRefresh = useCallback(async () => {
+    if (loggingOut.current) return true
+    const request = generation.current
+    try {
+      const sessionInfo = await authApi.refresh()
+      if (request === generation.current) setSession(sessionInfo)
+      return true
+    } catch {
+      // Transport failures do not prove that the server session has expired.
+      return false
+    }
+  }, [])
+
+  const refreshSession = useCallback(async () => {
+    await tryRefresh()
+  }, [tryRefresh])
 
   // Check session on mount
   useEffect(() => {
-    checkSession()
+    let active = true
+    const request = generation.current
+    void authApi.getSession().then(sessionInfo => {
+      if (active && request === generation.current) setSession(sessionInfo)
+    }).finally(() => {
+      if (active) setIsLoading(false)
+    })
+    return () => { active = false }
   }, [])
 
   // Auto-refresh before expiry
@@ -32,46 +58,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const now = Date.now()
     const timeUntilRefresh = expiresAt - now - REFRESH_BUFFER_MS
 
-    if (timeUntilRefresh <= 0) {
-      // Already expired or about to expire, refresh immediately
-      refreshSession()
-      return
+    let active = true
+    let attempts = 0
+    let timer: ReturnType<typeof setTimeout>
+    const run = async () => {
+      const refreshed = await tryRefresh()
+      if (!refreshed && active && attempts < 3) {
+        timer = setTimeout(run, Math.min(30000 * 2 ** attempts++, 120000))
+      }
     }
-
-    // Schedule refresh
-    const timer = setTimeout(() => {
-      refreshSession()
-    }, timeUntilRefresh)
-
-    return () => clearTimeout(timer)
-  }, [session])
-
-  async function checkSession() {
-    setIsLoading(true)
-    try {
-      const sessionInfo = await authApi.getSession()
-      setSession(sessionInfo)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function refreshSession() {
-    const sessionInfo = await authApi.refresh()
-    if (sessionInfo) {
-      setSession(sessionInfo)
-    } else {
-      setSession(null)
-    }
-  }
+    timer = setTimeout(run, Math.max(0, timeUntilRefresh))
+    return () => { active = false; clearTimeout(timer) }
+  }, [session, tryRefresh])
 
   function login() {
     authApi.login()
   }
 
   async function logout() {
-    await authApi.logout()
+    if (loggingOut.current) return
+    loggingOut.current = true
+    generation.current++
     setSession(null)
+    try {
+      await authApi.logout()
+    } finally {
+      generation.current++
+      setSession(null)
+      loggingOut.current = false
+    }
   }
 
   const value: AuthContextValue = {
@@ -83,7 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshSession
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>
+    {/* Session-owned providers must never carry private state into another login. */}
+    <Fragment key={session?.user?.id ?? 'anonymous'}>{children}</Fragment>
+  </AuthContext.Provider>
 }
 
 export function useAuth() {

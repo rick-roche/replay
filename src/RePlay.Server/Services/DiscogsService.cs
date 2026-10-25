@@ -1,7 +1,10 @@
 using System.Net.Http.Headers;
+using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+
 using Microsoft.Extensions.Options;
+
 using RePlay.Server.Configuration;
 using RePlay.Server.Models;
 
@@ -33,20 +36,8 @@ public sealed class DiscogsService : IDiscogsService
             throw new ArgumentException("Username or collection ID is required", nameof(usernameOrCollectionId));
         }
 
-        var profile = await TryGetProfileAsync("users", usernameOrCollectionId, cancellationToken);
-        if (profile != null)
-        {
-            var collection = await TryGetCollectionAsync(profile.Username, cancellationToken);
-            if (collection == null)
-            {
-                return null;
-            }
-
-            return CreateProfile(profile, collection);
-        }
-
-        // If not found as username, try collection ID
-        profile = await TryGetCollectionProfileAsync(usernameOrCollectionId, cancellationToken);
+        var username = NormalizeUsername(usernameOrCollectionId);
+        var profile = await TryGetProfileAsync("users", username, cancellationToken);
         if (profile == null)
         {
             return null;
@@ -73,74 +64,84 @@ public sealed class DiscogsService : IDiscogsService
             throw new ArgumentNullException(nameof(filter));
         }
 
-        // Get profile to determine username
-        var profile = await GetProfileAsync(usernameOrCollectionId, cancellationToken);
+        if (filter.MaxTracks is < 1 or > 500)
+        {
+            throw new ArgumentException("MaxTracks must be between 1 and 500", nameof(filter));
+        }
+
+        // Resolve the user without fetching and then discarding the first collection page.
+        var username = NormalizeUsername(usernameOrCollectionId);
+        var profile = await TryGetProfileAsync("users", username, cancellationToken);
         if (profile == null)
         {
             return null;
         }
 
         // Fetch collection releases with pagination
-        var allReleases = new List<DiscogsCollectionItem>();
+        var tracks = new List<DiscogsTrack>();
+        var releases = new List<DiscogsRelease>();
         int page = 1;
         int totalPages = 1;
 
         while (page <= totalPages)
         {
+            if (page > 100)
+            {
+                throw new InvalidOperationException("Discogs collection scan reached the 100-page limit. Narrow the collection filters or request fewer tracks.");
+            }
+
             var collectionResponse = await TryGetCollectionAsync(profile.Username, page, cancellationToken);
             if (collectionResponse == null)
             {
                 return null;
             }
 
-            allReleases.AddRange(collectionResponse.Releases);
             totalPages = collectionResponse.Pagination.Pages;
             page++;
-        }
 
-        // Apply filters and extract tracks
-        var filteredReleases = ApplyFilters(allReleases, filter).ToList();
-        var tracks = new List<DiscogsTrack>();
-        var releases = new List<DiscogsRelease>();
-
-        foreach (var release in filteredReleases)
-        {
-            if (release.BasicInformation == null)
+            foreach (var release in ApplyFilters(collectionResponse.Releases, filter))
             {
-                continue;
+                if (release.BasicInformation == null)
+                {
+                    continue;
+                }
+
+                // Create release object from basic info
+                var basicInfo = release.BasicInformation;
+                var primaryArtist = basicInfo.Artists?.FirstOrDefault()?.Name ?? "Unknown";
+                var format = basicInfo.Formats?.FirstOrDefault()?.Name;
+
+                var releaseObj = new DiscogsRelease
+                {
+                    Id = basicInfo.Id,
+                    Title = basicInfo.Title ?? "Unknown",
+                    Artist = primaryArtist,
+                    Year = basicInfo.Year,
+                    Format = format,
+                    DateAdded = release.DateAdded,
+                    Tracks = []
+                };
+
+                // Extract tracks from the release
+                var releaseDetail = await TryGetReleaseAsync(release.BasicInformation.Id, cancellationToken);
+                if (releaseDetail != null)
+                {
+                    var releaseTracks = ExtractTracksFromRelease(releaseDetail);
+                    releaseObj = releaseObj with { Tracks = releaseTracks };
+                    tracks.AddRange(releaseTracks);
+                    releases.Add(releaseObj);
+
+                    if (tracks.Count >= filter.MaxTracks)
+                    {
+                        tracks = tracks.Take(filter.MaxTracks).ToList();
+                        break;
+                    }
+                }
             }
 
-            // Create release object from basic info
-            var basicInfo = release.BasicInformation;
-            var primaryArtist = basicInfo.Artists?.FirstOrDefault()?.Name ?? "Unknown";
-            var format = basicInfo.Formats?.FirstOrDefault()?.Name;
-            var dateAddedYear = string.IsNullOrEmpty(release.DateAdded) ? null : (int?)DateTime.Parse(release.DateAdded).Year;
-
-            var releaseObj = new DiscogsRelease
+            if (tracks.Count >= filter.MaxTracks)
             {
-                Id = basicInfo.Id,
-                Title = basicInfo.Title ?? "Unknown",
-                Artist = primaryArtist,
-                Year = basicInfo.Year,
-                Format = format,
-                DateAdded = release.DateAdded,
-                Tracks = []
-            };
-
-            // Extract tracks from the release
-            var releaseDetail = await TryGetReleaseAsync(release.BasicInformation.Id, cancellationToken);
-            if (releaseDetail != null)
-            {
-                var releaseTracks = ExtractTracksFromRelease(releaseDetail);
-                releaseObj = releaseObj with { Tracks = releaseTracks };
-                tracks.AddRange(releaseTracks);
-                releases.Add(releaseObj);
-
-                if (tracks.Count >= filter.MaxTracks)
-                {
-                    tracks = tracks.Take(filter.MaxTracks).ToList();
-                    break;
-                }
+                break;
             }
         }
 
@@ -197,11 +198,13 @@ public sealed class DiscogsService : IDiscogsService
 
     private async Task<DiscogsUserResponse?> TryGetProfileAsync(string path, string identifier, CancellationToken cancellationToken)
     {
-        var userResponse = await _httpClient.GetAsync($"{path}/{identifier}", cancellationToken);
-        if (!userResponse.IsSuccessStatusCode)
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{path}/{Uri.EscapeDataString(NormalizeUsername(identifier))}");
+        using var userResponse = await _httpClient.SendAsync(request, cancellationToken);
+        if (userResponse.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
+        userResponse.EnsureSuccessStatusCode();
 
         await using var userStream = await userResponse.Content.ReadAsStreamAsync(cancellationToken);
         return await JsonSerializer.DeserializeAsync<DiscogsUserResponse>(userStream, cancellationToken: cancellationToken);
@@ -214,11 +217,13 @@ public sealed class DiscogsService : IDiscogsService
 
     private async Task<DiscogsCollectionResponse?> TryGetCollectionAsync(string username, int page, CancellationToken cancellationToken)
     {
-        var collectionResponse = await _httpClient.GetAsync($"users/{username}/collection/folders/0/releases?per_page=100&page={page}", cancellationToken);
-        if (!collectionResponse.IsSuccessStatusCode)
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"users/{Uri.EscapeDataString(NormalizeUsername(username))}/collection/folders/0/releases?per_page=100&page={page}");
+        using var collectionResponse = await _httpClient.SendAsync(request, cancellationToken);
+        if (collectionResponse.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
+        collectionResponse.EnsureSuccessStatusCode();
 
         await using var collectionStream = await collectionResponse.Content.ReadAsStreamAsync(cancellationToken);
         return await JsonSerializer.DeserializeAsync<DiscogsCollectionResponse>(collectionStream, cancellationToken: cancellationToken);
@@ -226,31 +231,50 @@ public sealed class DiscogsService : IDiscogsService
 
     private async Task<DiscogsReleaseDetail?> TryGetReleaseAsync(int releaseId, CancellationToken cancellationToken)
     {
-        var releaseResponse = await _httpClient.GetAsync($"releases/{releaseId}", cancellationToken);
-        if (!releaseResponse.IsSuccessStatusCode)
+        if (releaseId <= 0)
+        {
+            throw new JsonException("Discogs returned an invalid release ID.");
+        }
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"releases/{releaseId}");
+        using var releaseResponse = await _httpClient.SendAsync(request, cancellationToken);
+        if (releaseResponse.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
+        releaseResponse.EnsureSuccessStatusCode();
 
         await using var releaseStream = await releaseResponse.Content.ReadAsStreamAsync(cancellationToken);
         return await JsonSerializer.DeserializeAsync<DiscogsReleaseDetail>(releaseStream, cancellationToken: cancellationToken);
     }
 
-    private async Task<DiscogsUserResponse?> TryGetCollectionProfileAsync(string collectionUrlOrId, CancellationToken cancellationToken)
+    private static string NormalizeUsername(string value)
     {
-        // Discogs collection URLs often contain /users/{username}/collection
-        if (collectionUrlOrId.Contains("discogs.com", StringComparison.OrdinalIgnoreCase))
+        var username = value.Trim();
+        // Uri canonicalizes dot segments; reject traversal before that normalization.
+        var decoded = Uri.UnescapeDataString(username);
+        if (decoded.Contains('\\') || decoded.Split('/').Any(segment => segment is "." or ".."))
         {
-            var match = Regex.Match(collectionUrlOrId, @"users/(?<username>[^/]+)/collection", RegexOptions.IgnoreCase);
-            if (match.Success)
+            throw new ArgumentException("Invalid Discogs collection path", nameof(value));
+        }
+        if (Uri.TryCreate(username, UriKind.Absolute, out var uri))
+        {
+            var segments = uri.AbsolutePath.Trim('/').Split('/');
+            if ((uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) ||
+                (uri.Host != "www.discogs.com" && uri.Host != "discogs.com") ||
+                !uri.IsDefaultPort || uri.UserInfo.Length > 0 || uri.Query.Length > 0 || uri.Fragment.Length > 0 ||
+                segments.Length != 3 || (segments[0] != "user" && segments[0] != "users") || segments[2] != "collection")
             {
-                var username = match.Groups["username"].Value;
-                return await TryGetProfileAsync("users", username, cancellationToken);
+                throw new ArgumentException("Use a Discogs username or a discogs.com/user/username/collection URL", nameof(value));
             }
+            username = Uri.UnescapeDataString(segments[1]);
         }
 
-        // If not a URL, attempt to fetch as username fallback
-        return await TryGetProfileAsync("users", collectionUrlOrId, cancellationToken);
+        if (username.Length is < 1 or > 100 || username is "." or ".." ||
+            !Regex.IsMatch(username, @"\A[A-Za-z0-9_.-]+\z"))
+        {
+            throw new ArgumentException("Invalid Discogs username", nameof(value));
+        }
+        return username;
     }
 
     private static DiscogsProfile CreateProfile(DiscogsUserResponse userProfile, DiscogsCollectionResponse collection)
@@ -331,7 +355,7 @@ public sealed class DiscogsService : IDiscogsService
             .Where(track => !string.IsNullOrWhiteSpace(track.Title))
             .Select(track => new DiscogsTrack
             {
-                Name = track.Title,
+                Name = track.Title!,
                 Artist = track.Artists?.FirstOrDefault()?.Name ?? primaryArtist,
                 Album = release.Title,
                 ReleaseYear = release.Year

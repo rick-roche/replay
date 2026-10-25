@@ -115,6 +115,14 @@ public class SourcesEndpointsTests
     public void ValidateSetlistFmUser_RejectsUserDifferentFromSessionConfiguration()
     {
         var store = new InMemorySessionStore();
+        store.StoreSession(new AuthSession
+        {
+            SessionId = "sid",
+            AccessToken = "access",
+            RefreshToken = "refresh",
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            User = new SpotifyUser { Id = "user", DisplayName = "User" }
+        });
         store.StoreSourceConfig("sid", new ExternalSourceConfig
         {
             Source = "setlistfm",
@@ -134,6 +142,48 @@ public class SourcesEndpointsTests
     }
 
 
+
+    [Fact]
+    public async Task PostFetchLastfmDataNormalized_ProviderFailure_ReturnsBadGatewayWithoutDetails()
+    {
+        var fake = new FakeLastfmService
+        {
+            OnGetUserDataNormalizedAsync = (_, _, _) => throw new HttpRequestException("private provider failure detail")
+        };
+        var request = new FetchLastfmDataRequest
+        {
+            Username = "user",
+            Filter = new LastfmFilter { DataType = LastfmDataType.Tracks, TimePeriod = LastfmTimePeriod.Overall }
+        };
+
+        var result = await InvokeAsync(GetPrivate("PostFetchLastfmDataNormalized"), request, fake, ContextWithSessionCookie(), CancellationToken.None);
+
+        var json = result.Should().BeOfType<JsonHttpResult<ApiError>>().Subject;
+        json.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        json.Value!.Code.Should().Be("LASTFM_API_ERROR");
+        json.Value.Message.Should().NotContain("private provider failure detail");
+    }
+
+    [Fact]
+    public async Task PostFetchDiscogsDataNormalized_ProviderFailure_ReturnsBadGatewayWithoutDetails()
+    {
+        var fake = new FakeDiscogsService
+        {
+            OnGetCollectionNormalizedAsync = (_, _, _) => throw new HttpRequestException("private provider failure detail")
+        };
+        var request = new FetchDiscogsDataRequest
+        {
+            UsernameOrCollectionId = "user",
+            Filter = new DiscogsFilter { MaxTracks = 100 }
+        };
+
+        var result = await InvokeAsync(GetPrivate("PostFetchDiscogsDataNormalized"), request, fake, ContextWithSessionCookie(), CancellationToken.None);
+
+        var json = result.Should().BeOfType<JsonHttpResult<ApiError>>().Subject;
+        json.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
+        json.Value!.Code.Should().Be("DISCOGS_API_ERROR");
+        json.Value.Message.Should().NotContain("private provider failure detail");
+    }
 
     [Fact]
     public async Task PostFetchLastfmDataNormalized_ValidatesErrors()
@@ -272,7 +322,7 @@ public class SourcesEndpointsTests
     }
 
     [Fact]
-    public async Task PostFetchSetlistFmDataNormalized_ReturnsServiceUnavailableForProviderFailure()
+    public async Task PostFetchSetlistFmDataNormalized_ReturnsBadGatewayForProviderFailure()
     {
         var mi = GetPrivate("PostFetchSetlistFmDataNormalized");
         var fake = new FakeSetlistFmService
@@ -290,6 +340,7 @@ public class SourcesEndpointsTests
         var response = (JsonHttpResult<ApiError>)result;
         response.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
         response.Value!.Code.Should().Be("SETLISTFM_API_ERROR");
+        response.Value.Message.Should().NotContain("rate limited");
     }
 
     [Fact]
@@ -351,7 +402,7 @@ public class SourcesEndpointsTests
     }
 
     [Fact]
-    public async Task PostFetchSetlistFmConcerts_ReturnsServiceUnavailableForProviderFailure()
+    public async Task PostFetchSetlistFmConcerts_ReturnsBadGatewayForProviderFailure()
     {
         var mi = GetPrivate("PostFetchSetlistFmConcerts");
         var fake = new FakeSetlistFmService
@@ -369,6 +420,7 @@ public class SourcesEndpointsTests
         var response = (JsonHttpResult<ApiError>)result;
         response.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
         response.Value!.Code.Should().Be("SETLISTFM_API_ERROR");
+        response.Value.Message.Should().NotContain("rate limited");
     }
 
     [Fact]
@@ -418,6 +470,7 @@ public class SourcesEndpointsTests
         var json = (JsonHttpResult<ApiError>)r3;
         json.StatusCode.Should().Be(500);
         json.Value!.Code.Should().Be("DISCOGS_FETCH_ERROR");
+        json.Value.Message.Should().NotContain("oops");
 
         // Success -> Ok
         var fake4 = new FakeDiscogsService { OnGetCollectionNormalizedAsync = (u, f, ct) => Task.FromResult<NormalizedDataResponse?>(new NormalizedDataResponse { DataType = "Tracks", Tracks = [], Albums = [], Artists = [], Source = "discogs" }) };

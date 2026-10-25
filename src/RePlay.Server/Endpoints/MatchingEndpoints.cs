@@ -11,7 +11,7 @@ public static class MatchingEndpoints
 {
     public static void MapMatchingEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/match");
+        var group = endpoints.MapGroup("/match").AddEndpointFilter<SessionEndpointFilter>().WithProviderErrors();
 
         group.MapPost("/spotify", MatchTracksAsync)
             .WithName("MatchTracksToSpotify")
@@ -26,7 +26,7 @@ public static class MatchingEndpoints
         group.MapGet("/spotify/search", SearchTracksAsync)
             .WithName("SearchSpotifyTracks")
             .WithSummary("Search Spotify for tracks")
-            .WithDescription("Searches Spotify for tracks matching the given query. Returns up to 5 results.")
+            .WithDescription("Searches Spotify for tracks matching the given query. Returns up to 10 results.")
             .Produces<List<SpotifyTrack>>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest)
             .Produces<ApiError>(StatusCodes.Status401Unauthorized)
@@ -88,7 +88,8 @@ public static class MatchingEndpoints
         CancellationToken cancellationToken)
     {
         // Validate request
-        if (request.Tracks is null || request.Tracks.Count == 0)
+        if (request.Tracks is null || request.Tracks.Count is 0 or > 500 ||
+            request.Tracks.Any(track => track is null || !ValidText(track.Name) || !ValidText(track.Artist)))
         {
             return Results.BadRequest(new ApiError
             {
@@ -97,42 +98,26 @@ public static class MatchingEndpoints
             });
         }
 
-        // Get session from cookie
-        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Retrieve session and access token
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return Results.Unauthorized();
-        }
+        var (session, sessionError) = SessionAccess.Get(httpContext, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
         try
         {
             var matchedData = await matchingService.MatchTracksAsync(
                 request.Tracks, 
-                session.AccessToken,
+                session!.AccessToken,
                 cancellationToken);
 
             return Results.Ok(matchedData);
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Spotify API Error");
+            return ProviderErrors.Spotify(ex);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "Internal Server Error");
+            return ApiErrorExtensions.InternalServerError("INTERNAL_SERVER_ERROR", "An unexpected error occurred while matching Spotify data.");
         }
     }
 
@@ -153,7 +138,7 @@ public static class MatchingEndpoints
         CancellationToken cancellationToken)
     {
         // Validate query
-        if (string.IsNullOrWhiteSpace(query))
+        if (!ValidText(query))
         {
             return Results.BadRequest(new ApiError
             {
@@ -162,42 +147,26 @@ public static class MatchingEndpoints
             });
         }
 
-        // Get session from cookie
-        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Retrieve session and access token
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return Results.Unauthorized();
-        }
+        var (session, sessionError) = SessionAccess.Get(httpContext, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
         try
         {
             var results = await matchingService.SearchTracksAsync(
                 query,
-                session.AccessToken,
+                session!.AccessToken,
                 cancellationToken);
 
             return Results.Ok(results);
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Spotify API Error");
+            return ProviderErrors.Spotify(ex);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "Internal Server Error");
+            return ApiErrorExtensions.InternalServerError("INTERNAL_SERVER_ERROR", "An unexpected error occurred while searching Spotify.");
         }
     }
 
@@ -218,7 +187,8 @@ public static class MatchingEndpoints
         CancellationToken cancellationToken)
     {
         // Validate request
-        if (request.Albums is null || request.Albums.Count == 0)
+        if (request.Albums is null || request.Albums.Count is 0 or > 500 ||
+            request.Albums.Any(album => album is null || !ValidText(album.Name) || !ValidText(album.Artist)))
         {
             return Results.BadRequest(new ApiError
             {
@@ -227,42 +197,26 @@ public static class MatchingEndpoints
             });
         }
 
-        // Get session from cookie
-        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Retrieve session and access token
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return Results.Unauthorized();
-        }
+        var (session, sessionError) = SessionAccess.Get(httpContext, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
         try
         {
             var matchedData = await matchingService.MatchAlbumsAsync(
                 request.Albums,
-                session.AccessToken,
+                session!.AccessToken,
                 cancellationToken);
 
             return Results.Ok(matchedData);
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Spotify API Error");
+            return ProviderErrors.Spotify(ex);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "Internal Server Error");
+            return ApiErrorExtensions.InternalServerError("INTERNAL_SERVER_ERROR", "An unexpected error occurred while matching Spotify data.");
         }
     }
 
@@ -283,7 +237,7 @@ public static class MatchingEndpoints
         CancellationToken cancellationToken)
     {
         // Validate query
-        if (string.IsNullOrWhiteSpace(query))
+        if (!ValidText(query))
         {
             return Results.BadRequest(new ApiError
             {
@@ -292,42 +246,26 @@ public static class MatchingEndpoints
             });
         }
 
-        // Get session from cookie
-        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Retrieve session and access token
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return Results.Unauthorized();
-        }
+        var (session, sessionError) = SessionAccess.Get(httpContext, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
         try
         {
             var results = await matchingService.SearchAlbumsAsync(
                 query,
-                session.AccessToken,
+                session!.AccessToken,
                 cancellationToken);
 
             return Results.Ok(results);
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Spotify API Error");
+            return ProviderErrors.Spotify(ex);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "Internal Server Error");
+            return ApiErrorExtensions.InternalServerError("INTERNAL_SERVER_ERROR", "An unexpected error occurred while searching Spotify.");
         }
     }
 
@@ -348,7 +286,8 @@ public static class MatchingEndpoints
         CancellationToken cancellationToken)
     {
         // Validate request
-        if (request.Artists is null || request.Artists.Count == 0)
+        if (request.Artists is null || request.Artists.Count is 0 or > 500 ||
+            request.Artists.Any(artist => artist is null || !ValidText(artist.Name)))
         {
             return Results.BadRequest(new ApiError
             {
@@ -357,42 +296,26 @@ public static class MatchingEndpoints
             });
         }
 
-        // Get session from cookie
-        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Retrieve session and access token
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return Results.Unauthorized();
-        }
+        var (session, sessionError) = SessionAccess.Get(httpContext, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
         try
         {
             var matchedData = await matchingService.MatchArtistsAsync(
                 request.Artists,
-                session.AccessToken,
+                session!.AccessToken,
                 cancellationToken);
 
             return Results.Ok(matchedData);
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Spotify API Error");
+            return ProviderErrors.Spotify(ex);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "Internal Server Error");
+            return ApiErrorExtensions.InternalServerError("INTERNAL_SERVER_ERROR", "An unexpected error occurred while matching Spotify data.");
         }
     }
 
@@ -413,7 +336,7 @@ public static class MatchingEndpoints
         CancellationToken cancellationToken)
     {
         // Validate query
-        if (string.IsNullOrWhiteSpace(query))
+        if (!ValidText(query))
         {
             return Results.BadRequest(new ApiError
             {
@@ -422,44 +345,31 @@ public static class MatchingEndpoints
             });
         }
 
-        // Get session from cookie
-        if (!httpContext.Request.Cookies.TryGetValue("replay_session_id", out var sessionId) ||
-            string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Retrieve session and access token
-        var session = sessionStore.GetSession(sessionId);
-        if (session is null)
-        {
-            return Results.Unauthorized();
-        }
+        var (session, sessionError) = SessionAccess.Get(httpContext, sessionStore, requireSpotifyToken: true);
+        if (sessionError is not null) return sessionError;
 
         try
         {
             var results = await matchingService.SearchArtistsAsync(
                 query,
-                session.AccessToken,
+                session!.AccessToken,
                 cancellationToken);
 
             return Results.Ok(results);
         }
         catch (HttpRequestException ex)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Spotify API Error");
+            return ProviderErrors.Spotify(ex);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "Internal Server Error");
+            return ApiErrorExtensions.InternalServerError("INTERNAL_SERVER_ERROR", "An unexpected error occurred while searching Spotify.");
         }
     }
+
+    private static bool ValidText([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= 500;
 }
 
 /// <summary>

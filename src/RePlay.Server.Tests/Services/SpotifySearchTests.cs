@@ -19,7 +19,7 @@ public class SpotifySearchTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchTracksAsync_ReturnsTopFifteenAndMapsFields()
+    public async Task SearchTracksAsync_ReturnsTopTenAndMapsFields()
     {
         // Arrange
         var spotifyResponse = new
@@ -42,7 +42,7 @@ public class SpotifySearchTests : IDisposable
         var results = await _service.SearchTracksAsync("track:foo artist:bar", "token");
 
         // Assert
-        Assert.Equal(15, results.Count); // limited to top 15
+        Assert.Equal(10, results.Count);
         Assert.Equal("id1", results[0].Id);
         Assert.Equal("Name 1", results[0].Name);
         Assert.Equal("Artist 1", results[0].Artist);
@@ -58,16 +58,14 @@ public class SpotifySearchTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchTracksAsync_NonSuccessStatus_ReturnsEmpty()
+    public async Task SearchTracksAsync_NonSuccessStatus_ThrowsProviderFailure()
     {
         // Arrange
         _mockHandler.SetResponse("{}", HttpStatusCode.Unauthorized);
 
         // Act
-        var results = await _service.SearchTracksAsync("track:foo", "token");
-
-        // Assert
-        Assert.Empty(results);
+        var error = await Assert.ThrowsAsync<SpotifyApiException>(() => _service.SearchTracksAsync("track:foo", "token"));
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
     }
 
     public void Dispose()

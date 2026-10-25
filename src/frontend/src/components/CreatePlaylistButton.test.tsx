@@ -227,7 +227,7 @@ describe('CreatePlaylistButton', () => {
 
   it('should call lockWorkflow after successful playlist creation', async () => {
     const user = userEvent.setup()
-    mockCreatePlaylist.mockResolvedValue(undefined)
+    mockCreatePlaylist.mockResolvedValue(true)
     
     render(
       <TestWrapper>

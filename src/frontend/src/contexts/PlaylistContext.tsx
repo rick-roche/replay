@@ -33,8 +33,17 @@ const PlaylistContext = createContext<PlaylistContextType | undefined>(undefined
 export function PlaylistProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<PlaylistConfig>(() => {
     // Load from localStorage on mount
-    const stored = localStorage.getItem('replay:playlist_config');
-    return stored ? JSON.parse(stored) : defaultConfig;
+    try {
+      const stored = localStorage.getItem('replay:playlist_config');
+      const value: unknown = stored ? JSON.parse(stored) : null;
+      if (typeof value === 'object' && value !== null &&
+        'name' in value && typeof value.name === 'string' &&
+        'description' in value && typeof value.description === 'string' &&
+        'isPublic' in value && typeof value.isPublic === 'boolean') {
+        return { name: value.name, description: value.description, isPublic: value.isPublic };
+      }
+    } catch { /* Invalid stored preferences must not prevent the app from loading. */ }
+    return defaultConfig;
   });
 
   // Persist to localStorage whenever config changes (except when at default)

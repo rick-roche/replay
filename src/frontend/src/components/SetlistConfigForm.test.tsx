@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { Theme } from '@radix-ui/themes'
 import { SetlistConfigForm } from '@/components/SetlistConfigForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
+import { configApi } from '@/api/config'
+vi.mock('@/api/config')
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -30,7 +32,7 @@ describe('SetlistConfigForm', () => {
     expect(screen.getByPlaceholderText(/Setlist.fm username or user ID/i)).toBeInTheDocument()
   })
 
-  it('should render configured state with display name', () => {
+  it('should render configured state with display name', async () => {
     const config = {
       userId: 'user123',
       displayName: 'Test User',
@@ -46,6 +48,8 @@ describe('SetlistConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureSetlistFm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Setlist.fm/i }))
     expect(screen.getByText('Test User')).toBeInTheDocument()
     expect(screen.getByText(/5 concerts attended/)).toBeInTheDocument()
   })
@@ -155,7 +159,7 @@ describe('SetlistConfigForm', () => {
     expect(input.value).toBe('12345')
   })
 
-  it('should show Change Profile button when configured', () => {
+  it('should show Change Profile button when configured', async () => {
     const config = {
       userId: 'user123',
       displayName: 'Test User',
@@ -171,6 +175,8 @@ describe('SetlistConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureSetlistFm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Setlist.fm/i }))
     expect(screen.getByRole('button', { name: /Change Profile/i })).toBeInTheDocument()
   })
 
@@ -191,6 +197,8 @@ describe('SetlistConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureSetlistFm).mockResolvedValue(config)
+    await user.click(screen.getByRole('button', { name: /Connect Setlist.fm/i }))
     const changeButton = screen.getByRole('button', { name: /Change Profile/i })
     await user.click(changeButton)
 
@@ -215,6 +223,8 @@ describe('SetlistConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureSetlistFm).mockResolvedValue(config)
+    await user.click(screen.getByRole('button', { name: /Connect Setlist.fm/i }))
     const changeButton = screen.getByRole('button', { name: /Change Profile/i })
     await user.click(changeButton)
 
@@ -243,7 +253,7 @@ describe('SetlistConfigForm', () => {
     expect(heading).toBeInTheDocument()
   })
 
-  it('should display profile URL link when configured', () => {
+  it('should display profile URL link when configured', async () => {
     const config = {
       userId: 'user123',
       displayName: 'Test User',
@@ -259,6 +269,8 @@ describe('SetlistConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureSetlistFm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Setlist.fm/i }))
     const link = screen.getByRole('link', { name: /View profile/i })
     expect(link).toHaveAttribute('href', 'https://setlist.fm/user/test123')
     expect(link).toHaveAttribute('target', '_blank')
@@ -307,7 +319,7 @@ describe('SetlistConfigForm', () => {
     expect((input as HTMLInputElement).value).toBe('  user123  ')
   })
 
-  it('should handle display of multiple attended concerts', () => {
+  it('should handle display of multiple attended concerts', async () => {
     const config = {
       userId: 'user456',
       displayName: 'Concert Fan',
@@ -323,6 +335,8 @@ describe('SetlistConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureSetlistFm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Setlist.fm/i }))
     expect(screen.getByText(/125 concerts attended/)).toBeInTheDocument()
   })
 

@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { Theme } from '@radix-ui/themes'
 import App from './App'
 
+vi.mock('./contexts/CreatePlaylistContext', () => ({ useCreatePlaylist: () => ({ clearPlaylist: vi.fn() }) }))
+
 // Test wrapper component
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -79,7 +81,8 @@ vi.mock('./contexts/WorkflowContext', () => ({
     nextStep: vi.fn(),
     previousStep: vi.fn(),
     resetWorkflow: vi.fn(),
-    lockWorkflow: vi.fn()
+    lockWorkflow: vi.fn(),
+    invalidateFrom: vi.fn()
   })),
   STEP_ORDER: ['select-source', 'configure', 'fetch-and-match', 'curate', 'create']
 }))

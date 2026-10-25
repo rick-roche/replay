@@ -29,6 +29,58 @@ public class SpotifyAuthServiceTests
     }
 
     [Fact]
+    public async Task RefreshTokenAsync_ProfileBadRequest_IsNotARejectedRefreshGrant()
+    {
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"access_token":"new","expires_in":3600,"token_type":"Bearer"}""")
+        });
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("""{"error":"invalid_grant"}""")
+        });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _service.RefreshTokenAsync("refresh"));
+
+        exception.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "{\"error\":\"invalid_client\"}")]
+    [InlineData(HttpStatusCode.TooManyRequests, "{\"error\":\"invalid_grant\"}")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "{\"error\":\"invalid_grant\"}")]
+    [InlineData(HttpStatusCode.BadRequest, "{\"error\":\"invalid_request\"}")]
+    [InlineData(HttpStatusCode.BadRequest, "not-json")]
+    public async Task RefreshTokenAsync_OtherProviderFailures_AreNotRejectedRefreshGrants(HttpStatusCode statusCode, string body)
+    {
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(statusCode)
+        {
+            Content = new StringContent(body)
+        });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _service.RefreshTokenAsync("refresh"));
+
+        exception.StatusCode.Should().Be(statusCode);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_PreservesToken_WhenReplacementIsOmitted()
+    {
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"access_token":"new","expires_in":3600,"token_type":"Bearer"}""")
+        });
+        _httpMessageHandler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"id":"user123"}""")
+        });
+
+        var session = await _service.RefreshTokenAsync("original-refresh-token");
+
+        session.RefreshToken.Should().Be("original-refresh-token");
+    }
+
+    [Fact]
     public void GetAuthorizationUrl_ShouldGenerateCorrectUrl()
     {
         // Arrange

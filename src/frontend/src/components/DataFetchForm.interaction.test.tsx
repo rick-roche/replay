@@ -2,7 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Theme } from '@radix-ui/themes'
 import { FetchDataButton, DataResults } from './DataFetchForm'
-import { ConfigProvider } from '@/contexts/ConfigContext'
+import { ConfigProvider, useConfig } from '@/contexts/ConfigContext'
+import { configApi } from '@/api/config'
+vi.mock('@/api/config')
+
+function ConfigureProfile() {
+  const { configureLastfm } = useConfig()
+  return <button onClick={() => configureLastfm('alice')}>Configure test profile</button>
+}
 import { DataProvider } from '@/contexts/DataContext'
 import { DataSourceProvider } from '@/contexts/DataSourceContext'
 import * as sourcesApiModule from '@/api/sources'
@@ -47,6 +54,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <Theme>
       <ConfigProvider>
+        <ConfigureProfile />
         <DataSourceProvider>
           <DataProvider>{children}</DataProvider>
         </DataSourceProvider>
@@ -69,6 +77,7 @@ describe('DataFetchForm interactions', () => {
     vi.clearAllMocks()
     appendMatchesMock.mockReset()
     localStorage.clear()
+    vi.mocked(configApi.configureLastfm).mockResolvedValue({ username: 'alice', profileUrl: '', playCount: 100, isConfigured: true })
     matchState.matchedData = null
     matchState.isLoading = false
   })
@@ -85,7 +94,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
     expect(screen.getByText(/Fetching.../)).toBeInTheDocument()
     // During loading, the accessible name is "Fetching..."
     expect(screen.getByRole('button', { name: /Fetching.../i })).toBeDisabled()
@@ -105,7 +115,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Tracks Found/)).toBeInTheDocument()
@@ -129,7 +140,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Albums Found/)).toBeInTheDocument()
@@ -153,7 +165,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Artists Found/)).toBeInTheDocument()
@@ -176,7 +189,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/No tracks found/)).toBeInTheDocument()
@@ -195,7 +209,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
 
     await waitFor(() => {
       expect(screen.getByText('Boom')).toBeInTheDocument()
@@ -227,7 +242,8 @@ describe('DataFetchForm interactions', () => {
     )
 
     // Initial fetch
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
     await waitFor(() => {
       expect(screen.getByText(/Tracks Found/)).toBeInTheDocument()
     })
@@ -277,7 +293,8 @@ describe('DataFetchForm interactions', () => {
       </Wrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Fetch Data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configure test profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Fetch Data/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Tracks Found/)).toBeInTheDocument()

@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { Theme } from '@radix-ui/themes'
 import { Home } from './Home'
 
+vi.mock('../contexts/CreatePlaylistContext', () => ({ useCreatePlaylist: () => ({ clearPlaylist: vi.fn() }) }))
+
 let mockAuthState = {
   user: null,
   isLoading: false,
@@ -27,7 +29,8 @@ let mockWorkflowState = {
   nextStep: vi.fn(),
   previousStep: vi.fn(),
   resetWorkflow: vi.fn(),
-  lockWorkflow: vi.fn()
+  lockWorkflow: vi.fn(),
+  invalidateFrom: vi.fn()
 }
 
 let mockMatchState = {
@@ -78,7 +81,8 @@ beforeEach(() => {
     nextStep: vi.fn(),
     previousStep: vi.fn(),
     resetWorkflow: vi.fn(),
-    lockWorkflow: vi.fn()
+    lockWorkflow: vi.fn(),
+    invalidateFrom: vi.fn()
   }
   
   mockMatchState = {

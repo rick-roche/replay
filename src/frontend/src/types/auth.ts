@@ -1,13 +1,4 @@
-export interface SpotifyUser {
-  id: string;
-  displayName: string;
-  imageUrl?: string;
-  externalUrl?: string;
-}
+import type { components } from '../api/generated-client'
 
-export interface SessionInfo {
-  isAuthenticated: boolean;
-  user?: SpotifyUser;
-  expiresAt: string;
-  source?: string;
-}
+export type SpotifyUser = components['schemas']['SpotifyUser']
+export type SessionInfo = components['schemas']['SessionInfo']

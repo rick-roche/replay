@@ -1,7 +1,3 @@
-import type { components } from './generated-client'
-
-type ApiError = components['schemas']['ApiError']
-
 /**
  * Helper to extract and throw typed API errors from openapi-fetch responses.
  * Use this across all API wrappers for consistent error handling.
@@ -16,7 +12,9 @@ type ApiError = components['schemas']['ApiError']
  * return data!
  */
 export function handleApiError(error: unknown, fallbackMessage: string): never {
-  const apiError = error as ApiError | undefined
-  const message = apiError?.message ?? apiError?.code ?? fallbackMessage
-  throw new Error(message)
+  if (typeof error === 'object' && error !== null) {
+    if ('message' in error && typeof error.message === 'string' && error.message.trim()) throw new Error(error.message)
+    if ('code' in error && typeof error.code === 'string' && error.code.trim()) throw new Error(error.code)
+  }
+  throw new Error(fallbackMessage)
 }

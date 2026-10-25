@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { handleApiError } from './errors'
 
 describe('handleApiError', () => {
+  it.each([{ message: { detail: 'unsafe' } }, { message: 42 }, { message: '', code: [] }])('uses fallback for malformed errors: %j', error => {
+    expect(() => handleApiError(error, 'Operation failed')).toThrow('Operation failed')
+  })
   it('throws error with API error message', () => {
     const error = {
       message: 'User not found',

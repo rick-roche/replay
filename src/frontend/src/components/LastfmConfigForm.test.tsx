@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { Theme } from '@radix-ui/themes'
 import { LastfmConfigForm } from '@/components/LastfmConfigForm'
 import { ConfigProvider } from '@/contexts/ConfigContext'
+import { configApi } from '@/api/config'
+vi.mock('@/api/config')
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -110,7 +112,7 @@ describe('LastfmConfigForm', () => {
     expect(input).toBeInTheDocument()
   })
 
-  it('should show configured state with username and play count', () => {
+  it('should show configured state with username and play count', async () => {
     const config = {
       username: 'testuser',
       playCount: 10000,
@@ -125,12 +127,14 @@ describe('LastfmConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureLastfm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Last.fm/i }))
     expect(screen.getByText('testuser')).toBeInTheDocument()
     expect(screen.getByText(/10[\s,.]000 total scrobbles/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Change Username/i })).toBeInTheDocument()
   })
 
-  it('should show change username button when configured', () => {
+  it('should show change username button when configured', async () => {
     const config = {
       username: 'testuser',
       playCount: 10000,
@@ -145,6 +149,8 @@ describe('LastfmConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureLastfm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Last.fm/i }))
     expect(screen.getByRole('button', { name: /Change Username/i })).toBeInTheDocument()
   })
 
@@ -164,6 +170,8 @@ describe('LastfmConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureLastfm).mockResolvedValue(config)
+    await user.click(screen.getByRole('button', { name: /Connect Last.fm/i }))
     const changeButton = screen.getByRole('button', { name: /Change Username/i })
     await user.click(changeButton)
 
@@ -182,7 +190,7 @@ describe('LastfmConfigForm', () => {
     expect(form).toBeInTheDocument()
   })
 
-  it('should format large play counts using the default locale', () => {
+  it('should format large play counts using the default locale', async () => {
     const config = {
       username: 'testuser',
       playCount: 1234567,
@@ -197,6 +205,8 @@ describe('LastfmConfigForm', () => {
       </TestWrapper>
     )
 
+    vi.mocked(configApi.configureLastfm).mockResolvedValue(config)
+    await userEvent.click(screen.getByRole('button', { name: /Connect Last.fm/i }))
     expect(screen.getByText(/1[\s,.]234[\s,.]567 total scrobbles/)).toBeInTheDocument()
   })
 })

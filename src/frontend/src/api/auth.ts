@@ -1,4 +1,5 @@
 import type { SessionInfo } from '../types/auth'
+import { client } from './client'
 
 const API_BASE = '/api/auth'
 
@@ -7,7 +8,7 @@ export const authApi = {
    * Initiate Spotify OAuth login
    */
   login(): void {
-    const returnUrl = window.location.href
+    const returnUrl = window.location.pathname + window.location.search + window.location.hash
     window.location.href = `${API_BASE}/login?returnUrl=${encodeURIComponent(returnUrl)}`
   },
 
@@ -16,15 +17,8 @@ export const authApi = {
    */
   async getSession(): Promise<SessionInfo | null> {
     try {
-      const response = await fetch(`${API_BASE}/session`, {
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      return await response.json()
+      const { data, response } = await client.GET('/api/auth/session')
+      return response.ok ? data ?? null : null
     } catch {
       return null
     }
@@ -34,29 +28,18 @@ export const authApi = {
    * Refresh the current session
    */
   async refresh(): Promise<SessionInfo | null> {
-    try {
-      const response = await fetch(`${API_BASE}/refresh`, {
-        method: 'POST',
-        credentials: 'include'
-      })
+    const { data, response } = await client.POST('/api/auth/refresh')
 
-      if (!response.ok) {
-        return null
-      }
+    if (response.status === 401) return null
+    if (!response.ok) throw new Error('Session refresh temporarily unavailable')
 
-      return await response.json()
-    } catch {
-      return null
-    }
+    return data ?? null
   },
 
   /**
    * Logout and clear session
    */
   async logout(): Promise<void> {
-    await fetch(`${API_BASE}/logout`, {
-      method: 'POST',
-      credentials: 'include'
-    })
+    await client.POST('/api/auth/logout')
   }
 }

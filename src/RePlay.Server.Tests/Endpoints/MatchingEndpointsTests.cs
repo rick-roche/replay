@@ -10,6 +10,14 @@ namespace RePlay.Server.Tests.Endpoints;
 
 public class MatchingEndpointsTests
 {
+    private static ApiError AssertError(IResult result, int statusCode, string code)
+    {
+        var json = result.Should().BeOfType<JsonHttpResult<ApiError>>().Subject;
+        json.StatusCode.Should().Be(statusCode);
+        json.Value!.Code.Should().Be(code);
+        return json.Value;
+    }
+
     private static MethodInfo GetPrivate(string name)
     {
         var mi = typeof(MatchingEndpoints).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static);
@@ -77,7 +85,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -160,7 +168,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -204,7 +212,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -220,7 +228,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -290,9 +298,8 @@ public class MatchingEndpointsTests
 
         var result = await InvokeAsync(mi, request, fake, store, ctx, (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var error = AssertError(result, StatusCodes.Status502BadGateway, "SPOTIFY_API_ERROR");
+        error.Message.Should().NotContain("Spotify API error");
     }
 
     [Fact]
@@ -311,9 +318,8 @@ public class MatchingEndpointsTests
 
         var result = await InvokeAsync(mi, request, fake, store, ctx, (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
+        var error = AssertError(result, StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR");
+        error.Message.Should().NotContain("Unexpected error");
     }
 
     [Fact]
@@ -328,7 +334,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -376,7 +382,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "INVALID_SESSION");
     }
 
     [Fact]
@@ -403,8 +409,11 @@ public class MatchingEndpointsTests
         ok.Value!.Should().HaveCount(0);
     }
 
-    [Fact]
-    public async Task SearchTracksAsync_ServiceThrowsHttpRequestException()
+    [Theory]
+    [InlineData(null, StatusCodes.Status502BadGateway, "SPOTIFY_API_ERROR")]
+    [InlineData(System.Net.HttpStatusCode.TooManyRequests, StatusCodes.Status429TooManyRequests, "SPOTIFY_RATE_LIMITED")]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, StatusCodes.Status401Unauthorized, "SPOTIFY_TOKEN_EXPIRED")]
+    public async Task SearchTracksAsync_ServiceThrowsHttpRequestException(System.Net.HttpStatusCode? providerStatus, int expectedStatus, string expectedCode)
     {
         var mi = GetPrivate("SearchTracksAsync");
         var ctx = ContextWithSessionCookie();
@@ -412,7 +421,7 @@ public class MatchingEndpointsTests
         store.StoreSession(new AuthSession { SessionId = "sid", AccessToken = "a", RefreshToken = "r", ExpiresAt = DateTime.UtcNow.AddHours(1), User = new SpotifyUser { Id = "id", DisplayName = "name" } });
         var fake = new FakeSpotifyMatchingService
         {
-            OnSearchTracksAsync = (q, token, ct) => throw new HttpRequestException("Spotify unavailable")
+            OnSearchTracksAsync = (q, token, ct) => throw new HttpRequestException("private provider failure detail", null, providerStatus)
         };
 
         var result = await InvokeAsync(mi,
@@ -422,9 +431,8 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var error = AssertError(result, expectedStatus, expectedCode);
+        error.Message.Should().NotContain("private provider failure detail");
     }
 
     [Fact]
@@ -446,9 +454,8 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
+        var error = AssertError(result, StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR");
+        error.Message.Should().NotContain("Unexpected error");
     }
 
     [Fact]
@@ -543,7 +550,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -589,9 +596,8 @@ public class MatchingEndpointsTests
 
         var result = await InvokeAsync(mi, request, fake, store, ctx, (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var error = AssertError(result, StatusCodes.Status502BadGateway, "SPOTIFY_API_ERROR");
+        error.Message.Should().NotContain("Spotify API error");
     }
 
     [Fact]
@@ -610,9 +616,8 @@ public class MatchingEndpointsTests
 
         var result = await InvokeAsync(mi, request, fake, store, ctx, (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
+        var error = AssertError(result, StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR");
+        error.Message.Should().NotContain("Unexpected error");
     }
 
     [Fact]
@@ -643,7 +648,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -694,9 +699,8 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var error = AssertError(result, StatusCodes.Status502BadGateway, "SPOTIFY_API_ERROR");
+        error.Message.Should().NotContain("Spotify unavailable");
     }
 
     [Fact]
@@ -730,7 +734,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -776,9 +780,8 @@ public class MatchingEndpointsTests
 
         var result = await InvokeAsync(mi, request, fake, store, ctx, (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var error = AssertError(result, StatusCodes.Status502BadGateway, "SPOTIFY_API_ERROR");
+        error.Message.Should().NotContain("Spotify API error");
     }
 
     [Fact]
@@ -797,9 +800,8 @@ public class MatchingEndpointsTests
 
         var result = await InvokeAsync(mi, request, fake, store, ctx, (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
+        var error = AssertError(result, StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR");
+        error.Message.Should().NotContain("Unexpected error");
     }
 
     [Fact]
@@ -830,7 +832,7 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<UnauthorizedHttpResult>();
+        AssertError(result, StatusCodes.Status401Unauthorized, "NO_SESSION");
     }
 
     [Fact]
@@ -881,9 +883,8 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        var error = AssertError(result, StatusCodes.Status502BadGateway, "SPOTIFY_API_ERROR");
+        error.Message.Should().NotContain("Spotify unavailable");
     }
 
     [Fact]
@@ -905,9 +906,8 @@ public class MatchingEndpointsTests
             ctx,
             (object)CancellationToken.None);
 
-        result.Should().BeOfType<ProblemHttpResult>();
-        var problem = (ProblemHttpResult)result;
-        problem.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
+        var error = AssertError(result, StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR");
+        error.Message.Should().NotContain("Unexpected error");
     }
 
     [Fact]

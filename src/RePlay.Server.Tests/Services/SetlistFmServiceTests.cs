@@ -302,16 +302,82 @@ public sealed class SetlistFmServiceTests
             .ThrowAsync<InvalidOperationException>();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetUserConcertsAsync_BoundsFilteredAndSelectedScans(bool selected)
+    {
+        for (var page = 1; page <= 100; page++)
+            _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent($$"""{"setlist":[{"id":"other","eventDate":"01-01-2000"}],"total":101,"page":{{page}},"itemsPerPage":1}""")
+            });
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => _service.GetUserConcertsAsync("alice",
+            new SetlistFmFilter { StartDate = "2024-01-01" }, selected ? ["wanted"] : null));
+        error.Message.Should().Contain("100");
+        _handler.RequestCount.Should().Be(100);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task GetUserAsync_PreservesProfileAndCountProviderFailures(HttpStatusCode status)
+    {
+        _handler.Enqueue(new HttpResponseMessage(status));
+        var profileError = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserAsync("alice"));
+        profileError.StatusCode.Should().Be(status);
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"userId":"alice"}""") });
+        _handler.Enqueue(new HttpResponseMessage(status));
+        var countError = await Assert.ThrowsAsync<HttpRequestException>(() => _service.GetUserAsync("alice"));
+        countError.StatusCode.Should().Be(status);
+    }
+
+    [Fact]
+    public async Task GetUserAsync_PropagatesCancellationDuringAttendedCount()
+    {
+        using var cancellation = new CancellationTokenSource();
+        _handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"userId":"alice"}""") });
+        _handler.BeforeRequest = count => { if (count == 2) cancellation.Cancel(); };
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _service.GetUserAsync("alice", cancellation.Token));
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("alice/attended")]
+    [InlineData("alice?key=evil")]
+    [InlineData("https://evil.test")]
+    public async Task UserIdentifiers_RejectPathAndQueryInjectionBeforeSendingCredentials(string userId)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetUserAsync(userId));
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetUserConcertsAsync(userId, new SetlistFmFilter()));
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetUserConcertsPageAsync(userId, new SetlistFmFilter(), 1, 20));
+        _handler.RequestCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SelectedIdentifiers_RejectPathInjectionBeforeAttendanceScan()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.GetUserConcertsAsync("alice", new SetlistFmFilter(), ["../secret"]));
+        _handler.RequestCount.Should().Be(0);
+    }
+
     private sealed class TestHttpMessageHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
 
         public string? LastRequestUri { get; private set; }
+        public int RequestCount { get; private set; }
+        public Action<int>? BeforeRequest { get; set; }
 
         public void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
+            BeforeRequest?.Invoke(RequestCount);
+            cancellationToken.ThrowIfCancellationRequested();
             LastRequestUri = request.RequestUri?.ToString();
             if (_responses.Count == 0)
             {

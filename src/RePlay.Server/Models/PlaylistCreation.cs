@@ -52,4 +52,11 @@ public sealed record PlaylistCreationResponse
     /// Number of tracks added to the playlist.
     /// </summary>
     public required int TracksAdded { get; init; }
+
+    /// <summary>False when the playlist exists but not all additions were confirmed.</summary>
+    public bool IsComplete { get; init; } = true;
+
+    public string? ErrorCode { get; init; }
+
+    public string? ErrorMessage { get; init; }
 }

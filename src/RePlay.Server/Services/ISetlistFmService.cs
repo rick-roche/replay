@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 using Microsoft.Extensions.Options;
+
 using RePlay.Server.Configuration;
 using RePlay.Server.Models;
 
@@ -54,6 +56,7 @@ public sealed class SetlistFmService : ISetlistFmService
 {
     private const int MaximumConcerts = 100;
     private const int MaximumTracks = 500;
+    private const int MaximumPages = 100;
     private static readonly JsonSerializerOptions SerializerOptions = new();
 
     private readonly HttpClient _httpClient;
@@ -82,19 +85,17 @@ public sealed class SetlistFmService : ISetlistFmService
         {
             throw new ArgumentException("Username or ID cannot be empty", nameof(usernameOrId));
         }
+        usernameOrId = NormalizeIdentifier(usernameOrId);
 
         using var request = CreateRequest($"user/{Uri.EscapeDataString(usernameOrId)}");
-        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
 
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
+        response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var payload = await JsonSerializer.DeserializeAsync<SetlistUserResponse>(stream, SerializerOptions, cancellationToken)
@@ -127,6 +128,7 @@ public sealed class SetlistFmService : ISetlistFmService
         {
             throw new ArgumentException("User ID cannot be empty", nameof(userId));
         }
+        userId = NormalizeIdentifier(userId);
 
         var concerts = new List<SetlistConcert>();
         var allTracks = new List<SetlistTrack>();
@@ -155,6 +157,8 @@ public sealed class SetlistFmService : ISetlistFmService
                 throw new ArgumentException($"Select between 1 and {maxConcerts} unique concerts", nameof(selectedConcertIds));
             }
 
+            concertIds = concertIds.Select(NormalizeIdentifier).ToList();
+
             await ValidateSelectedConcertsAsync(userId, concertIds, cancellationToken).ConfigureAwait(false);
 
             foreach (var concertId in concertIds)
@@ -181,6 +185,10 @@ public sealed class SetlistFmService : ISetlistFmService
         var fetchedConcerts = 0;
         while (fetchedConcerts < maxConcerts)
         {
+            if (page > MaximumPages)
+            {
+                throw new InvalidOperationException("Setlist.fm scan reached the 100-page limit. Narrow the date range or select fewer concerts.");
+            }
             var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
             if (payload.Setlist == null || payload.Setlist.Count == 0)
             {
@@ -230,6 +238,7 @@ public sealed class SetlistFmService : ISetlistFmService
         {
             throw new ArgumentException("User ID cannot be empty", nameof(userId));
         }
+        userId = NormalizeIdentifier(userId);
 
         if (pageNumber < 1)
         {
@@ -323,27 +332,31 @@ public sealed class SetlistFmService : ISetlistFmService
 
     private async Task<int> GetAttendedConcertsCountAsync(string userId, CancellationToken cancellationToken)
     {
-        try
+        using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?perPage=1");
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?perPage=1");
-            var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return 0;
-            }
-
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            var payload = await JsonSerializer.DeserializeAsync<SetlistAttendedResponse>(stream, SerializerOptions, cancellationToken)
-                .ConfigureAwait(false);
-
-            return payload?.Total ?? 0;
-        }
-        catch
-        {
-            // If attended endpoint fails, return 0
             return 0;
         }
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var payload = await JsonSerializer.DeserializeAsync<SetlistAttendedResponse>(stream, SerializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        return payload?.Total ?? 0;
+    }
+
+    private static string NormalizeIdentifier(string value)
+    {
+        var identifier = value.Trim();
+        if (identifier.Length is < 1 or > 100 || identifier is "." or ".." ||
+            identifier.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '_' and not '-' and not '.'))
+        {
+            throw new ArgumentException("Invalid Setlist.fm username or ID", nameof(value));
+        }
+        return identifier;
     }
 
     private HttpRequestMessage CreateRequest(string relativePath)
@@ -362,7 +375,7 @@ public sealed class SetlistFmService : ISetlistFmService
         CancellationToken cancellationToken)
     {
         using var request = CreateRequest($"user/{Uri.EscapeDataString(userId)}/attended?p={page}&perPage={pageSize}");
-        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -373,7 +386,7 @@ public sealed class SetlistFmService : ISetlistFmService
     private async Task<SetlistAttendedResponse.SetlistItem> GetSetlistAsync(string concertId, CancellationToken cancellationToken)
     {
         using var request = CreateRequest($"setlist/{Uri.EscapeDataString(concertId)}");
-        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -391,6 +404,10 @@ public sealed class SetlistFmService : ISetlistFmService
 
         while (remainingIds.Count > 0)
         {
+            if (page > MaximumPages)
+            {
+                throw new InvalidOperationException("Setlist.fm selection validation reached the 100-page limit. Select concerts from the first 100 attended pages.");
+            }
             var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
             foreach (var item in payload.Setlist ?? [])
             {

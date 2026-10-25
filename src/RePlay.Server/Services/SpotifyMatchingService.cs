@@ -63,7 +63,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         var searchResults = await SearchSpotifyAsync(query, accessToken, cancellationToken);
         
         return searchResults
-            .Take(15) // Limit to top 15 results
+            .Take(10) // Spotify Development Mode search limit
             .Select(track => new SpotifyTrack
             {
                 Id = track.Id,
@@ -187,7 +187,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         }
 
         // Step 1: Create the playlist
-        var createPlaylistUrl = $"https://api.spotify.com/v1/users/{userId}/playlists";
+        var createPlaylistUrl = "https://api.spotify.com/v1/me/playlists";
         var createPlaylistPayload = new
         {
             name = request.Name,
@@ -195,7 +195,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
             @public = request.IsPublic
         };
 
-        var createRequest = new HttpRequestMessage(HttpMethod.Post, createPlaylistUrl)
+        using var createRequest = new HttpRequestMessage(HttpMethod.Post, createPlaylistUrl)
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(createPlaylistPayload),
@@ -204,62 +204,90 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         };
         createRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var createResponse = await _httpClient.SendAsync(createRequest, cancellationToken);
-        if (!createResponse.IsSuccessStatusCode)
+        const string unconfirmedCode = "PLAYLIST_CREATION_UNCONFIRMED";
+        const string unconfirmedMessage = "Spotify may have created the playlist. Check your Spotify library before trying again.";
+        string? playlistId;
+        string? playlistUri;
+        string? playlistUrl;
+
+        // Before sending, cancellation is known not to have caused a write. After sending,
+        // an interrupted or unreadable response cannot prove that Spotify did not commit it.
+        cancellationToken.ThrowIfCancellationRequested();
+        try
         {
-            var errorContent = await createResponse.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException(
-                $"Failed to create playlist on Spotify: {createResponse.StatusCode}. Details: {errorContent}");
+            using var createResponse = await _httpClient.SendAsync(createRequest, cancellationToken);
+            if ((int)createResponse.StatusCode >= 500)
+            {
+                throw new SpotifyApiException(System.Net.HttpStatusCode.BadGateway, unconfirmedCode, unconfirmedMessage);
+            }
+            if (!createResponse.IsSuccessStatusCode)
+            {
+                throw new SpotifyApiException(createResponse.StatusCode);
+            }
+
+            var createResponseBody = await createResponse.Content.ReadAsStringAsync(cancellationToken);
+            var playlistJson = JsonSerializer.Deserialize<JsonElement>(createResponseBody);
+            playlistId = playlistJson.GetProperty("id").GetString();
+            playlistUri = playlistJson.GetProperty("uri").GetString();
+            playlistUrl = playlistJson.GetProperty("external_urls").GetProperty("spotify").GetString();
+            if (string.IsNullOrWhiteSpace(playlistId))
+            {
+                throw new SpotifyApiException(System.Net.HttpStatusCode.BadGateway, unconfirmedCode, unconfirmedMessage);
+            }
         }
-
-        var createResponseBody = await createResponse.Content.ReadAsStringAsync(cancellationToken);
-        var playlistJson = JsonSerializer.Deserialize<JsonElement>(createResponseBody);
-        var playlistId = playlistJson.GetProperty("id").GetString();
-        var playlistUri = playlistJson.GetProperty("uri").GetString();
-        var playlistUrl = playlistJson.GetProperty("external_urls").GetProperty("spotify").GetString();
-
-        if (string.IsNullOrWhiteSpace(playlistId))
+        catch (Exception ex) when (ex is not SpotifyApiException && ex is
+            HttpRequestException or OperationCanceledException or Polly.ExecutionRejectedException or
+            JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            throw new InvalidOperationException("Playlist created but ID was null or empty.");
+            throw new SpotifyApiException(System.Net.HttpStatusCode.BadGateway, unconfirmedCode, unconfirmedMessage);
         }
 
         // Step 2: Add tracks to the playlist (Spotify allows up to 100 tracks per request)
-        var addTracksUrl = $"https://api.spotify.com/v1/playlists/{playlistId}/tracks";
+        var addTracksUrl = $"https://api.spotify.com/v1/playlists/{System.Uri.EscapeDataString(playlistId)}/items";
         var tracksAdded = 0;
-
-        // Add tracks in batches of 100
-        for (int i = 0; i < request.TrackUris.Count; i += 100)
-        {
-            var batch = request.TrackUris.Skip(i).Take(100).ToList();
-            var addTracksPayload = new { uris = batch };
-
-            var addTracksRequest = new HttpRequestMessage(HttpMethod.Post, addTracksUrl)
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(addTracksPayload),
-                    Encoding.UTF8,
-                    "application/json")
-            };
-            addTracksRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            var addTracksResponse = await _httpClient.SendAsync(addTracksRequest, cancellationToken);
-            if (!addTracksResponse.IsSuccessStatusCode)
-            {
-                var errorContent = await addTracksResponse.Content.ReadAsStringAsync(cancellationToken);
-                throw new InvalidOperationException(
-                    $"Failed to add tracks to playlist: {addTracksResponse.StatusCode}. Details: {errorContent}");
-            }
-
-            tracksAdded += batch.Count;
-        }
-
-        return new PlaylistCreationResponse
+        var result = new PlaylistCreationResponse
         {
             PlaylistId = playlistId,
             Uri = playlistUri ?? $"spotify:playlist:{playlistId}",
             Url = playlistUrl ?? $"https://open.spotify.com/playlist/{playlistId}",
-            TracksAdded = tracksAdded
+            TracksAdded = 0
         };
+
+        try
+        {
+            for (int i = 0; i < request.TrackUris.Count; i += 100)
+            {
+                var batch = request.TrackUris.Skip(i).Take(100).ToList();
+                using var addTracksRequest = new HttpRequestMessage(HttpMethod.Post, addTracksUrl)
+                {
+                    Content = new StringContent(
+                        JsonSerializer.Serialize(new { uris = batch }),
+                        Encoding.UTF8,
+                        "application/json")
+                };
+                addTracksRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+                using var addTracksResponse = await _httpClient.SendAsync(addTracksRequest, cancellationToken);
+                if (!addTracksResponse.IsSuccessStatusCode)
+                {
+                    throw new SpotifyApiException(addTracksResponse.StatusCode);
+                }
+                tracksAdded += batch.Count;
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or Polly.ExecutionRejectedException)
+        {
+            // A timed-out write may have applied: expose confirmed progress, never retry blindly.
+            return result with
+            {
+                TracksAdded = tracksAdded,
+                IsComplete = false,
+                ErrorCode = "PLAYLIST_PARTIALLY_CREATED",
+                ErrorMessage = "The playlist was created, but not all track additions were confirmed. Open it in Spotify before retrying."
+            };
+        }
+
+        return result with { TracksAdded = tracksAdded };
     }
 
     private async Task<SpotifyMatch?> MatchSingleTrackAsync(
@@ -373,7 +401,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         CancellationToken cancellationToken)
     {
         var encodedQuery = Uri.EscapeDataString(query);
-        var url = $"{SearchEndpoint}?q={encodedQuery}&type=track&limit=15";
+        var url = $"{SearchEndpoint}?q={encodedQuery}&type=track&limit=10";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -382,7 +410,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
 
         if (!response.IsSuccessStatusCode)
         {
-            return Array.Empty<SpotifySearchTrack>();
+            throw new SpotifyApiException(response.StatusCode);
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -580,25 +608,24 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         string accessToken,
         CancellationToken cancellationToken)
     {
-        var url = $"https://api.spotify.com/v1/albums/{albumId}/tracks?limit=50";
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return [];
-        }
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var tracksResponse = JsonSerializer.Deserialize<SpotifyAlbumTracksResponse>(json);
-
         var tracks = new List<SpotifyMatch>();
-        if (tracksResponse?.Items != null)
+        const int pageSize = 50;
+        const int maxPages = 100;
+        for (var page = 0; page < maxPages; page++)
         {
-            foreach (var track in tracksResponse.Items)
+            // Ignore provider-supplied next URLs: bearer tokens must only reach Spotify.
+            var url = $"https://api.spotify.com/v1/albums/{Uri.EscapeDataString(albumId)}/tracks?limit={pageSize}&offset={page * pageSize}";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new SpotifyApiException(response.StatusCode);
+            }
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var tracksResponse = JsonSerializer.Deserialize<SpotifyAlbumTracksResponse>(json);
+            var items = tracksResponse?.Items ?? [];
+            foreach (var track in items)
             {
                 tracks.Add(new SpotifyMatch
                 {
@@ -611,9 +638,13 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
                     Method = MatchMethod.Exact
                 });
             }
+            if (items.Length < pageSize)
+            {
+                return tracks;
+            }
         }
 
-        return tracks;
+        throw new SpotifyApiException(System.Net.HttpStatusCode.BadGateway, "SPOTIFY_PAGINATION_LIMIT", "Spotify album exceeded the supported pagination limit.");
     }
 
     private async Task<List<SpotifyMatch>> FetchArtistTopTracksAsync(
@@ -630,7 +661,11 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
 
         if (!response.IsSuccessStatusCode)
         {
-            return [];
+            if (response.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+            {
+                throw new SpotifyApiException(response.StatusCode, "SPOTIFY_TOP_TRACKS_UNSUPPORTED", "Artist top tracks are not supported by this Spotify application's access mode.");
+            }
+            throw new SpotifyApiException(response.StatusCode);
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -663,7 +698,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         CancellationToken cancellationToken)
     {
         var encodedQuery = Uri.EscapeDataString(query);
-        var url = $"{SearchEndpoint}?q={encodedQuery}&type=album&limit=15";
+        var url = $"{SearchEndpoint}?q={encodedQuery}&type=album&limit=10";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -672,7 +707,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
 
         if (!response.IsSuccessStatusCode)
         {
-            return Array.Empty<SpotifyAlbumData>();
+            throw new SpotifyApiException(response.StatusCode);
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -687,7 +722,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
         CancellationToken cancellationToken)
     {
         var encodedQuery = Uri.EscapeDataString(query);
-        var url = $"{SearchEndpoint}?q={encodedQuery}&type=artist&limit=15";
+        var url = $"{SearchEndpoint}?q={encodedQuery}&type=artist&limit=10";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -696,7 +731,7 @@ public sealed partial class SpotifyMatchingService : ISpotifyMatchingService
 
         if (!response.IsSuccessStatusCode)
         {
-            return Array.Empty<SpotifyArtistData>();
+            throw new SpotifyApiException(response.StatusCode);
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);

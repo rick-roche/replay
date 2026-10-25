@@ -51,7 +51,7 @@ describe('matchApi', () => {
 
       expect(result).toEqual(mockResponse)
       expect(client.POST).toHaveBeenCalledWith(
-        '/api/api/match/spotify',
+        '/api/match/spotify',
         expect.objectContaining({
           body: mockRequest
         })
@@ -117,7 +117,7 @@ describe('matchApi', () => {
 
       expect(result).toEqual(mockResults)
       expect(client.GET).toHaveBeenCalledWith(
-        '/api/api/match/spotify/search',
+        '/api/match/spotify/search',
         expect.objectContaining({
           params: {
             query: {
@@ -220,7 +220,7 @@ describe('matchApi', () => {
 
       expect(result).toEqual(mockResponse)
       expect(client.POST).toHaveBeenCalledWith(
-        '/api/api/match/spotify/albums',
+        '/api/match/spotify/albums',
         expect.objectContaining({
           body: mockRequest
         })
@@ -271,7 +271,7 @@ describe('matchApi', () => {
 
       expect(result).toEqual(mockResults)
       expect(client.GET).toHaveBeenCalledWith(
-        '/api/api/match/spotify/albums/search',
+        '/api/match/spotify/albums/search',
         expect.objectContaining({
           params: {
             query: {
@@ -328,7 +328,7 @@ describe('matchApi', () => {
 
       expect(result).toEqual(mockResponse)
       expect(client.POST).toHaveBeenCalledWith(
-        '/api/api/match/spotify/artists',
+        '/api/match/spotify/artists',
         expect.objectContaining({
           body: mockRequest
         })
@@ -377,7 +377,7 @@ describe('matchApi', () => {
 
       expect(result).toEqual(mockResults)
       expect(client.GET).toHaveBeenCalledWith(
-        '/api/api/match/spotify/artists/search',
+        '/api/match/spotify/artists/search',
         expect.objectContaining({
           params: {
             query: {

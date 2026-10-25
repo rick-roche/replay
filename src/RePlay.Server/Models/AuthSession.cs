@@ -10,6 +10,11 @@ public sealed record AuthSession
     public required string RefreshToken { get; init; }
     public required DateTime ExpiresAt { get; init; }
     public required SpotifyUser User { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+    public DateTime SessionExpiresAt => CreatedAt.AddDays(30);
+
+    /// <summary>Application lifetime is independent of the Spotify access token lifetime.</summary>
+    public bool IsSessionExpired() => DateTime.UtcNow >= SessionExpiresAt;
 
     /// <summary>
     /// Check if the access token is expired or about to expire.

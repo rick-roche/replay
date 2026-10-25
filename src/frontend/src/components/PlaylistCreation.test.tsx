@@ -151,10 +151,7 @@ describe('CreatePlaylistContext', () => {
     };
 
     global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      } as Response)
+      Promise.resolve(Response.json(mockResponse))
     );
 
     const TestComponent = () => {
@@ -186,10 +183,7 @@ describe('CreatePlaylistContext', () => {
 
   it('should handle fetch errors', async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        json: () => Promise.resolve({ code: 'ERROR', message: 'Failed to create playlist' }),
-      } as Response)
+      Promise.resolve(Response.json({ code: 'ERROR', message: 'Failed to create playlist' }, { status: 502 }))
     );
 
     const TestComponent = () => {
