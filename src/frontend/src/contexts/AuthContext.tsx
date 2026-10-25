@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let timer: ReturnType<typeof setTimeout>
     const run = async () => {
       const refreshed = await tryRefresh()
-      if (!refreshed && active && attempts < 3) {
+      if (!refreshed && active) {
         timer = setTimeout(run, Math.min(30000 * 2 ** attempts++, 120000))
       }
     }

@@ -22,6 +22,7 @@ public static class SourcesEndpoints
             .Accepts<FetchLastfmDataRequest>("application/json")
             .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status422UnprocessableEntity, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         var discogs = sources.MapGroup("/discogs");
@@ -33,6 +34,7 @@ public static class SourcesEndpoints
             .Accepts<FetchDiscogsDataRequest>("application/json")
             .Produces<NormalizedDataResponse>(StatusCodes.Status200OK)
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
+            .Produces<ApiError>(StatusCodes.Status422UnprocessableEntity, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
         var setlistfm = sources.MapGroup("/setlistfm");
@@ -72,6 +74,7 @@ public static class SourcesEndpoints
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
             .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
             .Produces<ApiError>(StatusCodes.Status403Forbidden, "application/json")
+            .Produces<ApiError>(StatusCodes.Status422UnprocessableEntity, "application/json")
             .Produces<ApiError>(StatusCodes.Status502BadGateway, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
@@ -84,6 +87,7 @@ public static class SourcesEndpoints
             .Produces<ApiError>(StatusCodes.Status400BadRequest, "application/json")
             .Produces<ApiError>(StatusCodes.Status401Unauthorized, "application/json")
             .Produces<ApiError>(StatusCodes.Status403Forbidden, "application/json")
+            .Produces<ApiError>(StatusCodes.Status422UnprocessableEntity, "application/json")
             .Produces<ApiError>(StatusCodes.Status502BadGateway, "application/json")
             .Produces<ApiError>(StatusCodes.Status500InternalServerError, "application/json");
 
@@ -284,6 +288,7 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
+        catch (ProviderScanLimitException ex) { return ProviderErrors.ScanLimit(ex); }
         catch (HttpRequestException ex) { return ProviderErrors.Source("DISCOGS", ex); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
@@ -356,6 +361,7 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
+        catch (ProviderScanLimitException ex) { return ProviderErrors.ScanLimit(ex); }
         catch (HttpRequestException ex) { return ProviderErrors.Source("SETLISTFM", ex); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
@@ -418,6 +424,7 @@ public static class SourcesEndpoints
                 "INVALID_FILTER",
                 ex.Message);
         }
+        catch (ProviderScanLimitException ex) { return ProviderErrors.ScanLimit(ex); }
         catch (HttpRequestException ex) { return ProviderErrors.Source("SETLISTFM", ex); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)

@@ -7,6 +7,12 @@ namespace RePlay.Server.Endpoints;
 
 internal static class ProviderErrors
 {
+    public static IResult ScanLimit(ProviderScanLimitException error) => Results.Json(new ApiError
+    {
+        Code = $"{error.Provider}_SCAN_LIMIT_REACHED",
+        Message = error.Message
+    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+
     public static RouteGroupBuilder WithProviderErrors(this RouteGroupBuilder group) => group.WithMetadata(
         new ProducesResponseTypeAttribute(typeof(ApiError), 401),
         new ProducesResponseTypeAttribute(typeof(ApiError), 403),

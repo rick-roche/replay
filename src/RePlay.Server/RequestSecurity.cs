@@ -31,13 +31,13 @@ public static class RequestSecurity
         builder.Services.AddRateLimiter(options =>
         {
             options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
-                PartitionedRateLimiter.Create<HttpContext, string>(context => !context.Request.Path.StartsWithSegments("/api")
+                PartitionedRateLimiter.Create<HttpContext, string>(context => !IsLimitedApiRequest(context)
                     ? RateLimitPartition.GetNoLimiter("static")
                     : RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0
                     })),
-                PartitionedRateLimiter.Create<HttpContext, string>(context => !context.Request.Path.StartsWithSegments("/api")
+                PartitionedRateLimiter.Create<HttpContext, string>(context => !IsLimitedApiRequest(context)
                     ? RateLimitPartition.GetNoLimiter("static")
                     : RateLimitPartition.GetConcurrencyLimiter(PartitionKey(context), _ => new ConcurrencyLimiterOptions
                     {
@@ -54,6 +54,10 @@ public static class RequestSecurity
             };
         });
     }
+
+    private static bool IsLimitedApiRequest(HttpContext context) =>
+        context.Request.Path.StartsWithSegments("/api") &&
+        !(HttpMethods.IsPost(context.Request.Method) && context.Request.Path.Equals("/api/auth/logout", StringComparison.OrdinalIgnoreCase));
 
     public static void UseRequestSecurity(this WebApplication app)
     {

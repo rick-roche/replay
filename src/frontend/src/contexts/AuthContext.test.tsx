@@ -103,6 +103,28 @@ describe('AuthContext', () => {
     }
   })
 
+  it('continues retrying at the capped interval until Spotify refresh recovers', async () => {
+    vi.useFakeTimers()
+    const session = { sessionId: 's', user: { id: 'alice', displayName: 'Alice', email: '', imageUrl: null }, expiresAt: new Date(Date.now() + 1000).toISOString() }
+    vi.mocked(authApi.getSession).mockResolvedValue(session)
+    vi.mocked(authApi.refresh)
+      .mockRejectedValueOnce(new Error('503'))
+      .mockRejectedValueOnce(new Error('503'))
+      .mockRejectedValueOnce(new Error('503'))
+      .mockRejectedValueOnce(new Error('503'))
+      .mockResolvedValueOnce({ ...session, expiresAt: new Date(Date.now() + 3600000).toISOString() })
+    const { result, unmount } = renderHook(useAuth, { wrapper: AuthProvider })
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000 + 60000 + 120000 + 120000) })
+      expect(authApi.refresh).toHaveBeenCalledTimes(5)
+      expect(result.current.isAuthenticated).toBe(true)
+    } finally {
+      unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('should show loading state initially', () => {
     vi.mocked(authApi.getSession).mockResolvedValue(null)
 

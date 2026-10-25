@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using RePlay.Server;
@@ -99,6 +100,38 @@ public sealed class HttpBoundaryTests
     }
 
     [Fact]
+    public async Task Logout_RemainsAvailableAfterRequestRateLimitIsExhausted()
+    {
+        await using var api = await RunningApi.StartAsync(authenticated: true);
+        for (var i = 0; i < 60; i++)
+        {
+            using var response = await api.Client.GetAsync("/api/security-probe");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using var logout = await api.Client.PostAsync("/api/auth/logout", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_RemainsAvailableWhenAllConcurrentSlotsAreBusy()
+    {
+        await using var api = await RunningApi.StartAsync(authenticated: true);
+        var inFlight = Enumerable.Range(0, 4).Select(_ => api.Client.GetAsync("/api/hold")).ToArray();
+        await api.AllHoldsStarted.WaitAsync(TimeSpan.FromSeconds(3));
+
+        using var logout = await api.Client.PostAsync("/api/auth/logout", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        api.ReleaseHolds.TrySetResult();
+        foreach (var request in inFlight)
+        {
+            try { using var response = await request; }
+            catch (HttpRequestException) { }
+            catch (TaskCanceledException) { }
+        }
+    }
+
+    [Fact]
     public async Task PartialPlaylist_ReturnsExistingPlaylistAndConfirmedProgress()
     {
         await using var api = await RunningApi.StartAsync(authenticated: true);
@@ -150,6 +183,24 @@ public sealed class HttpBoundaryTests
         Assert.DoesNotContain("Provider validation details", await response.Content.ReadAsStringAsync());
     }
 
+    [Theory]
+    [InlineData("/api/sources/discogs/data", "{\"usernameOrCollectionId\":\"listener\",\"filter\":{}}", "DISCOGS_SCAN_LIMIT_REACHED")]
+    [InlineData("/api/sources/setlistfm/data", "{\"userId\":\"listener\",\"filter\":{}}", "SETLISTFM_SCAN_LIMIT_REACHED")]
+    public async Task ProviderScanLimit_ReturnsGuidedUnprocessableError(string path, string body, string errorCode)
+    {
+        await using var api = await RunningApi.StartAsync(authenticated: true);
+        api.Discogs.GetCollectionNormalizedAsync(Arg.Any<string>(), Arg.Any<DiscogsFilter>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<NormalizedDataResponse?>(new ProviderScanLimitException("DISCOGS", "Narrow the collection filters.")));
+        api.Setlist.GetUserConcertsNormalizedAsync(Arg.Any<string>(), Arg.Any<SetlistFmFilter>(), Arg.Any<IReadOnlyCollection<string>?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<NormalizedDataResponse>(new ProviderScanLimitException("SETLISTFM", "Narrow the date range.")));
+
+        using var response = await api.Client.PostAsync(path, new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+        Assert.True(response.StatusCode == (HttpStatusCode)422, $"Unexpected {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        var error = await response.Content.ReadFromJsonAsync<ApiError>();
+        Assert.Equal(errorCode, error!.Code);
+        Assert.Contains("Narrow", error.Message);
+    }
+
     [Fact]
     public async Task UnconfirmedCreation_ReturnsWarningInsteadOfRetryableGenericError()
     {
@@ -184,12 +235,14 @@ public sealed class HttpBoundaryTests
             schema.GetProperty("properties").TryGetProperty("tracksAdded", out _));
     }
 
-    private sealed class RunningApi(WebApplication app, HttpClient client, ISpotifyMatchingService matching) : IAsyncDisposable
+    private sealed class RunningApi(WebApplication app, HttpClient client, ISpotifyMatchingService matching, TaskCompletionSource allHoldsStarted, TaskCompletionSource releaseHolds) : IAsyncDisposable
     {
         public HttpClient Client { get; } = client;
         public ISpotifyMatchingService Matching { get; } = matching;
         public IDiscogsService Discogs => app.Services.GetRequiredService<IDiscogsService>();
         public ISetlistFmService Setlist => app.Services.GetRequiredService<ISetlistFmService>();
+        public Task AllHoldsStarted => allHoldsStarted.Task;
+        public TaskCompletionSource ReleaseHolds => releaseHolds;
 
         public static async Task<RunningApi> StartAsync(bool authenticated = false)
         {
@@ -203,8 +256,15 @@ public sealed class HttpBoundaryTests
                     SessionId = "session", AccessToken = "access", RefreshToken = "refresh",
                     ExpiresAt = DateTime.UtcNow.AddHours(1), User = new SpotifyUser { Id = "user", DisplayName = "Listener" }
                 });
+                store.StoreSourceConfig("session", new ExternalSourceConfig
+                {
+                    Source = "setlistfm", ConfigValue = "listener", ConfiguredAt = DateTime.UtcNow
+                });
             }
             var matching = Substitute.For<ISpotifyMatchingService>();
+            var holdCount = 0;
+            var allHoldsStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseHolds = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             builder.Services.AddSingleton<ISessionStore>(store);
             builder.Services.AddSingleton(matching);
             builder.Services.AddSingleton(Substitute.For<ILastfmService>());
@@ -217,6 +277,17 @@ public sealed class HttpBoundaryTests
             app.MapOpenApi();
             var api = app.MapGroup("/api");
             api.MapGet("/security-probe", () => "ok");
+            api.MapGet("/hold", async (CancellationToken cancellationToken) =>
+            {
+                if (Interlocked.Increment(ref holdCount) == 4) allHoldsStarted.TrySetResult();
+                await releaseHolds.Task.WaitAsync(cancellationToken);
+                return "released";
+            });
+            api.MapPost("/auth/logout", (HttpContext context, ISessionStore sessions) =>
+            {
+                if (context.Request.Cookies.TryGetValue("replay_session_id", out var id)) sessions.RemoveSession(id);
+                return Results.NoContent();
+            });
             api.MapGet("/request-info", (Microsoft.AspNetCore.Http.HttpContext context) => $"{context.Request.Scheme}|{context.Request.Host}");
             api.MapSourcesEndpoints();
             api.MapMatchingEndpoints();
@@ -226,7 +297,7 @@ public sealed class HttpBoundaryTests
             var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
             var client = new HttpClient { BaseAddress = new Uri(address) };
             if (authenticated) client.DefaultRequestHeaders.Add("Cookie", "replay_session_id=session");
-            return new RunningApi(app, client, matching);
+            return new RunningApi(app, client, matching, allHoldsStarted, releaseHolds);
         }
 
         public async ValueTask DisposeAsync()

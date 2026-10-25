@@ -125,7 +125,7 @@ public class DiscogsServiceBasicTests : IDisposable
         for (var page = 1; page <= 100; page++)
             _httpHandler.EnqueueResponse("""{"pagination":{"pages":101,"items":101},"releases":[]}""");
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => _service.GetCollectionAsync("alice", new DiscogsFilter { MaxTracks = 1 }));
+        var error = await Assert.ThrowsAsync<ProviderScanLimitException>(() => _service.GetCollectionAsync("alice", new DiscogsFilter { MaxTracks = 1 }));
         error.Message.Should().Contain("100");
         _httpHandler.Requests.Should().HaveCount(101);
     }

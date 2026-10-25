@@ -186,6 +186,13 @@ public sealed class SetlistFmServiceTests
                 ["concert-1", " "]))
             .Should()
             .ThrowAsync<ArgumentException>();
+
+        await FluentActions.Invoking(() => _service.GetUserConcertsAsync(
+                "exampleUser",
+                new SetlistFmFilter { MaxConcerts = 2 },
+                ["concert-1", " concert-1 "]))
+            .Should()
+            .ThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -313,7 +320,7 @@ public sealed class SetlistFmServiceTests
                 Content = new StringContent($$"""{"setlist":[{"id":"other","eventDate":"01-01-2000"}],"total":101,"page":{{page}},"itemsPerPage":1}""")
             });
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => _service.GetUserConcertsAsync("alice",
+        var error = await Assert.ThrowsAsync<ProviderScanLimitException>(() => _service.GetUserConcertsAsync("alice",
             new SetlistFmFilter { StartDate = "2024-01-01" }, selected ? ["wanted"] : null));
         error.Message.Should().Contain("100");
         _handler.RequestCount.Should().Be(100);

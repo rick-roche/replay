@@ -87,7 +87,7 @@ public sealed class DiscogsService : IDiscogsService
         {
             if (page > 100)
             {
-                throw new InvalidOperationException("Discogs collection scan reached the 100-page limit. Narrow the collection filters or request fewer tracks.");
+                throw new ProviderScanLimitException("DISCOGS", "Discogs collection scan reached the 100-page limit. Narrow the collection filters or request fewer tracks.");
             }
 
             var collectionResponse = await TryGetCollectionAsync(profile.Username, page, cancellationToken);

@@ -149,6 +149,7 @@ public sealed class SetlistFmService : ISetlistFmService
             var requestedConcertIds = selectedConcertIds!;
             var concertIds = requestedConcertIds
                 .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(NormalizeIdentifier)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -156,8 +157,6 @@ public sealed class SetlistFmService : ISetlistFmService
             {
                 throw new ArgumentException($"Select between 1 and {maxConcerts} unique concerts", nameof(selectedConcertIds));
             }
-
-            concertIds = concertIds.Select(NormalizeIdentifier).ToList();
 
             await ValidateSelectedConcertsAsync(userId, concertIds, cancellationToken).ConfigureAwait(false);
 
@@ -187,7 +186,7 @@ public sealed class SetlistFmService : ISetlistFmService
         {
             if (page > MaximumPages)
             {
-                throw new InvalidOperationException("Setlist.fm scan reached the 100-page limit. Narrow the date range or select fewer concerts.");
+                throw new ProviderScanLimitException("SETLISTFM", "Setlist.fm scan reached the 100-page limit. Narrow the date range or select fewer concerts.");
             }
             var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
             if (payload.Setlist == null || payload.Setlist.Count == 0)
@@ -406,7 +405,7 @@ public sealed class SetlistFmService : ISetlistFmService
         {
             if (page > MaximumPages)
             {
-                throw new InvalidOperationException("Setlist.fm selection validation reached the 100-page limit. Select concerts from the first 100 attended pages.");
+                throw new ProviderScanLimitException("SETLISTFM", "Setlist.fm selection validation reached the 100-page limit. Select concerts from the first 100 attended pages.");
             }
             var payload = await GetAttendedPageAsync(userId, page, 20, cancellationToken).ConfigureAwait(false);
             foreach (var item in payload.Setlist ?? [])
